@@ -1,0 +1,150 @@
+{
+  "join": {
+    "title": "Join the room",
+    "heading": "What is your name?",
+    "hint": "Letters only. Accents are fine.",
+    "placeholder": "Your name",
+    "submit": "Enter",
+    "back": "Back",
+    "watchInstead": "Watch instead",
+    "participateInstead": "Join as voter"
+  },
+  "welcome": {
+    "returningTitle": "Welcome back",
+    "returningBody": "Continue as {{name}}?",
+    "continue": "Continue",
+    "changeName": "Use a different name"
+  },
+  "room": {
+    "round": "Round {{round}}",
+    "waiting": "Waiting for people to join",
+    "waitingHint": "Share this link: {{link}}",
+    "copyLink": "Copy link",
+    "copied": "Copied",
+    "connected": "{{count}} here",
+    "disconnected": "{{name}} left",
+    "emptyRoom": "The room is empty",
+    "roomDeleted": "This room was deleted",
+    "reconnecting": "Reconnecting...",
+    "offline": "Connection lost",
+    "waitingForVote": "Waiting for the owner to reveal",
+    "yourVote": "Your vote: {{value}}",
+    "noVote": "No vote",
+    "discussionNeeded": "Needs discussion",
+    "totalPoints": "{{total}} points",
+    "spectatorBadge": "Watching",
+    "invite": "share",
+    "removedHint": "You can no longer see the room. Ask the owner for a new link."
+  },
+  "controls": {
+    "reveal": "Reveal",
+    "nextRound": "Next round",
+    "resetRound": "Reset votes",
+    "deleteRoom": "Delete room",
+    "changeDeck": "Change scale",
+    "deck": {
+      "fibonacci": "Fibonacci",
+      "tshirt": "T-shirt sizes",
+      "linear": "Linear 1-10"
+    },
+    "transferOwnership": "Make owner",
+    "removeParticipant": "Remove",
+    "youAreOwner": "You own this room",
+    "ownerControls": "Owner",
+    "changeRole": "Make watcher",
+    "changeToVoter": "Make voter",
+    "rename": "Change name"
+  },
+  "vote": {
+    "prompt": "Your estimate",
+    "hint": "Choose once. Tap again to undo.",
+    "coffee": "Coffee",
+    "undo": "Undo",
+    "stamp": "Stamped {{value}}",
+    "stampFallback": "Your seal is stamped"
+  },
+  "errors": {
+    "name_required": "Please enter your name",
+    "name_invalid": "Use letters only, accents are fine",
+    "room_full": "This room is full",
+    "room_not_found": "Room not found",
+    "room_deleted": "This room was deleted",
+    "not_owner": "Only the room owner can do this",
+    "unauthorized": "Something went wrong",
+    "invalid_vote": "That value is not on the scale",
+    "generic": "Something went wrong",
+    "offline": "You appear to be offline",
+    "retry": "Try again",
+    "empty_message": "Type something first",
+    "session_name_required": "Give the session a name",
+    "session_name_invalid": "That name cannot be used",
+    "rate_limited": "Slow down a moment",
+    "participant_removed": "You were removed from this room"
+  },
+  "a11y": {
+    "voteButton": "Vote {{value}}",
+    "selectedVote": "Selected vote {{value}}",
+    "participantList": "People in the room",
+    "revealList": "Revealed votes",
+    "backgroundArt": "Decorative background",
+    "distribution": "How the votes spread",
+    "votedMarker": "{{name}} has voted",
+    "pendingMarker": "{{name}} has not voted yet"
+  },
+  "landing": {
+    "tagline": "Estimate together, reveal at the same moment.",
+    "create": "Start a room",
+    "creating": "Creating...",
+    "failed": "Could not create the room. Check your connection.",
+    "stepOne": "Start a room and share the link.",
+    "stepTwo": "Everyone picks a number in private.",
+    "stepThree": "The owner reveals, and the team sees the spread."
+  },
+  "brand": {
+    "name": "Hanko",
+    "tagline": "Your team's consensus.",
+    "credit": "Made by",
+    "author": "skvggor"
+  },
+  "result": {
+    "average": "Average",
+    "needsDiscussion": "{{count}} need discussion",
+    "coffee": "{{count}} on coffee",
+    "range": "Range {{min}} – {{max}}",
+    "ofVotes": "{{counted}} of {{total}} votes counted"
+  },
+  "progress": {
+    "waiting": "Waiting for {{count}}",
+    "waitingOne": "Waiting for {{count}}",
+    "allVoted": "Everyone has voted",
+    "allVotedShort": "Voted",
+    "votersOnly": "{{count}} voting",
+    "votersOnlyOne": "{{count}} voter",
+    "watching": "{{count}} watching",
+    "waitingYou": "You have not voted yet",
+    "votedLabel": "{{name}} has voted"
+  },
+  "consensus": {
+    "aligned": "The room agrees",
+    "close": "Close enough to agree",
+    "split": "The room is split"
+  },
+  "chat": {
+    "title": "Chat",
+    "open": "Open chat",
+    "minimize": "Minimize chat",
+    "clear": "Clear the conversation",
+    "send": "Send message",
+    "placeholder": "Say something",
+    "empty": "No messages yet",
+    "openUnread": "Open chat, {{count}} unread"
+  },
+  "session": {
+    "label": "Session name",
+    "placeholder": "Sprint 42 planning",
+    "save": "Save",
+    "empty": "Give the session a name",
+    "too_long": "That name is too long",
+    "invalid_characters": "That name has characters we cannot show"
+  }
+}

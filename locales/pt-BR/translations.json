@@ -1,0 +1,150 @@
+{
+  "join": {
+    "title": "Entrar na sala",
+    "heading": "Qual é o seu nome?",
+    "hint": "Apenas letras. Acentos são permitidos.",
+    "placeholder": "Seu nome",
+    "submit": "Entrar",
+    "back": "Voltar",
+    "watchInstead": "Apenas assistir",
+    "participateInstead": "Participar como votante"
+  },
+  "welcome": {
+    "returningTitle": "Bem-vindo de volta",
+    "returningBody": "Continuar como {{name}}?",
+    "continue": "Continuar",
+    "changeName": "Usar outro nome"
+  },
+  "room": {
+    "round": "Rodada {{round}}",
+    "waiting": "Aguardando pessoas entrarem",
+    "waitingHint": "Compartilhe este link: {{link}}",
+    "copyLink": "Copiar link",
+    "copied": "Copiado",
+    "connected": "{{count}} presentes",
+    "disconnected": "{{name}} saiu",
+    "emptyRoom": "A sala está vazia",
+    "roomDeleted": "Esta sala foi apagada",
+    "reconnecting": "Reconectando...",
+    "offline": "Conexão perdida",
+    "waitingForVote": "Aguardando o dono revelar",
+    "yourVote": "Seu voto: {{value}}",
+    "noVote": "Sem voto",
+    "discussionNeeded": "Precisa de discussão",
+    "totalPoints": "{{total}} pontos",
+    "spectatorBadge": "Assistindo",
+    "invite": "convidar",
+    "removedHint": "Você não vê mais a sala. Peça um novo link ao dono."
+  },
+  "controls": {
+    "reveal": "Revelar",
+    "nextRound": "Próxima rodada",
+    "resetRound": "Limpar votos",
+    "deleteRoom": "Apagar sala",
+    "changeDeck": "Mudar escala",
+    "deck": {
+      "fibonacci": "Fibonacci",
+      "tshirt": "Tamanhos de camiseta",
+      "linear": "Linear 1 a 10"
+    },
+    "transferOwnership": "Tornar dono",
+    "removeParticipant": "Remover",
+    "youAreOwner": "Você é o dono desta sala",
+    "ownerControls": "Dono",
+    "changeRole": "Virar observador",
+    "changeToVoter": "Virar votante",
+    "rename": "Mudar nome"
+  },
+  "vote": {
+    "prompt": "Sua estimativa",
+    "hint": "Escolha uma vez. Toque de novo para desfazer.",
+    "coffee": "Café",
+    "undo": "Desfazer",
+    "stamp": "Carimbado {{value}}",
+    "stampFallback": "Seu selo está carimbado"
+  },
+  "errors": {
+    "name_required": "Digite seu nome",
+    "name_invalid": "Use apenas letras, acentos são permitidos",
+    "room_full": "Esta sala está cheia",
+    "room_not_found": "Sala não encontrada",
+    "room_deleted": "Esta sala foi apagada",
+    "not_owner": "Apenas o dono da sala pode fazer isso",
+    "unauthorized": "Algo deu errado",
+    "invalid_vote": "Esse valor não está na escala",
+    "generic": "Algo deu errado",
+    "offline": "Você parece estar sem conexão",
+    "retry": "Tentar de novo",
+    "empty_message": "Escreva algo primeiro",
+    "session_name_required": "Dê um nome para a sessão",
+    "session_name_invalid": "Esse nome não pode ser usado",
+    "rate_limited": "Devagar um pouco",
+    "participant_removed": "Você foi removido desta sala"
+  },
+  "a11y": {
+    "voteButton": "Votar {{value}}",
+    "selectedVote": "Voto selecionado {{value}}",
+    "participantList": "Pessoas na sala",
+    "revealList": "Votos revelados",
+    "backgroundArt": "Fundo decorativo",
+    "distribution": "Como os votos se espalharam",
+    "votedMarker": "{{name}} já votou",
+    "pendingMarker": "{{name}} ainda não votou"
+  },
+  "landing": {
+    "tagline": "Estime junto, revele no mesmo instante.",
+    "create": "Criar sala",
+    "creating": "Criando...",
+    "failed": "Não foi possível criar a sala. Verifique sua conexão.",
+    "stepOne": "Crie uma sala e compartilhe o link.",
+    "stepTwo": "Cada pessoa escolhe um número em privado.",
+    "stepThree": "O dono revela e o time vê a distribuição."
+  },
+  "brand": {
+    "name": "Hanko",
+    "tagline": "O consenso da sua equipe.",
+    "credit": "Feito por",
+    "author": "skvggor"
+  },
+  "result": {
+    "average": "Média",
+    "needsDiscussion": "{{count}} precisam de discussão",
+    "coffee": "{{count}} no café",
+    "range": "Faixa {{min}} – {{max}}",
+    "ofVotes": "{{counted}} de {{total}} votos contados"
+  },
+  "progress": {
+    "waiting": "Falta {{count}}",
+    "waitingOne": "Falta {{count}}",
+    "allVoted": "Todos votaram",
+    "allVotedShort": "Votou",
+    "votersOnly": "{{count}} votando",
+    "votersOnlyOne": "{{count}} votante",
+    "watching": "{{count}} assistindo",
+    "waitingYou": "Você ainda não votou",
+    "votedLabel": "{{name}} já votou"
+  },
+  "consensus": {
+    "aligned": "O time concorda",
+    "close": "Quase de acordo",
+    "split": "O time está dividido"
+  },
+  "chat": {
+    "title": "Bate-papo",
+    "open": "Open chat",
+    "minimize": "Minimizar bate-papo",
+    "clear": "Limpar a conversa",
+    "send": "Enviar mensagem",
+    "placeholder": "Diga alguma coisa",
+    "empty": "Nenhuma mensagem ainda",
+    "openUnread": "Abrir bate-papo, {{count}} não lidas"
+  },
+  "session": {
+    "label": "Nome da sessão",
+    "placeholder": "Planning da Sprint 42",
+    "save": "Salvar",
+    "empty": "Dê um nome para a sessão",
+    "too_long": "Esse nome é longo demais",
+    "invalid_characters": "Esse nome tem caracteres que não conseguimos mostrar"
+  }
+}

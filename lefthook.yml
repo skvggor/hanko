@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      glob: "*.{ts,tsx,js}"
+      run: npx eslint {staged_files} --max-warnings=0
+    typecheck:
+      glob: "*.{ts,tsx}"
+      run: npx tsc --noEmit && npx tsc --noEmit -p tsconfig.worker.json
+    test:
+      run: npx vitest run --coverage
+    secrets:
+      glob: "*.{ts,tsx,js,mjs,json,jsonc,html,yml,yaml,env}"
+      run: git diff --cached --no-ext-diff | node scripts/scan-secrets.mjs
