@@ -302,9 +302,10 @@ these properties intact:
   block cross site WebSocket hijacking.
 - Chat and commands have separate per window rate limits, and `MAX_SOCKETS` caps sockets
   per room.
-- `public/_headers` carries the CSP and the other response headers. Nothing typechecks or
-  tests it, so read it back after editing: an unterminated `/*` silently turns the file
-  into a comment and disables every header in production.
+- `public/_headers` carries the CSP and the other response headers, and Workers parses it
+  on deploy. A comment is a line beginning with `#`; there is no block comment syntax, and
+  a header must be indented under a URL pattern. Getting that wrong fails the deploy at the
+  API rather than shipping silently. `infra/headers.test.ts` enforces the shape.
 
 ## Commits
 
