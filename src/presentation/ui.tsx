@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 export function Button({
   children,
@@ -7,6 +7,7 @@ export function Button({
   variant = "default",
   type = "button",
   disabled = false,
+  ref,
 }: {
   children: ReactNode;
   className?: string;
@@ -14,6 +15,11 @@ export function Button({
   variant?: "default" | "primary" | "quiet" | "danger";
   type?: "button" | "submit";
   disabled?: boolean;
+  /**
+   * A dialog has to move focus onto the button it opens with, so the primitive accepts
+   * a ref rather than forcing every caller to drop down to a bare element.
+   */
+  ref?: Ref<HTMLButtonElement> | undefined;
 }) {
   const base =
     "inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-full px-4 py-2 font-sans text-[0.8125rem] font-semibold tracking-[0.02em] transition-transform duration-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100";
@@ -30,6 +36,7 @@ export function Button({
       className={`${base} ${variants[variant]} ${className}`}
       disabled={disabled}
       onClick={onClick}
+      ref={ref}
       type={type}
     >
       {children}

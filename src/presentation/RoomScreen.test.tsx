@@ -790,11 +790,12 @@ describe("RoomScreen owner controls", () => {
     expect(harness.sent).toContainEqual({ type: "set-name", name: "" });
   });
 
-  it("asks the connection to delete the room", async () => {
+  it("asks the connection to delete the room, once the owner confirms", async () => {
     await enterRoom();
     pushState(ownerState);
 
     await userEvent.click(await screen.findByRole("button", { name: "Delete room" }));
+    await userEvent.click(screen.getByRole("button", { name: "Yes, delete it" }));
 
     expect(harness.sent).toContainEqual({ type: "delete-room" });
   });
@@ -846,5 +847,153 @@ describe("RoomScreen owner controls", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
 
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
+  });
+});
+
+describe("RoomScreen deleting the room", () => {
+  const ownerState = {
+    ...roomState,
+    participants: [
+      {
+        id: "p1",
+        name: "Ana",
+        role: "voter",
+        isOwner: true,
+        isConnected: true,
+        hasVoted: true,
+      },
+    ],
+  };
+
+  const onRoomDeleted = vi.fn();
+
+  beforeEach(() => {
+    harness.sockets.length = 0;
+    harness.joinCalls.length = 0;
+    harness.sent.length = 0;
+    harness.errors.length = 0;
+    onRoomDeleted.mockClear();
+
+    vi.stubGlobal("location", {
+      origin: "https://hanko.pages.dev",
+      pathname: "/room/room-1",
+      protocol: "https:",
+    });
+    vi.stubGlobal("navigator", { language: "en-US" });
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    });
+    vi.stubGlobal("sessionStorage", {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function enterRoom() {
+    render(
+      <RoomScreen
+        onRoomDeleted={onRoomDeleted}
+        roomId="room-1"
+        translate={createTranslator("en-US")}
+      />,
+    );
+    await joinAs("Ana");
+    await waitFor(() => expect(harness.joinCalls).toHaveLength(1));
+    pushState(ownerState);
+  }
+
+  it("asks before deleting, because the room cannot be brought back", async () => {
+    await enterRoom();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Delete room" }));
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(harness.sent).toHaveLength(0);
+  });
+
+  it("names the room in the warning so nobody deletes the wrong one", async () => {
+    await enterRoom();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Delete room" }));
+
+    expect(screen.getByRole("dialog").textContent).toContain("This room");
+  });
+
+  it("sends nothing until the owner confirms", async () => {
+    await enterRoom();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Delete room" }));
+    await userEvent.click(screen.getByRole("button", { name: "Yes, delete it" }));
+
+    expect(harness.sent).toContainEqual({ type: "delete-room" });
+  });
+
+  it("leaves the room alone when the owner backs out", async () => {
+    await enterRoom();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Delete room" }));
+    await userEvent.click(screen.getByRole("button", { name: "Keep it" }));
+
+    expect(harness.sent).toHaveLength(0);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("closes the warning without deleting when the escape key is pressed", async () => {
+    await enterRoom();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Delete room" }));
+    await userEvent.keyboard("{Escape}");
+
+    expect(harness.sent).toHaveLength(0);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("returns focus to the delete button when the warning closes", async () => {
+    await enterRoom();
+    const trigger = await screen.findByRole("button", { name: "Delete room" });
+
+    await userEvent.click(trigger);
+    await userEvent.click(screen.getByRole("button", { name: "Keep it" }));
+
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("marks the warning as the thing a screen reader lands on", async () => {
+    await enterRoom();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Delete room" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.getAttribute("aria-labelledby")).toBeTruthy();
+  });
+
+  it("sends the owner home once the room is really gone", async () => {
+    await enterRoom();
+
+    pushDeleted();
+
+    expect(onRoomDeleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the owner the room is gone on the way out", async () => {
+    await enterRoom();
+
+    pushDeleted();
+
+    expect(onRoomDeleted).toHaveBeenCalledWith("room_deleted");
+  });
+
+  it("leaves the room without asking anyone to leave a room that no longer exists", async () => {
+    await enterRoom();
+
+    pushDeleted();
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

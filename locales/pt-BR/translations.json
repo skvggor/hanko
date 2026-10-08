@@ -53,7 +53,11 @@
     "ownerControls": "Dono",
     "changeRole": "Virar observador",
     "changeToVoter": "Virar votante",
-    "rename": "Mudar nome"
+    "rename": "Mudar nome",
+    "confirmDeleteTitle": "Apagar esta sala?",
+    "confirmDeleteBody": "Esta sala e todos os votos dela somem para todo mundo. Não é possível desfazer.",
+    "confirmDeleteAccept": "Sim, apagar",
+    "confirmDeleteCancel": "Manter"
   },
   "vote": {
     "prompt": "Sua estimativa",

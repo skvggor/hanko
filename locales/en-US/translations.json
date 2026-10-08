@@ -53,7 +53,11 @@
     "ownerControls": "Owner",
     "changeRole": "Make watcher",
     "changeToVoter": "Make voter",
-    "rename": "Change name"
+    "rename": "Change name",
+    "confirmDeleteTitle": "Delete this room?",
+    "confirmDeleteBody": "This room and every vote in it disappear for everyone. It cannot be brought back.",
+    "confirmDeleteAccept": "Yes, delete it",
+    "confirmDeleteCancel": "Keep it"
   },
   "vote": {
     "prompt": "Your estimate",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MESSAGE_LIMIT, type ChatMessage } from "@domain/chat";
 import type { PublicRoomState } from "@domain/protocol";
 import type { DeckId } from "@domain/deck";
@@ -7,6 +7,7 @@ import { RoomConnection } from "@application/roomConnection";
 import type { Translator } from "@application/i18n";
 import { roomPath } from "@application/routing";
 import { ChatPanel } from "@presentation/ChatPanel";
+import { ConfirmDialog } from "@presentation/ConfirmDialog";
 import { Hanko } from "@presentation/Hanko";
 import { NameGate } from "@presentation/NameGate";
 import { RoomBoard } from "@presentation/RoomBoard";
@@ -54,10 +55,16 @@ function writeStoredName(roomId: string, name: string): void {
 export interface RoomScreenProps {
   roomId: string;
   onSessionNameChange?: (name: string | null) => void;
+  onRoomDeleted?: (errorCode: string) => void;
   translate: Translator;
 }
 
-export function RoomScreen({ roomId, onSessionNameChange, translate }: RoomScreenProps) {
+export function RoomScreen({
+  roomId,
+  onSessionNameChange,
+  onRoomDeleted,
+  translate,
+}: RoomScreenProps) {
   const [state, setState] = useState<PublicRoomState | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draftName, setDraftName] = useState<string | null>(null);
@@ -65,6 +72,8 @@ export function RoomScreen({ roomId, onSessionNameChange, translate }: RoomScree
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [wasRemoved, setWasRemoved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const deleteTrigger = useRef<HTMLButtonElement>(null);
 
   const connection = useMemo(() => new RoomConnection(roomId), [roomId]);
   const storedToken = useMemo(() => readStoredToken(roomId), [roomId]);
@@ -85,7 +94,9 @@ export function RoomScreen({ roomId, onSessionNameChange, translate }: RoomScree
     });
     const unsubscribeError = connection.onError(setErrorCode);
     const unsubscribeDeleted = connection.onDeleted(() => {
+      setConfirmingDelete(false);
       setErrorCode("room_deleted");
+      onRoomDeleted?.("room_deleted");
     });
     const unsubscribeRemoved = connection.onRemoved(() => {
       setWasRemoved(true);
@@ -99,7 +110,7 @@ export function RoomScreen({ roomId, onSessionNameChange, translate }: RoomScree
       unsubscribeRemoved();
       connection.close();
     };
-  }, [connection]);
+  }, [connection, onRoomDeleted]);
 
   useEffect(() => {
     if (draftName === null) return;
@@ -122,7 +133,19 @@ export function RoomScreen({ roomId, onSessionNameChange, translate }: RoomScree
     (deckId: DeckId) => connection.setDeck(deckId),
     [connection],
   );
-  const handleDeleteRoom = useCallback(() => connection.deleteRoom(), [connection]);
+  const handleDeleteRoom = useCallback(() => {
+    setConfirmingDelete(true);
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    setConfirmingDelete(false);
+    connection.deleteRoom();
+  }, [connection]);
+
+  const cancelDelete = useCallback(() => {
+    setConfirmingDelete(false);
+    deleteTrigger.current?.focus();
+  }, []);
   const handleTransferOwnership = useCallback(
     (participantId: string) => connection.transferOwnership(participantId),
     [connection],
@@ -232,6 +255,7 @@ export function RoomScreen({ roomId, onSessionNameChange, translate }: RoomScree
             onSetRole={handleSetRole}
             onSetRoomName={handleSetRoomName}
             onTransferOwnership={handleTransferOwnership}
+            deleteButtonRef={deleteTrigger}
             shareUrl={shareUrl}
             state={state}
             translate={translate}
@@ -254,6 +278,17 @@ export function RoomScreen({ roomId, onSessionNameChange, translate }: RoomScree
             translate={translate}
           />
         </>
+      )}
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          acceptLabel={translate("controls.confirmDeleteAccept")}
+          body={translate("controls.confirmDeleteBody")}
+          cancelLabel={translate("controls.confirmDeleteCancel")}
+          title={translate("controls.confirmDeleteTitle")}
+          onAccept={confirmDelete}
+          onCancel={cancelDelete}
+        />
       )}
     </>
   );

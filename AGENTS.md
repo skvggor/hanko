@@ -266,6 +266,13 @@ holds; the `[data-frame]` element inside it caps the measure so a long line neve
 the width of the display. Do not put the chrome back inside the frame: the wordmark and
 the credit are meant to stay put while the room moves.
 
+Destructive actions confirm first. `ConfirmDialog` opens on the safe answer rather than
+the destructive one, because a dialog reached by a stray Enter must not be confirmed by
+the same Enter, and it hands focus back to whatever opened it. Deleting a room broadcasts
+`room-deleted` to every socket including the owner's, so the redirect home and the notice
+are the same code path for everyone rather than a special case for whoever pressed the
+button.
+
 Accessibility is treated as a requirement, not polish. Every icon gets `aria-hidden`,
 every icon only button gets an `aria-label`, errors use `role="alert"`, chat uses
 `role="log"`, the vote meter is a `role="progressbar"` with `aria-valuenow`, toggles carry

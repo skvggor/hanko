@@ -24,10 +24,24 @@ vi.mock("@application/createRoom", () => ({
 }));
 
 vi.mock("@presentation/RoomScreen", () => ({
-  RoomScreen: ({ roomId, translate }: { roomId: string; translate: Translator }) => (
+  RoomScreen: ({
+    onRoomDeleted,
+    roomId,
+    translate,
+  }: {
+    onRoomDeleted?: (errorCode: string) => void;
+    roomId: string;
+    translate: Translator;
+  }) => (
     <>
       <p data-testid="room-screen">room:{roomId}</p>
       <p data-testid="room-copy">{translate("room.waiting")}</p>
+      <button
+        onClick={() => onRoomDeleted?.("room_deleted")}
+        type="button"
+      >
+        simulate deletion
+      </button>
     </>
   ),
 }));
@@ -268,5 +282,85 @@ describe("Root language memory", () => {
     render(<Root />);
 
     expect(screen.getByRole("button", { name: "Start a room" })).toBeTruthy();
+  });
+});
+
+describe("Root after a room is deleted", () => {
+  beforeEach(() => {
+    harness.fetchCalls.length = 0;
+    harness.pushState.length = 0;
+
+    vi.stubGlobal("navigator", { language: "en-US" });
+    vi.stubGlobal("location", {
+      pathname: "/room/abc12345",
+      origin: "https://hanko.pages.dev",
+      protocol: "https:",
+    });
+    vi.stubGlobal("history", {
+      pushState(_state: unknown, _title: string, path: string) {
+        harness.pushState.push(path);
+        vi.stubGlobal("location", {
+          pathname: path,
+          origin: "https://hanko.pages.dev",
+          protocol: "https:",
+        });
+      },
+    });
+    vi.stubGlobal("localStorage", { getItem: vi.fn(() => null), setItem: vi.fn() });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function renderRoomScreen() {
+    return render(<Root />);
+  }
+
+  it("takes everyone back to the landing page", async () => {
+    renderRoomScreen();
+
+    await userEvent.click(screen.getByRole("button", { name: "simulate deletion" }));
+
+    expect(harness.pushState).toContain("/");
+  });
+
+  it("says out loud that the room is gone, since the redirect would otherwise be silent", async () => {
+    renderRoomScreen();
+
+    await userEvent.click(screen.getByRole("button", { name: "simulate deletion" }));
+
+    expect(await screen.findByText("This room was deleted")).toBeTruthy();
+  });
+
+  it("announces the notice rather than only showing it", async () => {
+    renderRoomScreen();
+
+    await userEvent.click(screen.getByRole("button", { name: "simulate deletion" }));
+
+    expect((await screen.findByText("This room was deleted")).getAttribute("role")).toBe(
+      "status",
+    );
+  });
+
+  it("offers a way to start a fresh room from where it lands", async () => {
+    renderRoomScreen();
+
+    await userEvent.click(screen.getByRole("button", { name: "simulate deletion" }));
+
+    expect(await screen.findByRole("button", { name: "Start a room" })).toBeTruthy();
+  });
+
+  it("clears the notice once a new room is opened", async () => {
+    renderRoomScreen();
+
+    await userEvent.click(screen.getByRole("button", { name: "simulate deletion" }));
+    await screen.findByText("This room was deleted");
+
+    await userEvent.click(screen.getByRole("button", { name: "Start a room" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("This room was deleted")).toBeNull();
+    });
   });
 });

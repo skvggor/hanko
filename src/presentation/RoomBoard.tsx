@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import type { PublicRoomState } from "@domain/protocol";
 import type { DeckId } from "@domain/deck";
 import {
@@ -39,6 +39,11 @@ export interface RoomBoardProps {
   onSetRole: (participantId: string, role: "voter" | "spectator") => void;
   onSetRoomName: (name: string | null) => void;
   onRename: (name: string) => void;
+  /**
+   * The confirmation for deleting lives one level up, so focus has a way back to the
+   * button that opened it when the owner decides not to go through with it.
+   */
+  deleteButtonRef?: Ref<HTMLButtonElement> | undefined;
 }
 
 function MiniButton({
@@ -87,6 +92,7 @@ export function RoomBoard({
   onSetRole,
   onSetRoomName,
   onRename,
+  deleteButtonRef,
 }: RoomBoardProps) {
   const amOwner = state.ownerId !== null && state.ownerId === myParticipantId;
   const voted = readVotedState(state);
@@ -284,7 +290,12 @@ export function RoomBoard({
             translate={translate}
           />
 
-          <Button className="self-start" onClick={onDeleteRoom} variant="danger">
+          <Button
+            className="self-start"
+            onClick={onDeleteRoom}
+            ref={deleteButtonRef}
+            variant="danger"
+          >
             <Trash aria-hidden="true" size={16} weight="bold" />
             {translate("controls.deleteRoom")}
           </Button>

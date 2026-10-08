@@ -7,9 +7,10 @@ import { Button } from "@presentation/ui";
 export interface LandingProps {
   translate: Translator;
   onNavigate: (path: string) => void;
+  notice?: string | null;
 }
 
-export function Landing({ translate, onNavigate }: LandingProps) {
+export function Landing({ translate, onNavigate, notice = null }: LandingProps) {
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -44,6 +45,15 @@ export function Landing({ translate, onNavigate }: LandingProps) {
       >
         {pending ? translate("landing.creating") : translate("landing.create")}
       </Button>
+
+      {notice !== null && (
+        <p
+          className="w-full rounded-2xl border border-line bg-paper-raised px-3 py-2 text-[0.8125rem] font-semibold text-ink-dim"
+          role="status"
+        >
+          {translate(`errors.${notice}`)}
+        </p>
+      )}
 
       {failed && (
         <p className="m-0 rounded-2xl bg-primary/10 px-3 py-2 text-[0.8125rem] font-semibold text-primary" role="alert">
