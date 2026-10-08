@@ -1,8 +1,9 @@
+import { isRoomId } from "@domain/roomId";
+
 export type AppRoute =
   | { kind: "home" }
-  | { kind: "room"; roomId: string };
-
-const ROOM_PATTERN = /^[a-z0-9]{4,32}$/;
+  | { kind: "room"; roomId: string }
+  | { kind: "missing-room" };
 
 function segmentAfter(parts: string[], label: string): string | null {
   const index = parts.indexOf(label);
@@ -17,12 +18,14 @@ export function parseRoute(pathname: string): AppRoute {
 
   const roomId = segmentAfter(parts, "room");
 
-  if (roomId !== null && ROOM_PATTERN.test(roomId)) {
+  if (roomId !== null && isRoomId(roomId)) {
     return { kind: "room", roomId };
   }
 
-  if (parts[0] === "room" && roomId !== null) {
-    return { kind: "home" };
+  // Someone opening a room link and getting the home screen with no word about it looks
+  // like the app threw their room away, so the malformed case says so instead.
+  if (parts[0] === "room") {
+    return { kind: "missing-room" };
   }
 
   return { kind: "home" };

@@ -21,7 +21,7 @@ vi.mock("@application/createRoom", () => ({
     if (harness.outcome === "throw") {
       throw new (await import("@application/createRoom")).CreateRoomError("network");
     }
-    return "abc12345";
+    return "abcd2345";
   },
 }));
 
@@ -46,7 +46,7 @@ describe("Landing", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start a room" }));
 
     await waitFor(() => {
-      expect(onNavigate).toHaveBeenCalledWith("/room/abc12345");
+      expect(onNavigate).toHaveBeenCalledWith("/room/abcd2345");
     });
   });
 

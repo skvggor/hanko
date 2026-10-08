@@ -7,58 +7,59 @@ describe("parseRoute", () => {
   });
 
   it("routes a room path", () => {
-    expect(parseRoute("/room/abc12345")).toEqual({
+    expect(parseRoute("/room/abcd2345")).toEqual({
       kind: "room",
-      roomId: "abc12345",
+      roomId: "abcd2345",
     });
   });
 
   it("ignores a trailing slash", () => {
-    expect(parseRoute("/room/abc12345/")).toEqual({
+    expect(parseRoute("/room/abcd2345/")).toEqual({
       kind: "room",
-      roomId: "abc12345",
+      roomId: "abcd2345",
     });
   });
 
   it("routes a room with a nested path to the room", () => {
-    expect(parseRoute("/room/abc12345/something")).toEqual({
+    expect(parseRoute("/room/abcd2345/something")).toEqual({
       kind: "room",
-      roomId: "abc12345",
+      roomId: "abcd2345",
     });
   });
 
-  it("routes a missing room id to home", () => {
-    expect(parseRoute("/room")).toEqual({ kind: "home" });
-    expect(parseRoute("/room/")).toEqual({ kind: "home" });
+  it("routes a missing room id to the not found screen", () => {
+    expect(parseRoute("/room")).toEqual({ kind: "missing-room" });
+    expect(parseRoute("/room/")).toEqual({ kind: "missing-room" });
   });
 
-  it("routes an invalid room id to home", () => {
-    expect(parseRoute("/room/AB")).toEqual({ kind: "home" });
-    expect(parseRoute(`/room/${"a".repeat(33)}`)).toEqual({ kind: "home" });
-    expect(parseRoute("/room/abc!")).toEqual({ kind: "home" });
+  // Regression: an invalid room id used to fall back to the home screen, so following
+  // a bad link looked exactly like the app resetting on you. It now says what happened.
+  it("routes an invalid room id to the not found screen", () => {
+    expect(parseRoute("/room/AB")).toEqual({ kind: "missing-room" });
+    expect(parseRoute(`/room/${"a".repeat(33)}`)).toEqual({ kind: "missing-room" });
+    expect(parseRoute("/room/abc!")).toEqual({ kind: "missing-room" });
+  });
+
+  it("routes a room id the generator could never produce to not found", () => {
+    expect(parseRoute("/room/texto")).toEqual({ kind: "missing-room" });
+    expect(parseRoute("/room/il0o")).toEqual({ kind: "missing-room" });
+    expect(parseRoute("/room/sala10")).toEqual({ kind: "missing-room" });
   });
 
   it("routes an unknown path to home", () => {
     expect(parseRoute("/whatever")).toEqual({ kind: "home" });
   });
 
-  it("accepts the shortest valid room id", () => {
-    expect(parseRoute("/room/abcd")).toEqual({ kind: "room", roomId: "abcd" });
-  });
-
-  it("accepts the longest valid room id", () => {
-    const roomId = "a".repeat(32);
-    expect(parseRoute(`/room/${roomId}`)).toEqual({ kind: "room", roomId });
-  });
-
-  it("rejects an id longer than the limit", () => {
-    expect(parseRoute(`/room/${"a".repeat(33)}`)).toEqual({ kind: "home" });
+  it("routes an id of the wrong length to not found", () => {
+    expect(parseRoute("/room/abcd")).toEqual({ kind: "missing-room" });
+    expect(parseRoute(`/room/${"a".repeat(32)}`)).toEqual({ kind: "missing-room" });
+    expect(parseRoute(`/room/${"a".repeat(9)}`)).toEqual({ kind: "missing-room" });
   });
 });
 
 describe("roomPath", () => {
   it("builds the shareable path", () => {
-    expect(roomPath("abc12345")).toBe("/room/abc12345");
+    expect(roomPath("abcd2345")).toBe("/room/abcd2345");
   });
 
   it("round trips through the parser", () => {

@@ -34,7 +34,9 @@
     "totalPoints": "{{total}} points",
     "spectatorBadge": "Watching",
     "invite": "share",
-    "removedHint": "You can no longer see the room. Ask the owner for a new link."
+    "removedHint": "You can no longer see the room. Ask the owner for a new link.",
+    "missingTitle": "Room not found",
+    "missingLink": "This link isn't a room"
   },
   "controls": {
     "reveal": "Reveal",

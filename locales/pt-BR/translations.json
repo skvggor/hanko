@@ -34,7 +34,9 @@
     "totalPoints": "{{total}} pontos",
     "spectatorBadge": "Assistindo",
     "invite": "convidar",
-    "removedHint": "Você não vê mais a sala. Peça um novo link ao dono."
+    "removedHint": "Você não vê mais a sala. Peça um novo link ao dono.",
+    "missingTitle": "Sala não encontrada",
+    "missingLink": "Este link não é uma sala"
   },
   "controls": {
     "reveal": "Revelar",

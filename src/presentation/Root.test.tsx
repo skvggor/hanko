@@ -19,7 +19,7 @@ vi.mock("@application/createRoom", () => ({
   createRoom: async () => {
     harness.fetchCalls.push("called");
     if (harness.fetchCalls.at(-1) === "fail") throw new Error("network");
-    return "newroom1";
+    return "nd9k2qx7";
   },
 }));
 
@@ -105,7 +105,7 @@ describe("Root", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start a room" }));
 
     expect(harness.fetchCalls).toEqual(["called"]);
-    expect(harness.pushState).toEqual(["/room/newroom1"]);
+    expect(harness.pushState).toEqual(["/room/nd9k2qx7"]);
   });
 
   it("renders the room screen after navigating", async () => {
@@ -114,13 +114,13 @@ describe("Root", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start a room" }));
 
     expect(await screen.findByTestId("room-screen")).toBeTruthy();
-    expect(screen.getByTestId("room-screen").textContent).toBe("room:newroom1");
+    expect(screen.getByTestId("room-screen").textContent).toBe("room:nd9k2qx7");
   });
 
   it("opens a room directly from the url", () => {
-    setPath("/room/abc12345");
+    setPath("/room/abcd2345");
     render(<Root />);
-    expect(screen.getByTestId("room-screen").textContent).toBe("room:abc12345");
+    expect(screen.getByTestId("room-screen").textContent).toBe("room:abcd2345");
   });
 
   it("falls back to the landing page for an unknown path", () => {
@@ -129,10 +129,11 @@ describe("Root", () => {
     expect(screen.getByRole("button", { name: "Start a room" })).toBeTruthy();
   });
 
-  it("falls back to the landing page for an invalid room id", () => {
+  it("explains an invalid room link instead of silently landing on home", () => {
     setPath("/room/TOO-LONG-AND-UPPERCASE");
     render(<Root />);
-    expect(screen.getByRole("button", { name: "Start a room" })).toBeTruthy();
+
+    expect(screen.getByText("This link isn't a room")).toBeTruthy();
   });
 
   it("switches to portuguese", async () => {
@@ -292,7 +293,7 @@ describe("Root after a room is deleted", () => {
 
     vi.stubGlobal("navigator", { language: "en-US" });
     vi.stubGlobal("location", {
-      pathname: "/room/abc12345",
+      pathname: "/room/abcd2345",
       origin: "https://hanko.pages.dev",
       protocol: "https:",
     });
@@ -362,5 +363,78 @@ describe("Root after a room is deleted", () => {
     await waitFor(() => {
       expect(screen.queryByText("This room was deleted")).toBeNull();
     });
+  });
+});
+
+describe("Root on a room link that cannot exist", () => {
+  beforeEach(() => {
+    harness.fetchCalls.length = 0;
+    harness.pushState.length = 0;
+
+    vi.stubGlobal("navigator", { language: "en-US" });
+    vi.stubGlobal("location", {
+      pathname: "/room/texto",
+      origin: "https://hanko.pages.dev",
+      protocol: "https:",
+    });
+    vi.stubGlobal("history", {
+      pushState(_state: unknown, _title: string, path: string) {
+        harness.pushState.push(path);
+      },
+    });
+    vi.stubGlobal("localStorage", { getItem: vi.fn(() => null), setItem: vi.fn() });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Regression: a room id that cannot be minted used to be routed to the home screen,
+  // so following a typo looked like the app had thrown the room away.
+  it("says the link is not a room rather than showing the landing page", () => {
+    render(<Root />);
+
+    expect(screen.getByText("This link isn't a room")).toBeTruthy();
+    expect(screen.queryByText("Estimate together, reveal at the same moment.")).toBeNull();
+  });
+
+  it("never opens a socket for a room that cannot exist", () => {
+    render(<Root />);
+
+    expect(screen.queryByTestId("room-screen")).toBeNull();
+  });
+
+  it("offers a way forward rather than a dead end", () => {
+    render(<Root />);
+
+    expect(screen.getByRole("button", { name: "Start a room" })).toBeTruthy();
+  });
+
+  it("takes the offer and lands on a working room", async () => {
+    render(<Root />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Start a room" }));
+
+    expect(harness.pushState).toEqual(["/room/nd9k2qx7"]);
+  });
+
+  it("still offers the language switcher, since the chrome is not the problem", () => {
+    render(<Root />);
+
+    expect(screen.getByRole("button", { name: "PT" })).toBeTruthy();
+  });
+
+  it("translates the explanation", async () => {
+    render(<Root />);
+
+    await userEvent.click(screen.getByRole("button", { name: "PT" }));
+
+    expect(screen.getByText("Este link não é uma sala")).toBeTruthy();
+  });
+
+  it("keeps the wrong link out of the way of the offer", () => {
+    render(<Root />);
+
+    expect(screen.queryByText("texto")).toBeNull();
   });
 });

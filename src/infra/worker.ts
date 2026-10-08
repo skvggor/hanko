@@ -7,12 +7,13 @@ interface Env {
   ASSETS: Fetcher;
 }
 
-const ROOM_ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+import { ROOM_ID_ALPHABET, isRoomId } from "@domain/roomId";
 
 /**
  * The room id is the only secret guarding a room, so the alphabet is large and the
- * draw has to be uniform. A plain `byte % 30` biases the first characters of the
- * alphabet, so values that do not divide evenly are rejected and redrawn instead.
+ * draw has to be uniform. A plain `byte % size` biases the first characters of the
+ * alphabet, so values that do not divide evenly are rejected and redrawn instead. With
+ * 31 characters eight of every 256 bytes land past the limit and are thrown away.
  */
 export function generateRoomId(length = 8): string {
   const size = ROOM_ID_ALPHABET.length;
@@ -32,9 +33,7 @@ export function generateRoomId(length = 8): string {
   return id;
 }
 
-function isValidRoomId(roomId: string): boolean {
-  return /^[a-z0-9]{4,32}$/.test(roomId);
-}
+
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -64,7 +63,7 @@ async function handleRoomRequest(
     return createRoom();
   }
 
-  if (!isValidRoomId(roomId)) {
+  if (!isRoomId(roomId)) {
     return Response.json({ error: "invalid_room_id" }, { status: 400 });
   }
 

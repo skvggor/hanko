@@ -74,7 +74,7 @@ describe("main", () => {
   it("picks up a room route from the url it was served on", async () => {
     vi.stubGlobal("location", {
       origin: "https://hanko.pages.dev",
-      pathname: "/room/abc12345",
+      pathname: "/room/abcd2345",
       protocol: "https:",
     });
     const root = mountPoint();

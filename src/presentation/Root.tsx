@@ -9,6 +9,7 @@ import { parseRoute } from "@application/routing";
 import { Landing } from "@presentation/Landing";
 import { RoomScreen } from "@presentation/RoomScreen";
 import { Shell } from "@presentation/Shell";
+import { MissingRoom } from "@presentation/MissingRoom";
 
 export function Root() {
   const [locale, setLocaleState] = useState<Locale>(() =>
@@ -75,15 +76,17 @@ export function Root() {
       sessionName={route.kind === "room" ? sessionName : null}
       translate={translate}
     >
-      {route.kind === "home" ? (
-        <Landing notice={notice} onNavigate={handleNavigate} translate={translate} />
-      ) : (
+      {route.kind === "room" ? (
         <RoomScreen
           onRoomDeleted={handleRoomDeleted}
           onSessionNameChange={handleSessionName}
           roomId={route.roomId}
           translate={translate}
         />
+      ) : route.kind === "missing-room" ? (
+        <MissingRoom onNavigate={handleNavigate} translate={translate} />
+      ) : (
+        <Landing notice={notice} onNavigate={handleNavigate} translate={translate} />
       )}
     </Shell>
   );

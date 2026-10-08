@@ -112,8 +112,8 @@ describe("defaultWorker.fetch", () => {
     });
 
     it("serves client side routes as html", async () => {
-      const { result } = await callFetch(new Request("https://hanko.pages.dev/room/abc12345"));
-      expect(await result.text()).toBe("asset:/room/abc12345");
+      const { result } = await callFetch(new Request("https://hanko.pages.dev/room/abcd2345"));
+      expect(await result.text()).toBe("asset:/room/abcd2345");
     });
   });
 
@@ -158,55 +158,55 @@ describe("defaultWorker.fetch", () => {
     it("rewrites the socket path before it reaches the room object", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abc12345/socket"),
+        new Request("https://hanko.pages.dev/api/room/abcd2345/socket"),
         env,
       );
 
-      const stub = env.ROOMS.get(env.ROOMS.idFromName("abc12345")) as unknown as FakeStub;
+      const stub = env.ROOMS.get(env.ROOMS.idFromName("abcd2345")) as unknown as FakeStub;
       expect(new URL(stub.fetched[0]!.url).pathname).toBe("/socket");
     });
 
     it("rewrites the state path before it reaches the room object", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abc12345/state"),
+        new Request("https://hanko.pages.dev/api/room/abcd2345/state"),
         env,
       );
 
-      const stub = env.ROOMS.get(env.ROOMS.idFromName("abc12345")) as unknown as FakeStub;
+      const stub = env.ROOMS.get(env.ROOMS.idFromName("abcd2345")) as unknown as FakeStub;
       expect(new URL(stub.fetched[0]!.url).pathname).toBe("/state");
     });
 
     it("defaults a bare room path to the state endpoint", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abc12345"),
+        new Request("https://hanko.pages.dev/api/room/abcd2345"),
         env,
       );
 
-      const stub = env.ROOMS.get(env.ROOMS.idFromName("abc12345")) as unknown as FakeStub;
+      const stub = env.ROOMS.get(env.ROOMS.idFromName("abcd2345")) as unknown as FakeStub;
       expect(new URL(stub.fetched[0]!.url).pathname).toBe("/state");
     });
 
     it("forwards the participant token", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abc12345/state?token=t1"),
+        new Request("https://hanko.pages.dev/api/room/abcd2345/state?token=t1"),
         env,
       );
 
-      const stub = env.ROOMS.get(env.ROOMS.idFromName("abc12345")) as unknown as FakeStub;
+      const stub = env.ROOMS.get(env.ROOMS.idFromName("abcd2345")) as unknown as FakeStub;
       expect(new URL(stub.fetched[0]!.url).searchParams.get("token")).toBe("t1");
     });
 
     it("preserves the request method", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abc12345/command", { method: "POST" }),
+        new Request("https://hanko.pages.dev/api/room/abcd2345/command", { method: "POST" }),
         env,
       );
 
-      const stub = env.ROOMS.get(env.ROOMS.idFromName("abc12345")) as unknown as FakeStub;
+      const stub = env.ROOMS.get(env.ROOMS.idFromName("abcd2345")) as unknown as FakeStub;
       expect(stub.fetched[0]!.method).toBe("POST");
       expect(new URL(stub.fetched[0]!.url).pathname).toBe("/command");
     });
@@ -214,15 +214,15 @@ describe("defaultWorker.fetch", () => {
     it("reuses the same object for the same room id", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abc12345/state"),
+        new Request("https://hanko.pages.dev/api/room/abcd2345/state"),
         env,
       );
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abc12345/socket"),
+        new Request("https://hanko.pages.dev/api/room/abcd2345/socket"),
         env,
       );
 
-      expect(env.ROOMS.get(env.ROOMS.idFromName("abc12345"))).toBeDefined();
+      expect(env.ROOMS.get(env.ROOMS.idFromName("abcd2345"))).toBeDefined();
     });
   });
 
@@ -273,18 +273,18 @@ describe("defaultWorker.fetch", () => {
   describe("responses", () => {
     it("passes the room response back to the caller", async () => {
       const env = createEnv();
-      const stub = env.ROOMS.get(env.ROOMS.idFromName("abc12345")) as unknown as {
+      const stub = env.ROOMS.get(env.ROOMS.idFromName("abcd2345")) as unknown as {
         fetch: (request: Request) => Promise<Response>;
         responses: Response[];
       };
-      stub.responses.push(Response.json({ id: "abc12345", round: 3 }));
+      stub.responses.push(Response.json({ id: "abcd2345", round: 3 }));
 
       const result = await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abc12345/state"),
+        new Request("https://hanko.pages.dev/api/room/abcd2345/state"),
         env,
       );
 
-      expect(await result.json()).toEqual({ id: "abc12345", round: 3 });
+      expect(await result.json()).toEqual({ id: "abcd2345", round: 3 });
     });
   });
 });
