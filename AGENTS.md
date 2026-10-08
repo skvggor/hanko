@@ -6,11 +6,11 @@ Guidance for AI agents and humans working in this repository.
 
 Room based planning poker. A team opens a room, shares the link, everyone picks a card
 privately, and the room owner reveals. There are no accounts: **the room id is the only
-secret** guarding a room, and the reveal is exclusive to the room owner.
+secret** guarding a room.
 
-The whole product runs on Cloudflare Workers. State lives in a single Durable Object per
-room and is pushed to clients over a WebSocket, so the UI never polls and a vote is never
-visible to the server-rendered HTML.
+It runs entirely on Cloudflare Workers. State lives in one Durable Object per room and is
+pushed to clients over a WebSocket, so the UI never polls and a vote is never in the
+server-rendered HTML.
 
 The visual language is the Japanese seal stamp ("hanko"): ink, paper, and a stamp that
 lands on the vote grid at reveal time. Keep new UI consistent with that metaphor rather
@@ -21,15 +21,14 @@ than reaching for generic dashboard patterns.
 Vite, React and TypeScript on the client, Cloudflare Workers and Durable Objects on the
 server, Tailwind for styling, Vitest and Testing Library for tests, ESLint flat config,
 Lefthook for the hooks. Read `package.json` for the versions. Routing, state management,
-i18n and validation are all hand written; there is no router library, no state library and
-no i18n library.
+i18n and validation are all hand written.
 
 Runtime dependencies are deliberately few: React, React DOM, Phosphor icons and the
 self-hosted Space Grotesk variable font. Do not add a dependency for something that is a
 page of code.
 
-`package.json` has an `allowScripts` block opt-in allowlist for `esbuild`, `workerd` and
-`lefthook`. Do not remove it: their postinstall binaries are required for the build.
+`package.json` has an `allowScripts` allowlist for `esbuild`, `workerd` and `lefthook`. Do
+not remove it: their postinstall binaries are required for the build.
 
 ## Commands
 
@@ -38,26 +37,22 @@ npm run dev            # vite dev server with the Worker running locally
 npm run build          # tsc --noEmit && vite build
 npm run typecheck      # BOTH tsconfigs: client and worker
 npm run lint           # eslint .
-npm run lint:fix       # eslint . --fix
 npm test               # vitest run
 npm run test:coverage  # vitest run --coverage (enforces the 80% gate)
 npm run deploy         # coverage, then build, then wrangler deploy
 ```
 
-Two Lefthook hooks. `pre-commit` runs ESLint on staged files with `--max-warnings=0`, both
-`tsc --noEmit` passes, the full coverage run, and a secret scan over the staged diff.
-`pre-push` runs lint, both typecheck passes, coverage and the production build across the
-whole tree, which is what catches a branch carrying a commit whose staged file was clean
-but whose neighbours were not.
-`npm run typecheck`, `npm run lint` and `npm run test:coverage` must all be green before
-you consider a change done.
+`pre-commit` runs ESLint on staged files with `--max-warnings=0`, both `tsc --noEmit`
+passes, the coverage run and a secret scan. `pre-push` runs the same gates plus the
+production build across the whole tree. `typecheck`, `lint` and `test:coverage` must all
+be green before a change is done.
 
-Note that `npm run build` only typechecks the client config. The worker config is checked
-by `npm run typecheck` and by the hook, so run the full `typecheck`, not just `build`.
+`npm run build` only typechecks the client config, so run the full `typecheck` rather than
+relying on `build`.
 
 ## Architecture
 
-Five layers, each a path alias. The dependency direction is a one way street:
+Five layers, each a path alias, with the dependency direction a one way street:
 
 ```
 domain  <-  application  <-  presentation
@@ -66,112 +61,71 @@ domain  <-  application  <-  presentation
  infra
 ```
 
-| Alias           | Folder               | May import                            |
-| --------------- | -------------------- | ------------------------------------- |
-| `@domain`       | `src/domain`         | only `@domain/*`                      |
-| `@application`  | `src/application`    | `@domain/*`, `@application/*`         |
-| `@infra`        | `src/infra`          | `@domain/*`, `@infra/*`               |
-| `@presentation` | `src/presentation`   | all three, plus `@presentation/*`     |
-| `@config`       | `src/config`         | nothing                               |
+| Alias           | Folder             | May import                        |
+| --------------- | ------------------ | --------------------------------- |
+| `@domain`       | `src/domain`       | only `@domain/*`                  |
+| `@application`  | `src/application`  | `@domain/*`, `@application/*`     |
+| `@infra`        | `src/infra`        | `@domain/*`, `@infra/*`           |
+| `@presentation` | `src/presentation` | all three, plus `@presentation/*` |
+| `@config`       | `src/config`       | nothing                           |
 
-`@presentation` and `@infra` never import each other. The client bundle must not be able
-to reach server code, and the Worker bundle must not be able to reach React or the DOM.
-`@infra` compiles under `tsconfig.worker.json`, which excludes `src/presentation`, so a
-stray import fails typecheck rather than silently bloating the Worker.
+`@presentation` and `@infra` never import each other, so the client bundle cannot reach
+server code and the Worker bundle cannot reach React.
 
-### `@domain` — pure business rules
+- **`@domain`** is pure business rules with zero dependencies outside itself: no platform
+  APIs, no clocks, no randomness, no network. `room.ts` is the aggregate, `protocol.ts` the
+  wire types and `toPublicState`, the rest are value objects, validation and tallying. A
+  rule belongs here only if it can be decided without knowing about HTTP, WebSockets,
+  Durable Objects or React.
+- **`@application`** is orchestration and client side read models. `roomConnection.ts`
+  owns the WebSocket lifecycle; every `onX` there returns an unsubscribe closure.
+- **`@infra`** is adapters. `worker.ts` is the entry point and the router, `server.ts` is
+  the `Room` Durable Object with its dispatch, persistence, broadcast, rate limits and
+  expiry alarms. Auth is the socket's `serializeAttachment` payload
+  (`{ participantId, token }`, with an `ANONYMOUS` sentinel); tokens live in
+  `sessionStorage` and are tombstoned on removal.
+- **`@presentation`** is React. `RoomScreen.tsx` is the only place that constructs a
+  `RoomConnection` and owns all mutable state; everything below it takes data and
+  callbacks. Every component exports an explicit props interface and receives
+  `translate: Translator` as a prop. There is no context, no global i18n singleton and no
+  store.
 
-Zero dependencies outside `@domain`. No platform APIs, no clocks, no randomness, no
-network. Everything is a pure function `(room, ...) => RoomSnapshot`, which is what makes
-the layer trivially testable.
+Two entry points, which is why there are two tsconfigs: `presentation/main.tsx` for the
+SPA, mounted from `index.html` onto `#root`, and `infra/worker.ts`, named in
+`wrangler.jsonc` as `main`. `infra` compiles under `tsconfig.worker.json`, which excludes
+`src/presentation`, so a stray import fails typecheck rather than bloating the Worker.
 
-- `room.ts` — the `RoomSnapshot` aggregate and all its transitions
-- `protocol.ts` — wire types, runtime guards, and `toPublicState`, the single place that
-  projects the internal snapshot into a leak free DTO
-- `deck.ts`, `name.ts`, `sessionName.ts`, `chat.ts` — value objects and validation
-- `tally.ts` — reveal statistics and consensus
-
-A new rule belongs here only if it can be decided without knowing about HTTP, WebSockets,
-Durable Objects or React.
-
-### `@application` — use cases
-
-Orchestration and client side read models. `roomConnection.ts` owns the WebSocket
-lifecycle and exposes a listener registry where every `onX` returns an unsubscribe
-closure. The rest are small helpers: `createRoom`, `routing`, `i18n`, `localePreference`,
-`votedState`.
-
-### `@infra` — adapters
-
-`worker.ts` is the entry point and the router: `/api/room/create` mints an id, everything
-else under `/api/room/<id>/` is rewritten and forwarded to the Durable Object. `server.ts`
-is the `Room` Durable Object and holds the WebSocket dispatch, persistence, broadcast,
-rate limits and expiry alarms.
-
-Auth is the socket's `serializeAttachment` payload: `{ participantId, token }`, with an
-`ANONYMOUS` sentinel. Tokens live in `sessionStorage` and are tombstoned on removal so a
-reload with a stale token cannot walk back in.
-
-### `@presentation` — React UI
-
-One container, many presentational components. `RoomScreen.tsx` is the only place that
-constructs a `RoomConnection`; it owns all mutable state and wires the handlers down as
-`onX` props. Components below it take data and callbacks. Adding a second place that
-opens a connection splits the state that only the container can see.
-
-Every component exports an explicit props interface and receives `translate: Translator`
-as a prop. There is no context, no global i18n singleton and no store.
-
-### Entry points
-
-Two of them, which is why there are two tsconfigs:
-
-- `src/presentation/main.tsx` — the SPA, mounted from `index.html` onto `#root`
-- `src/infra/worker.ts` — the Worker, named in `wrangler.jsonc` as `main`
-
-Client routing is hand rolled in `application/routing.ts` against the History API.
-Cloudflare's `not_found_handling: "single-page-application"` is what makes deep links into
-`/room/<id>` work, so do not add a server side route to render those.
+Client routing is hand rolled against the History API. Cloudflare's
+`not_found_handling: "single-page-application"` is what makes deep links work, so do not
+add a server side route to render them.
 
 ## Path aliases are mandatory
 
 Import through the alias, never relatively. Only two relative imports exist in production
-code and both are deliberate: `domain/room.ts` importing `./deck` from its own folder, and
-`i18n.ts` importing the locale JSON because `locales/` has no alias.
+code and both are deliberate: `domain/room.ts` importing `./deck`, and `i18n.ts`
+importing the locale JSON because `locales/` has no alias.
 
-Adding a layer means updating **three** files: `aliases.ts` (the source of truth read by
-both `vite.config.ts` and `vitest.config.ts`), `tsconfig.json` `paths`, and
-`tsconfig.worker.json` `paths`. Miss one and you get a confusing resolution error.
+Adding a layer means updating **three** files: `aliases.ts` (read by both `vite.config.ts`
+and `vitest.config.ts`), `tsconfig.json` `paths`, and `tsconfig.worker.json` `paths`.
 
 ## Code conventions
 
 ### Naming
 
-camelCase files throughout, including components (`RoomScreen.tsx`). Components are named
-function exports with an explicit props interface, never default exports; the single
-default export in the repo is the Worker itself. Module constants are SCREAMING_SNAKE_CASE
-and live next to the concept they belong to (`NAME_MAX_LENGTH` in `name.ts`). Private class
-members use `#` fields. There are no barrel `index.ts` files; import the concrete module.
+camelCase files throughout, including components. Components are named function exports
+with an explicit props interface, never default exports; the single default export in the
+repo is the Worker itself. Module constants are SCREAMING_SNAKE_CASE and live next to the
+concept they belong to. Private class members use `#` fields. There are no barrel
+`index.ts` files.
 
 Spelling things out is a real preference: `roomId`, `participantId`, `translate`. Storage
-keys are namespaced with `hanko:` (`hanko:locale`, `hanko:token:<roomId>`, `hanko:name:<roomId>`).
+keys are namespaced with `hanko:`.
 
 ### Errors are return values, not exceptions
 
 Domain transitions never throw. "Nothing changed" is signalled by returning the **same
-reference**, which the tests assert directly:
-
-```ts
-export function joinRoom(room, participant): RoomSnapshot {
-  if (room.participants.length >= MAX_PARTICIPANTS) {
-    return room;
-  }
-  ...
-}
-```
-
-Validation returns a discriminated union, plus a thin boolean wrapper for callers that
-only need the yes or no:
+reference**, which the tests assert directly. Validation returns a discriminated union
+plus a thin boolean wrapper for callers who only need the yes or no:
 
 ```ts
 export type NameValidationResult =
@@ -182,16 +136,13 @@ export function validateName(rawName: string): NameValidationResult { ... }
 export function isValidName(rawName: string): boolean { return validateName(rawName).valid; }
 ```
 
-The one sanctioned exception is a typed error class carrying a reason union, used at
-network boundaries — `CreateRoomError` in `application/createRoom.ts`. Callers narrow on
-it and rethrow anything they do not recognise.
-
-Server side, failures leave as protocol error frames rather than HTTP errors:
-`this.#fail(socket, ERROR_CODES.notOwner); return;`.
+The one sanctioned exception is a typed error class carrying a reason union, at network
+boundaries: `CreateRoomError`. Callers narrow on it and rethrow what they do not
+recognise. Server side, failures leave as protocol frames rather than HTTP errors.
 
 ### Dependency injection without a container
 
-Inject via a defaulted parameter. No container, no interface-for-everything:
+Inject through a defaulted parameter. No container, no interface-for-everything:
 
 ```ts
 export async function createRoom(fetchImpl: typeof fetch = globalThis.fetch): Promise<string>
@@ -201,9 +152,9 @@ constructor(private readonly roomId: string,
 
 ### Comments explain why, in prose
 
-This is the strongest convention in the repo. Comments are complete sentences that explain
-the reasoning and often the rejected alternative. There are no `// TODO`, no comments that
-restate the code, and no commented-out blocks.
+This is the strongest convention in the repo. Comments are complete sentences that
+explain the reasoning and often the rejected alternative. There are no `// TODO`, no
+comments restating the code, and no commented-out blocks.
 
 ```ts
 /**
@@ -213,166 +164,112 @@ restate the code, and no commented-out blocks.
  */
 ```
 
-```ts
-/**
- * The room id is the only secret guarding a room, so the alphabet is large and the
- * draw has to be uniform. A plain `byte % 30` biases the first characters of the
- * alphabet, so values that do not divide evenly are rejected and redrawn instead.
- */
-```
-
-If you change a rule that has such a comment, update the comment with it. Match the
-register: explain the trade-off, not the mechanism.
+If you change a rule that has such a comment, update the comment with it. Explain the
+trade-off, not the mechanism. The same applies to this file: state the rule, not the story
+of how it arrived.
 
 ### TypeScript
 
 Both configs enable `strict` plus `noUncheckedIndexedAccess`, `noImplicitOverride`,
 `noFallthroughCasesInSwitch`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`,
-`isolatedModules` and `noUnusedLocals`/`noUnusedParameters`. `verbatimModuleSyntax` is
-why type imports are written as `import type`.
+`isolatedModules` and `noUnusedLocals`/`noUnusedParameters`.
 
-`noUncheckedIndexedAccess` means `array[0]` is `T | undefined`. This is not something to
-work around with `!`; the tests handle it with `participants[0]?.vote`.
+`noUncheckedIndexedAccess` means `array[0]` is `T | undefined`. Do not work around it with
+`!`. Zero `any` in the repository, zero `eslint-disable`, zero `@ts-ignore`; use
+`as never` or `as unknown as X` for platform fakes in tests.
 
-Zero `any` in the repository, and zero `eslint-disable` or `@ts-ignore`. For platform
-fakes in tests use `as never` (the fake `DurableObjectState`) or
-`as unknown as WebSocket`.
-
-`no-console` is a warning outside `src/infra` and is fully disabled inside it. The
-pre-commit hook runs with `--max-warnings=0`, so a stray `console.log` will fail the
-commit. Use `console.warn` / `console.error` where logging is genuinely needed.
+`no-console` is a warning outside `src/infra` and disabled inside it, and the hook runs
+with `--max-warnings=0`, so a stray `console.log` fails the commit.
 
 ### Styling and accessibility
 
-Tailwind utilities inline, plus a BEM-ish `src/presentation/styles/theme.css` for
-animation and stateful pieces. Design tokens are CSS variables surfaced through `@theme`
-(`bg-paper`, `text-ink-dim`, `border-line`, `text-primary`, `font-display`,
-`rounded-chip`). Arbitrary values are normal here: `min-h-11`, `max-w-115`,
-`text-[clamp(0.9375rem,4.2vw,1.375rem)]`.
+Tailwind utilities inline, plus `styles/theme.css` for animation and stateful pieces.
+Tokens are CSS variables surfaced through `@theme` (`bg-paper`, `text-ink-dim`,
+`border-line`, `text-primary`, `font-display`, `rounded-chip`).
 
-The root font size is fluid — `html { font-size: clamp(1rem, 0.95rem + 0.25vw, 1.35rem) }`
-— and everything else is sized in rem against it, so one value carries the interface from
-a phone to a large display. Expressing a font size in pixels opts that piece out of the
-scaling: it stays the size it was on a phone while everything around it swells, and the
-layout reads as broken rather than merely small. `presentation/typography.test.ts` fails
-on `text-[NNpx]` in a component or `font-size: NNpx` in the stylesheet, so this is
-enforced rather than remembered. The exceptions are deliberate: one pixel hairlines stay
-hairlines at any size, and focus outlines stay in pixels so they stay legible instead of
-thinning out.
+The root font size is fluid and everything else is sized in rem against it, so one value
+carries the interface from a phone to a large display. A pixel opts that piece out of the
+scaling. `presentation/typography.test.ts` refuses pixel font sizes in components and in
+the stylesheet; one pixel hairlines and focus outlines are the deliberate exceptions,
+because a hairline should stay a hairline and a focus ring should stay legible.
 
-`Shell.tsx` pins the header to the top and the footer to the bottom and centres only the
-content between them. `main` takes the free space with `flex-1` and centres what it
-holds; the `[data-frame]` element inside it caps the measure so a long line never runs
-the width of the display. Do not put the chrome back inside the frame: the wordmark and
-the credit are meant to stay put while the room moves.
+Spacing comes from the named steps declared in `@theme`, not from raw numbers above 8px.
+`presentation/spacing.test.ts` enforces that in components and in the stylesheet. Values
+below 8px stay numeric because those are optical corrections rather than rhythm.
 
-Both bars are `sticky` and share `h-[var(--chrome-height)]`, so the pair reads as a frame
-rather than as two unrelated bars that happen to be on screen. They share the token
-rather than each carrying a height, because the token is rem based and scales with the
-root, which is the only way the two can stay equal at 4k. The header carries the logo on
-the left with the language switcher laid out beside it, not absolutely positioned over it.
+`Shell.tsx` pins the header and footer and centres only the content between them. The two
+bars share one rem based height token so they stay equal at any root size, and the
+`[data-frame]` element inside `main` caps the measure so a line never runs the width of the
+display. Pinned chrome takes a frosted background through `data-glass` when there is
+something behind it to blur.
 
-Because the chrome is pinned it stops being the only thing on screen and becomes a lid
-over the content, so `data-glass` turns on a frosted background: the header when the page
-has scrolled under it, the footer whenever the document is taller than the viewport,
-since the footer is always pinned and always has something behind it. Frosting a surface
-with nothing behind it only costs paint. The floating chat dock is fixed and sits above
-the footer in z order, so its offset clears `--chrome-height` rather than resting at the
-viewport edge.
+Destructive actions confirm first. `ConfirmDialog` opens focused on the safe answer and
+hands focus back to whatever opened it. Dialogs are ours: `prompt`, `confirm` and `alert`
+are refused by `presentation/dialogs.test.ts`, which also requires the app to carry its
+own replacement.
 
-Destructive actions confirm first. `ConfirmDialog` opens on the safe answer rather than
-the destructive one, because a dialog reached by a stray Enter must not be confirmed by
-the same Enter, and it hands focus back to whatever opened it. Deleting a room broadcasts
-`room-deleted` to every socket including the owner's, so the redirect home and the notice
-are the same code path for everyone rather than a special case for whoever pressed the
-button.
-
-Accessibility is treated as a requirement, not polish. Every icon gets `aria-hidden`,
-every icon only button gets an `aria-label`, errors use `role="alert"`, chat uses
-`role="log"`, the vote meter is a `role="progressbar"` with `aria-valuenow`, toggles carry
-`aria-pressed`, and screen reader only text uses the `visually-hidden` utility. Motion is
-gated on `prefers-reduced-motion`, which `Shell.tsx` reflects onto
-`data-reduced-motion`.
-
-Fonts are self hosted with hand written `@font-face` blocks declaring only the `latin` and
-`latin-ext` subsets; the Vietnamese subset is deliberately skipped and the reason is in a
-comment.
+Accessibility is a requirement, not polish. Every icon gets `aria-hidden`, every icon only
+button an `aria-label`, errors `role="alert"`, chat `role="log"`, the meter
+`role="progressbar"` with `aria-valuenow`, toggles `aria-pressed`, screen reader only text
+the `visually-hidden` utility. Motion is gated on `prefers-reduced-motion`, which `Shell`
+reflects onto `data-reduced-motion`. Fonts are self hosted with hand written `@font-face`
+blocks declaring only the `latin` and `latin-ext` subsets.
 
 ## Testing
 
 ### The loop is red, green, refactor
 
-Every feature and every fix starts with a test that fails. The cycle is not something to
-reach for when there is time left, and it is not satisfied by writing the test afterwards
-to match the code that already exists.
+Every feature and every fix starts with a test that fails. Writing the test afterwards to
+match the code that already exists does not satisfy this.
 
-1. **Red.** Write the smallest test that describes the behaviour you are about to add, and
-   run it. It has to fail, and it has to fail *because the behaviour is missing* — a
-   misspelled import or a typo in the assertion is not a red step, it is a broken test
-   that would have passed for the wrong reason. A test nobody ever watched fail has not
-   been shown to test anything.
+1. **Red.** Write the smallest test that describes the behaviour you are about to add and
+   run it. It has to fail *because the behaviour is missing* — a typo or a bad import is a
+   broken test, not a red step.
 2. **Green.** Write the least code that makes it pass. The test is the specification, so
-   making it pass means implementing the behaviour, not special casing the fixture.
-   Returning a hardcoded expectation, relaxing the assertion, or widening the type until
-   the compiler agrees are all ways of buying a green run with nothing behind it.
-3. **Refactor.** Remove duplication and improve naming with the test green, re-running it
-   after each step. Refactoring is not permission to change behaviour: a new behaviour is
-   a new test and a new cycle, in that order.
+   passing it means implementing the behaviour. Hardcoding an expectation, relaxing the
+   assertion or widening the type are all ways of buying a green run with nothing behind
+   it.
+3. **Refactor.** Clean up duplication and naming with the test green. Refactoring is not
+   permission to change behaviour: a new behaviour is a new test and a new cycle.
 
-The step that gets skipped in practice is watching it fail. If production code has
-already been written, write the test that *would have* caught it, then delete the
-implementation, watch the test go red, and put it back. That round trip is the whole
-point: it is what proves the test is measuring the behaviour rather than agreeing with
-whatever the code happened to do.
+If the code was written first, write the test that would have caught it, delete the
+implementation, watch it go red, and put it back. That round trip is what separates a test
+that measures behaviour from one that merely agrees with the code.
 
-The gates in this repository catch mistakes after they are made. None of them can tell
-you a feature was never specified, so TDD is the only thing standing between a feature
-nobody tested and a build that is confidently green.
+The gates catch mistakes after the fact. None of them can tell you a feature was never
+specified, so the cycle is the only thing standing between an untested feature and a build
+that is confidently green.
 
 ### Conventions
 
-Tests are co-located next to the source they cover: `foo.ts` gets `foo.test.ts`, and
-`foo.tsx` gets `foo.test.tsx`. The environment is jsdom for everything, including the
-Worker and Durable Object tests, which run against hand rolled fakes rather than
-workerd. A few files are named after a concern instead of a module
-(`infra/security.test.ts`, `infra/stateEndpoint.test.ts`); that is fine when a test spans
-more than one file, but prefer one test file per source file otherwise.
+Tests are co-located: `foo.ts` gets `foo.test.ts`. The environment is jsdom for everything,
+including the Worker and Durable Object tests, which run against hand rolled fakes rather
+than workerd.
 
-Coverage is gated at 80% for statements, branches, functions and lines, and the gate
-covers every layer: `src/domain`, `src/application`, `src/infra` and `src/presentation`.
-A layer left out of the gate is a layer where a regression is free, so adding a new one
-to the thresholds is part of adding the layer itself.
-
-The thresholds are on the total, not per file, so one well covered file can carry another.
-When you add a component, check its own numbers rather than assuming the aggregate speaks
-for it.
+Coverage is gated at 80% on statements, branches, functions and lines, across every layer.
+A layer left out of the gate is a layer where a regression is free, so adding a layer means
+adding it to the thresholds. The thresholds are on the total, so check a new file's own
+numbers rather than assuming the aggregate speaks for it.
 
 Test names are behavioural sentences in the present tense: `"refuses a full room"`,
-`"keeps the seat of someone who just left"`, `"does not hand a connected socket vote to an
-anonymous caller"`.
+`"keeps the seat of someone who just left"`.
 
-There is no shared test helper module and no mocking library. Each test file declares its
-own local factories, which is deliberate:
+There is no shared test helper module and no mocking library. Each file declares its own
+factories, which is deliberate: `function state(overrides): PublicRoomState` in every
+presentation test, `createFakeSocket()` and `createFakeStorage()` in infra,
+`renderRoom()` style helpers returning `{ handlers }`. Module level mocks use `vi.hoisted`
+plus `vi.mock`; globals go through `vi.stubGlobal` and are cleared with
+`vi.unstubAllGlobals()` in `afterEach`.
 
-- `function state(overrides): PublicRoomState` in every presentation test
-- `function createFakeSocket()` in infra tests
-- `function createFakeStorage(initial)` — an in-memory `DurableObjectState` with
-  `getWebSockets`, `acceptWebSocket`, `storage.get/put/delete`, `setAlarm`
-- `function renderRoom()` style helpers returning `{ handlers }`
+Assert with `toBe`, `toBeTruthy`, `toHaveLength` and `container.querySelector`.
+`toBeInTheDocument` is not the house style even though jest-dom is set up. `data-*`
+attributes such as `[data-phase]`, `[data-open]`, `[data-consensus]`, `[data-copied]` and
+`[data-role]` are part of the test contract: when you add state a test needs to see, add
+the attribute too.
 
-Module level mocks use `vi.hoisted` plus `vi.mock`, e.g. a fake `RoomConnection` class in
-`RoomScreen.test.tsx`. Globals are stubbed with `vi.stubGlobal` and cleaned up in
-`afterEach` with `vi.unstubAllGlobals()`. Animation tests use `vi.useFakeTimers()` with
-`act(() => vi.advanceTimersByTime(ms))`.
-
-Assert on rendered output with `toBe`, `toBeTruthy`, `toHaveLength` and
-`container.querySelector`. `toBeInTheDocument` is not the house style even though jest-dom
-is set up. `data-*` attributes such as `[data-phase]`, `[data-open]`, `[data-consensus]`,
-`[data-copied]`, `[data-role]` are part of the test contract: when you add state a test
-needs to see, add the attribute too.
-
-Regressions get a comment naming the original bug, so the reader knows what the test is
-protecting.
+Fixtures carry realistic values rather than invented ones, because the app derives share
+links from `location.origin` at runtime and an invented host reads as a claim about where
+the app runs. Regressions get a comment naming the original bug.
 
 ## Internationalisation
 
@@ -381,11 +278,10 @@ path, resolved by `application/i18n.ts`. `translate` is passed down as a prop fr
 `Root.tsx`; never import a dictionary inside a component.
 
 Adding a key means adding it to **both** files with matching `{{variable}}` names.
-`i18n.test.ts` enforces key parity and placeholder hygiene, so a half finished translation
-fails the suite. Missing keys return the path itself rather than throwing. Keys are
-namespaced (`join`, `welcome`, `room`, `controls`, `vote`, `errors`, `a11y`, `landing`,
-`brand`, `result`, `progress`, `consensus`, `chat`, `session`) and error codes map onto
-`errors.<code>` dynamically.
+`i18n.test.ts` enforces key parity and placeholder hygiene. Missing keys return the path
+itself rather than throwing. Keys are namespaced (`join`, `welcome`, `room`, `controls`,
+`vote`, `errors`, `a11y`, `landing`, `brand`, `result`, `progress`, `consensus`, `chat`,
+`session`) and error codes map onto `errors.<code>` dynamically.
 
 The selected locale persists under `localStorage["hanko:locale"]`. Storage access is
 wrapped in `try/catch` because it can be denied by the browser.
@@ -396,49 +292,43 @@ The threat model is the weak one and the code takes it seriously: no accounts, r
 the only secret, so guessing or leaking an id is the attack. When touching this code, keep
 these properties intact:
 
-- Room ids use a Crockford style alphabet excluding ambiguous characters, drawn with
-  rejection sampling so the distribution is uniform.
+- Room ids are drawn from `domain/roomId.ts`, which is the single source for the alphabet
+  and the length. Accepting an id the generator cannot mint means accepting a shape of link
+  that looks like a room without being one.
 - Votes are hidden server side until reveal, and a vote is only ever returned for a token
   the caller actually presents. A regression test guards this; do not relax it to make a
-  state fixture easier to build.
-- WebSocket upgrades validate `Origin`, refusing a missing `Origin` as a non browser
-  client to block cross site WebSocket hijacking.
+  fixture easier to build.
+- WebSocket upgrades validate `Origin`, refusing a missing one as a non browser client to
+  block cross site WebSocket hijacking.
 - Chat and commands have separate per window rate limits, and `MAX_SOCKETS` caps sockets
   per room.
-- `public/_headers` carries the CSP and the other response headers. It is plain text and
-  nothing typechecks or tests it, so if you edit it, read it back. An unterminated `/*`
-  comment silently turns the whole file into a comment and disables every header in
-  production.
+- `public/_headers` carries the CSP and the other response headers. Nothing typechecks or
+  tests it, so read it back after editing: an unterminated `/*` silently turns the file
+  into a comment and disables every header in production.
 
 ## Commits
 
-Write the history the way the existing commits read. A capitalised sentence in the
-imperative as the subject, then a prose body wrapped at about 75 columns that explains
-**why** the change was made, not a list of what changed. Reach for a bullet list only
-when the thing being enumerated is a list, such as a security audit.
+Write the history the way the existing commits read: a capitalised imperative subject,
+then a prose body wrapped at about 75 columns explaining **why**, not a list of what
+changed. Reach for a bullet list only when the thing being enumerated is a list. There are
+no `feat:`, `fix:` or `chore:` prefixes in this repository.
 
-There are no `feat:`, `fix:` or `chore:` prefixes anywhere in this repository, and adding
-one would not match a single existing commit.
+An agent never signs its own work. No `Co-Authored-By` trailer, no `Generated with` line,
+no trailer naming a model or a tool. The person who asked for the change is its author,
+and an attribution trailer only follows every future `git blame`.
 
-An agent never signs its own work. Do not add a `Co-Authored-By` trailer, a `Generated
-with` line, or any other trailer naming a model or a tool. The person who asked for the
-change is its author, and an attribution trailer is noise that follows every future
-`git blame` for no benefit to the reader.
+Never commit unless you were asked to in this conversation, and never push unless you were
+asked to as well. Those are separate permissions. Leave the working tree as you found it
+and say plainly what you changed.
 
-Never commit unless you were asked to in this conversation, and never push unless you
-were asked to as well. Those are two separate permissions and one does not imply the
-other. Leave the working tree as you found it and say plainly what you changed.
-
-Do not reach for `--no-verify` to get past a failing hook. The pre-commit gate is the
-reason this repository can quote its coverage and lint numbers at all, so a commit that
-skipped it is a hole in that claim. Fix the underlying failure instead.
+Do not reach for `--no-verify`. The hooks are why this repository can quote coverage and
+lint numbers at all, so a commit that skipped them is a hole in that claim. Fix the
+underlying failure instead.
 
 ## Deploying
 
 `npm run deploy` runs the coverage gate, then `build`, then `wrangler deploy`, so a
-Durable Object bundle is never replaced by a commit whose tests never ran. A `pre-push`
-hook additionally runs lint, both typecheck passes, coverage and the production build
-across the whole tree, which catches what the staged-file pre-commit hook cannot.
+Durable Object bundle is never replaced by a commit whose tests never ran.
 
 Changes to the `Room` Durable Object's storage shape need a migration entry in
 `wrangler.jsonc`; the existing one is tagged `v1`.
