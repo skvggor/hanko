@@ -265,10 +265,15 @@ workerd. A few files are named after a concern instead of a module
 (`infra/security.test.ts`, `infra/stateEndpoint.test.ts`); that is fine when a test spans
 more than one file, but prefer one test file per source file otherwise.
 
-Coverage is gated at 80% for statements, branches, functions and lines, and the gate covers
-`src/domain`, `src/application` and `src/infra`. `src/presentation` is excluded from the
-threshold even though it is well tested; do not read that as permission to skip component
-tests. Current numbers sit around 96% statements and 94% branches.
+Coverage is gated at 80% for statements, branches, functions and lines, and the gate
+covers `src/domain`, `src/application`, `src/infra` and `src/presentation`. Presentation
+used to sit outside the thresholds, which is exactly how `ui.tsx` and `Wordmark.tsx` came
+to have no tests at all without anything complaining. Current numbers sit around 96%
+statements and 94% branches.
+
+The thresholds are on the total, not per file, so one well covered file can carry another.
+When you add a component, check its own numbers rather than assuming the aggregate speaks
+for it.
 
 Test names are behavioural sentences in the present tense: `"refuses a full room"`,
 `"keeps the seat of someone who just left"`, `"does not hand a connected socket vote to an

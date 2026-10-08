@@ -582,3 +582,269 @@ describe("RoomScreen", () => {
   });
 
 });
+
+describe("RoomScreen owner controls", () => {
+  const ownerState = {
+    ...roomState,
+    participants: [
+      {
+        id: "p1",
+        name: "Ana",
+        role: "voter",
+        isOwner: true,
+        isConnected: true,
+        hasVoted: true,
+      },
+      {
+        id: "p2",
+        name: "Bruno",
+        role: "voter",
+        isOwner: false,
+        isConnected: true,
+        hasVoted: false,
+      },
+    ],
+    connectedCount: 2,
+  };
+
+  const revealedState = {
+    ...ownerState,
+    isRevealed: true,
+    reveals: [
+      { participantId: "p1", name: "Ana", value: "5" },
+      { participantId: "p2", name: "Bruno", value: "5" },
+    ],
+    totalPoints: 10,
+    myVote: "5",
+  };
+
+  beforeEach(() => {
+    harness.sockets.length = 0;
+    harness.joinCalls.length = 0;
+    harness.sent.length = 0;
+    harness.errors.length = 0;
+
+    vi.stubGlobal("location", {
+      origin: "https://hanko.pages.dev",
+      pathname: "/room/room-1",
+      protocol: "https:",
+    });
+    vi.stubGlobal("navigator", { language: "en-US" });
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    });
+    vi.stubGlobal("sessionStorage", {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function enterRoom() {
+    renderRoom();
+    await joinAs("Ana");
+    await waitFor(() => expect(harness.joinCalls).toHaveLength(1));
+  }
+
+  it("offers the next round only once the votes are out", async () => {
+    await enterRoom();
+    pushState(revealedState);
+
+    expect(await screen.findByRole("button", { name: "Next round" })).toBeTruthy();
+  });
+
+  it("asks the connection for the next round", async () => {
+    await enterRoom();
+    pushState(revealedState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Next round" }));
+
+    expect(harness.sent).toContainEqual({ type: "next-round" });
+  });
+
+  it("asks the connection to reset the votes", async () => {
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Reset votes" }));
+
+    expect(harness.sent).toContainEqual({ type: "reset-round" });
+  });
+
+  it("changes the scale to the one that was picked", async () => {
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "T-shirt sizes" }));
+
+    expect(harness.sent).toContainEqual({ type: "set-deck", deckId: "tshirt" });
+  });
+
+  it("offers every scale the deck defines", async () => {
+    await enterRoom();
+    pushState(ownerState);
+
+    expect(await screen.findByRole("button", { name: "Fibonacci" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "T-shirt sizes" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Linear 1-10" })).toBeTruthy();
+  });
+
+  it("hands ownership to the participant that was chosen", async () => {
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Make owner" }));
+
+    expect(harness.sent).toContainEqual({
+      type: "transfer-ownership",
+      participantId: "p2",
+    });
+  });
+
+  it("turns a voter into a watcher when the owner asks", async () => {
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Make watcher" }));
+
+    expect(harness.sent).toContainEqual({
+      type: "set-role",
+      participantId: "p2",
+      role: "spectator",
+    });
+  });
+
+  it("turns a watcher back into a voter", async () => {
+    await enterRoom();
+    pushState({
+      ...ownerState,
+      participants: [
+        ownerState.participants[0],
+        { ...ownerState.participants[1], role: "spectator" },
+      ],
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Make voter" }));
+
+    expect(harness.sent).toContainEqual({
+      type: "set-role",
+      participantId: "p2",
+      role: "voter",
+    });
+  });
+
+  it("removes the participant the owner picked out", async () => {
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Remove" }));
+
+    expect(harness.sent).toContainEqual({
+      type: "remove-participant",
+      participantId: "p2",
+    });
+  });
+
+  it("never offers to remove the owner themselves", async () => {
+    await enterRoom();
+    pushState(ownerState);
+
+    await screen.findByRole("button", { name: "Make owner" });
+
+    // Only Bruno offers the owner controls, so exactly one "Remove" exists.
+    expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(1);
+  });
+
+  it("takes a new name from the rename prompt", async () => {
+    vi.stubGlobal("prompt", vi.fn(() => "Ana Maria"));
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Change name" }));
+
+    expect(harness.sent).toContainEqual({ type: "set-name", name: "Ana Maria" });
+  });
+
+  it("sends nothing when the rename prompt is dismissed", async () => {
+    vi.stubGlobal("prompt", vi.fn(() => null));
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Change name" }));
+
+    expect(harness.sent).toHaveLength(0);
+  });
+
+  it("keeps the old name when the prompt returns an empty string", async () => {
+    vi.stubGlobal("prompt", vi.fn(() => ""));
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Change name" }));
+
+    // An empty rename is the server's to reject, not the client's to swallow.
+    expect(harness.sent).toContainEqual({ type: "set-name", name: "" });
+  });
+
+  it("asks the connection to delete the room", async () => {
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Delete room" }));
+
+    expect(harness.sent).toContainEqual({ type: "delete-room" });
+  });
+
+  it("saves a session name once it validates", async () => {
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.type(
+      await screen.findByLabelText("Session name"),
+      "Sprint 42",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(harness.sent).toContainEqual({
+      type: "set-room-name",
+      name: "Sprint 42",
+    });
+  });
+
+  it("clears the session name when the field is emptied", async () => {
+    await enterRoom();
+    pushState({ ...ownerState, name: "Sprint 42" });
+
+    const field = await screen.findByLabelText("Session name");
+    await userEvent.clear(field);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(harness.sent).toContainEqual({ type: "set-room-name", name: null });
+  });
+
+  it("shows the room link copied once the clipboard accepts it", async () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { language: "en-US", clipboard: { writeText } });
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+
+    expect(writeText).toHaveBeenCalledWith("https://hanko.pages.dev/room/room-1");
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
+  });
+
+  it("still confirms the copy when there is no clipboard to write to", async () => {
+    vi.stubGlobal("navigator", { language: "en-US", clipboard: undefined });
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
+  });
+});

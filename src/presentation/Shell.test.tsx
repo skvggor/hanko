@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Shell } from "@presentation/Shell";
 import { createTranslator } from "@application/i18n";
 
@@ -210,5 +210,125 @@ describe("Shell", () => {
       expect(document.querySelector(".session-name")).toBeNull();
     });
   });
+});
 
+describe("Shell reduced motion", () => {
+  /**
+   * The listener has to be reachable from the test so the change event can be
+   * delivered the way the browser would, rather than by re-rendering with a
+   * different stub, which would never exercise the subscription at all.
+   */
+  function stubMatchMedia(matches: boolean) {
+    const listeners = new Set<() => void>();
+    const query = {
+      matches,
+      addEventListener: vi.fn((_type: string, listener: () => void) => {
+        listeners.add(listener);
+      }),
+      removeEventListener: vi.fn((_type: string, listener: () => void) => {
+        listeners.delete(listener);
+      }),
+    };
+
+    vi.stubGlobal("matchMedia", vi.fn(() => query));
+
+    return {
+      query,
+      emitChange(next: boolean) {
+        query.matches = next;
+        for (const listener of listeners) listener();
+      },
+      get listenerCount() {
+        return listeners.size;
+      },
+    };
+  }
+
+  function renderShell() {
+    const { container } = render(
+      <Shell errorCode={null} locale="en-US" onLocaleChange={vi.fn()} translate={translate}>
+        <p>x</p>
+      </Shell>,
+    );
+    return container.firstElementChild;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("leaves motion on when the reader has not asked for less", () => {
+    stubMatchMedia(false);
+
+    expect(renderShell()?.getAttribute("data-reduced-motion")).toBe("false");
+  });
+
+  it("reflects a reader who has asked for less motion", () => {
+    stubMatchMedia(true);
+
+    expect(renderShell()?.getAttribute("data-reduced-motion")).toBe("true");
+  });
+
+  it("asks the reader's own preference, not a guessed one", () => {
+    const media = stubMatchMedia(false);
+
+    renderShell();
+
+    expect(media.query).toBeDefined();
+    expect(vi.mocked(globalThis.matchMedia)).toHaveBeenCalledWith(
+      "(prefers-reduced-motion: reduce)",
+    );
+  });
+
+  it("follows the preference when the reader changes it mid session", () => {
+    const media = stubMatchMedia(false);
+    const shell = renderShell();
+
+    act(() => media.emitChange(true));
+
+    expect(shell?.getAttribute("data-reduced-motion")).toBe("true");
+  });
+
+  it("gives motion back when the reader turns it on again", () => {
+    const media = stubMatchMedia(true);
+    const shell = renderShell();
+
+    act(() => media.emitChange(false));
+
+    expect(shell?.getAttribute("data-reduced-motion")).toBe("false");
+  });
+
+  it("subscribes once so a change is not applied twice", () => {
+    const media = stubMatchMedia(false);
+
+    renderShell();
+
+    expect(media.listenerCount).toBe(1);
+  });
+
+  it("drops the subscription when it goes away, so no listener outlives the shell", () => {
+    const media = stubMatchMedia(false);
+    const { unmount } = render(
+      <Shell errorCode={null} locale="en-US" onLocaleChange={vi.fn()} translate={translate}>
+        <p>x</p>
+      </Shell>,
+    );
+
+    unmount();
+
+    expect(media.listenerCount).toBe(0);
+    expect(media.query.removeEventListener).toHaveBeenCalledWith("change", expect.any(Function));
+  });
+
+  it("assumes motion is fine when the browser cannot answer", () => {
+    vi.stubGlobal("matchMedia", undefined);
+
+    expect(renderShell()?.getAttribute("data-reduced-motion")).toBe("false");
+  });
+
+  it("assumes motion is fine when the browser has no matchMedia at all", () => {
+    vi.stubGlobal("matchMedia", {});
+
+    expect(renderShell()?.getAttribute("data-reduced-motion")).toBe("false");
+  });
 });
