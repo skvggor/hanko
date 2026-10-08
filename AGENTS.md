@@ -333,8 +333,35 @@ these properties intact:
   comment silently turns the whole file into a comment and disables every header in
   production.
 
+## Commits
+
+Write the history the way the existing commits read. A capitalised sentence in the
+imperative as the subject, then a prose body wrapped at about 75 columns that explains
+**why** the change was made, not a list of what changed. Reach for a bullet list only
+when the thing being enumerated is a list, such as a security audit.
+
+There are no `feat:`, `fix:` or `chore:` prefixes anywhere in this repository, and adding
+one would not match a single existing commit.
+
+An agent never signs its own work. Do not add a `Co-Authored-By` trailer, a `Generated
+with` line, or any other trailer naming a model or a tool. The person who asked for the
+change is its author, and an attribution trailer is noise that follows every future
+`git blame` for no benefit to the reader.
+
+Never commit unless you were asked to in this conversation, and never push unless you
+were asked to as well. Those are two separate permissions and one does not imply the
+other. Leave the working tree as you found it and say plainly what you changed.
+
+Do not reach for `--no-verify` to get past a failing hook. The pre-commit gate is the
+reason this repository can quote its coverage and lint numbers at all, so a commit that
+skipped it is a hole in that claim. Fix the underlying failure instead.
+
 ## Deploying
 
-`npm run deploy` runs `build` and `wrangler deploy`. It does not run the test suite, so
-run `npm run test:coverage` yourself first. Changes to the `Room` Durable Object's storage
-shape need a migration entry in `wrangler.jsonc`; the existing one is tagged `v1`.
+`npm run deploy` runs the coverage gate, then `build`, then `wrangler deploy`, so a
+Durable Object bundle is never replaced by a commit whose tests never ran. A `pre-push`
+hook additionally runs lint, both typecheck passes, coverage and the production build
+across the whole tree, which catches what the staged-file pre-commit hook cannot.
+
+Changes to the `Room` Durable Object's storage shape need a migration entry in
+`wrangler.jsonc`; the existing one is tagged `v1`.
