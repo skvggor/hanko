@@ -38,6 +38,16 @@ export function Root() {
     return () => globalThis.removeEventListener("popstate", onPopState);
   }, []);
 
+  /**
+   * index.html ships lang="en" because it has to render before React runs, but
+   * leaving it there means a Portuguese screen reader is handed an English
+   * document and picks English phonetics for every word. The active locale is
+   * already known here, so the document is told which language it is speaking.
+   */
+  useEffect(() => {
+    globalThis.document?.documentElement.setAttribute("lang", locale);
+  }, [locale]);
+
   const route = parseRoute(pathname);
 
   return (

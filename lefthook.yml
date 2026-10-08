@@ -12,3 +12,20 @@ pre-commit:
     secrets:
       glob: "*.{ts,tsx,js,mjs,json,jsonc,html,yml,yaml,env}"
       run: git diff --cached --no-ext-diff | node scripts/scan-secrets.mjs
+
+# The pre-commit hook only ever sees staged files, so a branch can carry a commit
+# whose lint or types were never checked and still reach a push. Pre-push runs the
+# gates across the whole tree and inlines the production build, because the push is
+# what deploys: a Worker bundle that does not compile is worth finding here rather
+# than after wrangler has already replaced the live one.
+pre-push:
+  parallel: true
+  commands:
+    lint:
+      run: npx eslint . --max-warnings=0
+    typecheck:
+      run: npx tsc --noEmit && npx tsc --noEmit -p tsconfig.worker.json
+    test:
+      run: npx vitest run --coverage
+    build:
+      run: npm run build

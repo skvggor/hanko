@@ -150,6 +150,37 @@ describe("Root", () => {
     expect(screen.getByRole("button", { name: "Start a room" })).toBeTruthy();
   });
 
+  // Regression: index.html hardcodes lang="en" so that it renders before React,
+  // and nothing ever corrected it. A screen reader was therefore handed an English
+  // document while the page spoke Portuguese, and read it with English phonetics.
+  it("marks the document as english when that is the locale", () => {
+    render(<Root />);
+    expect(document.documentElement.getAttribute("lang")).toBe("en-US");
+  });
+
+  it("marks the document as the locale the browser asked for", () => {
+    vi.stubGlobal("navigator", { language: "pt-BR" });
+    render(<Root />);
+    expect(document.documentElement.getAttribute("lang")).toBe("pt-BR");
+  });
+
+  it("follows the locale when the user switches it", async () => {
+    render(<Root />);
+
+    await userEvent.click(screen.getByRole("button", { name: "PT" }));
+
+    expect(document.documentElement.getAttribute("lang")).toBe("pt-BR");
+  });
+
+  it("follows the locale back when the user switches again", async () => {
+    render(<Root />);
+
+    await userEvent.click(screen.getByRole("button", { name: "PT" }));
+    await userEvent.click(screen.getByRole("button", { name: "EN" }));
+
+    expect(document.documentElement.getAttribute("lang")).toBe("en-US");
+  });
+
   it("keeps the locale when entering a room", async () => {
     render(<Root />);
 
