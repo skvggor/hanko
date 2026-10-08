@@ -28,13 +28,13 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
 
   return (
     <form className="mx-auto flex w-full max-w-105 flex-col gap-3.5 px-4 pt-2 pb-4" onSubmit={submit}>
-      <h2 className="font-display m-0 text-[26px] leading-tight font-bold tracking-[-0.02em] text-ink">
+      <h2 className="font-display m-0 text-[1.625rem] leading-tight font-bold tracking-[-0.02em] text-ink">
         {translate("join.heading")}
       </h2>
-      <p className="m-0 text-[13px] text-ink-dim">{translate("join.hint")}</p>
+      <p className="m-0 text-[0.8125rem] text-ink-dim">{translate("join.hint")}</p>
 
       <label
-        className="text-[10px] font-semibold tracking-[0.16em] text-ink-faint uppercase"
+        className="text-[0.625rem] font-semibold tracking-[0.16em] text-ink-faint uppercase"
         htmlFor="gate-name"
       >
         {translate("join.placeholder")}
@@ -43,7 +43,7 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
         aria-invalid={error !== null}
         autoComplete="off"
         autoFocus
-        className="min-h-12 w-full rounded-2xl border border-ink/20 bg-paper-raised px-4 py-3 font-sans text-[17px] text-ink aria-invalid:border-primary"
+        className="min-h-12 w-full rounded-2xl border border-ink/20 bg-paper-raised px-4 py-3 font-sans text-[1.0625rem] text-ink aria-invalid:border-primary"
         id="gate-name"
         onChange={(event) => {
           setName(event.target.value);
@@ -54,13 +54,13 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
       />
 
       <fieldset className="m-0 flex flex-wrap gap-2 rounded-2xl border border-line bg-paper-raised p-2.5">
-        <legend className="px-1 text-[10px] font-semibold tracking-[0.16em] text-ink-faint uppercase">
+        <legend className="px-1 text-[0.625rem] font-semibold tracking-[0.16em] text-ink-faint uppercase">
           {translate("join.title")}
         </legend>
         {(["voter", "spectator"] as const).map((option) => (
           <button
             aria-pressed={role === option}
-            className="min-h-10 flex-1 cursor-pointer rounded-full border border-ink/20 px-3 py-2 font-sans text-[11px] font-semibold tracking-[0.04em] text-ink-dim transition-colors hover:border-ink hover:text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-paper"
+            className="min-h-10 flex-1 cursor-pointer rounded-full border border-ink/20 px-3 py-2 font-sans text-[0.6875rem] font-semibold tracking-[0.04em] text-ink-dim transition-colors hover:border-ink hover:text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-paper"
             key={option}
             type="button"
             onClick={() => setRole(option)}
@@ -73,7 +73,7 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
       </fieldset>
 
       {error !== null && (
-        <p className="m-0 text-[13px] font-semibold text-primary" role="alert">
+        <p className="m-0 text-[0.8125rem] font-semibold text-primary" role="alert">
           {error}
         </p>
       )}

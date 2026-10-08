@@ -35,7 +35,7 @@ export function Landing({ translate, onNavigate }: LandingProps) {
   return (
     <section className="mx-auto flex w-full max-w-115 flex-col items-center gap-4 px-4 pt-4 text-center">
       <Button
-        className="min-h-13 px-6 text-[15px]"
+        className="min-h-13 px-6 text-[0.9375rem]"
         disabled={pending}
         variant="primary"
         onClick={() => {
@@ -46,15 +46,15 @@ export function Landing({ translate, onNavigate }: LandingProps) {
       </Button>
 
       {failed && (
-        <p className="m-0 rounded-2xl bg-primary/10 px-3 py-2 text-[13px] font-semibold text-primary" role="alert">
+        <p className="m-0 rounded-2xl bg-primary/10 px-3 py-2 text-[0.8125rem] font-semibold text-primary" role="alert">
           {translate("landing.failed")}
         </p>
       )}
 
-      <ol className="mt-1 flex list-none flex-col gap-2 border-t border-line pt-4 text-left text-[13px] text-ink-dim">
-        <li className="flex gap-2.5"><span className="mt-0.5 font-display text-[11px] font-bold text-primary">01</span><span>{translate("landing.stepOne")}</span></li>
-        <li className="flex gap-2.5"><span className="mt-0.5 font-display text-[11px] font-bold text-primary">02</span><span>{translate("landing.stepTwo")}</span></li>
-        <li className="flex gap-2.5"><span className="mt-0.5 font-display text-[11px] font-bold text-primary">03</span><span>{translate("landing.stepThree")}</span></li>
+      <ol className="mt-1 flex list-none flex-col gap-2 border-t border-line pt-4 text-left text-[0.8125rem] text-ink-dim">
+        <li className="flex gap-2.5"><span className="mt-0.5 font-display text-[0.6875rem] font-bold text-primary">01</span><span>{translate("landing.stepOne")}</span></li>
+        <li className="flex gap-2.5"><span className="mt-0.5 font-display text-[0.6875rem] font-bold text-primary">02</span><span>{translate("landing.stepTwo")}</span></li>
+        <li className="flex gap-2.5"><span className="mt-0.5 font-display text-[0.6875rem] font-bold text-primary">03</span><span>{translate("landing.stepThree")}</span></li>
       </ol>
     </section>
   );

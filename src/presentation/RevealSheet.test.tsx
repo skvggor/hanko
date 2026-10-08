@@ -66,6 +66,33 @@ describe("revealDuration", () => {
   });
 });
 
+/**
+ * The sizes are compared rather than asserted against a literal, because pinning the
+ * exact number would re-break every time the type scale is retuned while saying
+ * nothing the comparison does not already say.
+ */
+function fontRem(element: Element | null): number {
+  const className = element?.className;
+  if (typeof className !== "string") throw new Error("no element to measure");
+  const match = /text-\[([\d.]+)rem\]/.exec(className);
+  if (!match?.[1]) throw new Error(`no rem font size on ${className}`);
+  return Number(match[1]);
+}
+
+/**
+ * A vote value also shows up in the distribution bar, so the lookup is scoped to the
+ * seal it belongs to, the same way sealValues scopes the plain text lookup.
+ */
+function voteFontRem(participantName: string): number {
+  const seal = screen
+    .getAllByRole("listitem")
+    .find((item) => item.textContent?.includes(participantName));
+
+  if (!seal) throw new Error(`no seal for ${participantName}`);
+
+  return fontRem(seal.querySelector(".font-display"));
+}
+
 describe("RevealSheet", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -185,8 +212,10 @@ describe("RevealSheet", () => {
 
     act(() => { vi.advanceTimersByTime(400); });
 
-    const average = screen.getByText("5.5");
-    expect(average.className).toContain("text-[52px]");
+    const average = fontRem(screen.getByText("5.5"));
+
+    expect(average).toBeGreaterThan(voteFontRem("Ana"));
+    expect(average).toBeGreaterThan(voteFontRem("Bruno"));
   });
 
   it("drops the sum, which was noise next to the average", () => {

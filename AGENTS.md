@@ -248,7 +248,23 @@ Tailwind utilities inline, plus a BEM-ish `src/presentation/styles/theme.css` fo
 animation and stateful pieces. Design tokens are CSS variables surfaced through `@theme`
 (`bg-paper`, `text-ink-dim`, `border-line`, `text-primary`, `font-display`,
 `rounded-chip`). Arbitrary values are normal here: `min-h-11`, `max-w-115`,
-`text-[clamp(15px,4.2vw,22px)]`.
+`text-[clamp(0.9375rem,4.2vw,1.375rem)]`.
+
+The root font size is fluid — `html { font-size: clamp(1rem, 0.95rem + 0.25vw, 1.35rem) }`
+— and everything else is sized in rem against it, so one value carries the interface from
+a phone to a large display. Expressing a font size in pixels opts that piece out of the
+scaling: it stays the size it was on a phone while everything around it swells, and the
+layout reads as broken rather than merely small. `presentation/typography.test.ts` fails
+on `text-[NNpx]` in a component or `font-size: NNpx` in the stylesheet, so this is
+enforced rather than remembered. The exceptions are deliberate: one pixel hairlines stay
+hairlines at any size, and focus outlines stay in pixels so they stay legible instead of
+thinning out.
+
+`Shell.tsx` pins the header to the top and the footer to the bottom and centres only the
+content between them. `main` takes the free space with `flex-1` and centres what it
+holds; the `[data-frame]` element inside it caps the measure so a long line never runs
+the width of the display. Do not put the chrome back inside the frame: the wordmark and
+the credit are meant to stay put while the room moves.
 
 Accessibility is treated as a requirement, not polish. Every icon gets `aria-hidden`,
 every icon only button gets an `aria-label`, errors use `role="alert"`, chat uses

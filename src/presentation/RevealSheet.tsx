@@ -62,17 +62,17 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
       {isComplete && (
         <div className="rise-in flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
           <div className="flex items-end gap-2.5">
-            <span className="font-display text-[52px] leading-[0.85] font-bold text-primary">
+            <span className="font-display text-[3.25rem] leading-[0.85] font-bold text-primary">
               {tally.average === null ? "–" : tally.average}
             </span>
-            <span className="pb-1 text-[11px] font-semibold tracking-[0.16em] text-ink-dim uppercase">
+            <span className="pb-1 text-[0.6875rem] font-semibold tracking-[0.16em] text-ink-dim uppercase">
               {translate("result.average")}
             </span>
           </div>
 
           <div className="flex flex-col items-end gap-1">
             {tally.min !== null && tally.max !== null && (
-              <span className="font-mono text-[12px] text-ink-dim">
+              <span className="font-mono text-[0.75rem] text-ink-dim">
                 {translate("result.range", {
                   min: tally.min,
                   max: tally.max,
@@ -80,7 +80,7 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
               </span>
             )}
             <span
-              className={`rounded-chip px-2.5 py-1 text-[11px] font-bold tracking-[0.06em] uppercase ${
+              className={`rounded-chip px-2.5 py-1 text-[0.6875rem] font-bold tracking-[0.06em] uppercase ${
                 tally.consensus === "aligned"
                   ? "bg-secondary/12 text-secondary"
                   : tally.consensus === "close"
@@ -104,7 +104,7 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
           >
             {tally.distribution.map((row) => (
               <div
-                className={`flex min-w-6 items-center justify-center text-[12px] font-bold ${
+                className={`flex min-w-6 items-center justify-center text-[0.75rem] font-bold ${
                   row.value === "?" || row.value === "coffee"
                     ? `${tone.bar} text-paper-raised`
                     : `${tone.bar} text-paper-raised`
@@ -117,7 +117,7 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-dim">
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.6875rem] text-ink-dim">
             {tally.needsDiscussion > 0 && (
               <span>
                 {translate("result.needsDiscussion", { count: tally.needsDiscussion })}
@@ -153,23 +153,23 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
               key={entry.participantId}
               style={revealStyle(tiltFor(index, entries.length))}
             >
-              <span className="max-w-full overflow-hidden text-[10px] font-semibold tracking-[0.03em] text-ink-dim uppercase [text-overflow:ellipsis] whitespace-nowrap">
+              <span className="max-w-full overflow-hidden text-[0.625rem] font-semibold tracking-[0.03em] text-ink-dim uppercase [text-overflow:ellipsis] whitespace-nowrap">
                 {entry.name}
               </span>
               <span
-                className={`font-display text-[24px] leading-none font-bold ${
+                className={`font-display text-[1.5rem] leading-none font-bold ${
                   isIdle ? "text-ink-faint" : "text-ink"
                 }`}
               >
                 {isIdle ? "–" : voteLabel(entry.vote ?? "", translate)}
               </span>
               {isCoffee && (
-                <span className="text-[9px] font-semibold tracking-[0.08em] text-ink-faint uppercase">
+                <span className="text-[0.5625rem] font-semibold tracking-[0.08em] text-ink-faint uppercase">
                   {translate("vote.coffee")}
                 </span>
               )}
               {entry.role === "spectator" && (
-                <span className="text-[9px] font-semibold tracking-[0.08em] text-ink-faint uppercase">
+                <span className="text-[0.5625rem] font-semibold tracking-[0.08em] text-ink-faint uppercase">
                   {translate("room.spectatorBadge")}
                 </span>
               )}

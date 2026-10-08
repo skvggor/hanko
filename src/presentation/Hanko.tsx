@@ -53,7 +53,7 @@ export function Hanko({ state, myParticipantId, translate, onVote }: HankoProps)
                     : translate("a11y.voteButton", { value: label })
                 }
                 aria-pressed={isMine}
-                className="aspect-square min-h-11 cursor-pointer rounded-2xl border border-ink/20 bg-paper-raised px-0.5 font-display text-[clamp(15px,4.2vw,22px)] font-bold text-ink transition-all duration-100 hover:-translate-y-0.5 hover:border-ink hover:shadow-[0_4px_0_0_var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-40 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-on-primary"
+                className="aspect-square min-h-11 cursor-pointer rounded-2xl border border-ink/20 bg-paper-raised px-0.5 font-display text-[clamp(0.9375rem,4.2vw,1.375rem)] font-bold text-ink transition-all duration-100 hover:-translate-y-0.5 hover:border-ink hover:shadow-[0_4px_0_0_var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-40 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-on-primary"
                 disabled={isSpectator}
                 key={value}
                 type="button"
@@ -70,7 +70,7 @@ export function Hanko({ state, myParticipantId, translate, onVote }: HankoProps)
       )}
 
       {!state.isRevealed && (
-        <p className="m-0 text-[11px] leading-relaxed text-ink-faint">
+        <p className="m-0 text-[0.6875rem] leading-relaxed text-ink-faint">
           {isSpectator
             ? translate("room.waitingForVote")
             : translate("vote.hint")}

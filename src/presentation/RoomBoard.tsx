@@ -55,7 +55,7 @@ function MiniButton({
   return (
     <button
       aria-pressed={pressed}
-      className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1 font-sans text-[10px] font-semibold tracking-[0.06em] uppercase transition-colors ${
+      className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1 font-sans text-[0.625rem] font-semibold tracking-[0.06em] uppercase transition-colors ${
         pressed
           ? tone === "primary"
             ? "bg-primary text-on-primary"
@@ -102,10 +102,10 @@ export function RoomBoard({
     <div className="flex flex-col gap-3 px-4">
       <Panel className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2.5">
-          <span className="rounded-chip bg-ink/8 px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] text-ink-dim">
+          <span className="rounded-chip bg-ink/8 px-2.5 py-1 text-[0.6875rem] font-semibold tracking-[0.04em] text-ink-dim">
             {translate("room.round", { round: state.round })}
           </span>
-          <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-dim">
+          <span className="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-ink-dim">
             <Users aria-hidden="true" size={15} weight="bold" />
             {translate("room.connected", { count: state.connectedCount })}
           </span>
@@ -127,7 +127,7 @@ export function RoomBoard({
         <Panel className="flex flex-col gap-2 p-3.5">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span
-              className={`text-[13px] font-semibold ${voted.complete ? "text-secondary" : "text-ink"}`}
+              className={`text-[0.8125rem] font-semibold ${voted.complete ? "text-secondary" : "text-ink"}`}
             >
               {progressLabel}
             </span>
@@ -163,7 +163,7 @@ export function RoomBoard({
               className={`flex min-h-12 flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-line px-3.5 py-2 last:border-b-0 ${participant.isConnected ? "" : "opacity-50"}`}
               key={participant.id}
             >
-              <span className="text-[15px] font-semibold text-ink">
+              <span className="text-[0.9375rem] font-semibold text-ink">
                 {participant.name}
               </span>
 
@@ -334,7 +334,7 @@ function SessionNameField({
   return (
     <div className="flex w-full flex-col gap-1.5">
       <label
-        className="m-0 text-[10px] font-semibold tracking-[0.16em] text-ink-faint uppercase"
+        className="m-0 text-[0.625rem] font-semibold tracking-[0.16em] text-ink-faint uppercase"
         htmlFor="session-name"
       >
         {translate("session.label")}
@@ -362,7 +362,7 @@ function SessionNameField({
         </MiniButton>
       </div>
       {problem !== null && (
-        <p className="text-[11px] font-semibold text-primary" role="alert">
+        <p className="text-[0.6875rem] font-semibold text-primary" role="alert">
           {translate(problem)}
         </p>
       )}

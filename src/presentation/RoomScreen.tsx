@@ -198,7 +198,7 @@ export function RoomScreen({ roomId, onSessionNameChange, translate }: RoomScree
     <>
       {errorCode !== null && (
         <p
-          className="mx-4 mb-3 rounded-2xl bg-primary/10 px-3.5 py-2 text-[13px] font-semibold text-primary"
+          className="mx-4 mb-3 rounded-2xl bg-primary/10 px-3.5 py-2 text-[0.8125rem] font-semibold text-primary"
           role="alert"
         >
           {translate(`errors.${errorCode}`)}
@@ -207,10 +207,10 @@ export function RoomScreen({ roomId, onSessionNameChange, translate }: RoomScree
 
       {wasRemoved ? (
         <div className="mx-4 mt-6 mb-4 rounded-3xl border border-line bg-paper-raised p-6 text-center">
-          <p className="m-0 font-display text-[17px] font-bold text-ink">
+          <p className="m-0 font-display text-[1.0625rem] font-bold text-ink">
             {translate("errors.participant_removed")}
           </p>
-          <p className="mt-2 mb-0 text-[13px] text-ink-dim">
+          <p className="mt-2 mb-0 text-[0.8125rem] text-ink-dim">
             {translate("room.removedHint")}
           </p>
         </div>

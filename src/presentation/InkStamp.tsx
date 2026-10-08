@@ -40,12 +40,12 @@ export function InkStamp({ value, label, pressId = 0 }: InkStampProps) {
     >
       <span
         aria-hidden="true"
-        className={`stamp-bleed absolute h-24 w-24 rounded-full border-[3px] border-primary ${isWet ? "opacity-100" : "opacity-0"}`}
+        className={`stamp-bleed absolute h-24 w-24 rounded-full border-[0.1875rem] border-primary ${isWet ? "opacity-100" : "opacity-0"}`}
         key={`bleed-${stamp}`}
       />
       <span
         aria-hidden="true"
-        className={`relative z-1 flex h-18 w-18 items-center justify-center rounded-full border-[3px] font-display text-[34px] font-bold ${
+        className={`relative z-1 flex h-18 w-18 items-center justify-center rounded-full border-[0.1875rem] font-display text-[2.125rem] font-bold ${
           isWet
             ? "stamp-press border-primary bg-primary text-on-primary"
             : "stamp-settle border-primary bg-transparent text-primary"
