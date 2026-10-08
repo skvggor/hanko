@@ -18,10 +18,11 @@ than reaching for generic dashboard patterns.
 
 ## Stack
 
-Vite 8 + React 19 + TypeScript 5.9 on the client, Cloudflare Workers + Durable Objects on
-the server, Tailwind v4 for styling, Vitest 5 + Testing Library for tests, ESLint 10 flat
-config, Lefthook for the pre-commit hook. Routing, state management, i18n and validation
-are all hand written; there is no router library, no state library and no i18n library.
+Vite, React and TypeScript on the client, Cloudflare Workers and Durable Objects on the
+server, Tailwind for styling, Vitest and Testing Library for tests, ESLint flat config,
+Lefthook for the hooks. Read `package.json` for the versions. Routing, state management,
+i18n and validation are all hand written; there is no router library, no state library and
+no i18n library.
 
 Runtime dependencies are deliberately few: React, React DOM, Phosphor icons and the
 self-hosted Space Grotesk variable font. Do not add a dependency for something that is a
@@ -40,11 +41,14 @@ npm run lint           # eslint .
 npm run lint:fix       # eslint . --fix
 npm test               # vitest run
 npm run test:coverage  # vitest run --coverage (enforces the 80% gate)
-npm run deploy         # build + wrangler deploy
+npm run deploy         # coverage, then build, then wrangler deploy
 ```
 
-A Lefthook pre-commit hook runs ESLint on staged files with `--max-warnings=0`, both
+Two Lefthook hooks. `pre-commit` runs ESLint on staged files with `--max-warnings=0`, both
 `tsc --noEmit` passes, the full coverage run, and a secret scan over the staged diff.
+`pre-push` runs lint, both typecheck passes, coverage and the production build across the
+whole tree, which is what catches a branch carrying a commit whose staged file was clean
+but whose neighbours were not.
 `npm run typecheck`, `npm run lint` and `npm run test:coverage` must all be green before
 you consider a change done.
 
@@ -111,8 +115,9 @@ reload with a stale token cannot walk back in.
 ### `@presentation` — React UI
 
 One container, many presentational components. `RoomScreen.tsx` is the only place that
-constructs a `RoomConnection`; it owns all mutable state and wires roughly twelve
-`useCallback` handlers down as `onX` props. Components below it take data and callbacks.
+constructs a `RoomConnection`; it owns all mutable state and wires the handlers down as
+`onX` props. Components below it take data and callbacks. Adding a second place that
+opens a connection splits the state that only the container can see.
 
 Every component exports an explicit props interface and receives `translate: Translator`
 as a prop. There is no context, no global i18n singleton and no store.
@@ -266,10 +271,9 @@ workerd. A few files are named after a concern instead of a module
 more than one file, but prefer one test file per source file otherwise.
 
 Coverage is gated at 80% for statements, branches, functions and lines, and the gate
-covers `src/domain`, `src/application`, `src/infra` and `src/presentation`. Presentation
-used to sit outside the thresholds, which is exactly how `ui.tsx` and `Wordmark.tsx` came
-to have no tests at all without anything complaining. Current numbers sit around 96%
-statements and 94% branches.
+covers every layer: `src/domain`, `src/application`, `src/infra` and `src/presentation`.
+A layer left out of the gate is a layer where a regression is free, so adding a new one
+to the thresholds is part of adding the layer itself.
 
 The thresholds are on the total, not per file, so one well covered file can carry another.
 When you add a component, check its own numbers rather than assuming the aggregate speaks
@@ -326,9 +330,9 @@ these properties intact:
 
 - Room ids use a Crockford style alphabet excluding ambiguous characters, drawn with
   rejection sampling so the distribution is uniform.
-- Votes are hidden server side until reveal; a vote is only ever returned for a token the
-  caller actually presents. There is a regression test for the earlier version of this
-  that leaked the sole hidden vote to anyone who guessed the id.
+- Votes are hidden server side until reveal, and a vote is only ever returned for a token
+  the caller actually presents. A regression test guards this; do not relax it to make a
+  state fixture easier to build.
 - WebSocket upgrades validate `Origin`, refusing a missing `Origin` as a non browser
   client to block cross site WebSocket hijacking.
 - Chat and commands have separate per window rate limits, and `MAX_SOCKETS` caps sockets
