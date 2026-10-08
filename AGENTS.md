@@ -266,6 +266,20 @@ holds; the `[data-frame]` element inside it caps the measure so a long line neve
 the width of the display. Do not put the chrome back inside the frame: the wordmark and
 the credit are meant to stay put while the room moves.
 
+Both bars are `sticky` and share `h-[var(--chrome-height)]`, so the pair reads as a frame
+rather than as two unrelated bars that happen to be on screen. They share the token
+rather than each carrying a height, because the token is rem based and scales with the
+root, which is the only way the two can stay equal at 4k. The header carries the logo on
+the left with the language switcher laid out beside it, not absolutely positioned over it.
+
+Because the chrome is pinned it stops being the only thing on screen and becomes a lid
+over the content, so `data-glass` turns on a frosted background: the header when the page
+has scrolled under it, the footer whenever the document is taller than the viewport,
+since the footer is always pinned and always has something behind it. Frosting a surface
+with nothing behind it only costs paint. The floating chat dock is fixed and sits above
+the footer in z order, so its offset clears `--chrome-height` rather than resting at the
+viewport edge.
+
 Destructive actions confirm first. `ConfirmDialog` opens on the safe answer rather than
 the destructive one, because a dialog reached by a stray Enter must not be confirmed by
 the same Enter, and it hands focus back to whatever opened it. Deleting a room broadcasts

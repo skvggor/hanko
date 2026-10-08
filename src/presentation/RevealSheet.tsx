@@ -58,10 +58,10 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
   const headroom = Math.max(1, tally.counted);
 
   return (
-    <div className="flex flex-col gap-4" data-complete={isComplete}>
+    <div className="flex flex-col gap-stack" data-complete={isComplete}>
       {isComplete && (
-        <div className="rise-in flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-          <div className="flex items-end gap-2.5">
+        <div className="rise-in flex flex-wrap items-end justify-between gap-x-stack gap-y-tight">
+          <div className="flex items-end gap-snug">
             <span className="font-display text-[3.25rem] leading-[0.85] font-bold text-primary">
               {tally.average === null ? "–" : tally.average}
             </span>
@@ -80,7 +80,7 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
               </span>
             )}
             <span
-              className={`rounded-chip px-2.5 py-1 text-[0.6875rem] font-bold tracking-[0.06em] uppercase ${
+              className={`rounded-chip px-snug py-1 text-[0.6875rem] font-bold tracking-[0.06em] uppercase ${
                 tally.consensus === "aligned"
                   ? "bg-secondary/12 text-secondary"
                   : tally.consensus === "close"
@@ -117,7 +117,7 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.6875rem] text-ink-dim">
+          <div className="flex flex-wrap gap-x-snug gap-y-1 text-[0.6875rem] text-ink-dim">
             {tally.needsDiscussion > 0 && (
               <span>
                 {translate("result.needsDiscussion", { count: tally.needsDiscussion })}
@@ -140,7 +140,7 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
 
       <ol
         aria-label={translate("a11y.revealList")}
-        className="m-0 flex list-none flex-wrap gap-2 p-0"
+        className="m-0 flex list-none flex-wrap gap-tight p-0"
       >
         {entries.slice(0, revealedCount).map((entry, index) => {
           const isDiscussion = entry.vote === "?";
@@ -149,7 +149,7 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
 
           return (
             <li
-              className="seal-in flex min-w-16 flex-1 basis-16 flex-col items-center gap-0.5 rounded-2xl border border-line bg-paper-raised px-1.5 py-2"
+              className="seal-in flex min-w-16 flex-1 basis-16 flex-col items-center gap-0.5 rounded-2xl border border-line bg-paper-raised px-1.5 py-tight"
               key={entry.participantId}
               style={revealStyle(tiltFor(index, entries.length))}
             >

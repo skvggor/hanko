@@ -17,6 +17,14 @@ function voteLabel(value: string, translate: Translator): string {
   return value === "coffee" ? translate("vote.coffee") : value;
 }
 
+/**
+ * Every other value on the scale is one or two characters, and a word does not fit a
+ * card sized for them. Setting the word smaller keeps the grid uniform: all the cards
+ * stay the same shape and the eye reads one row rather than a squashed last entry.
+ */
+const WORD_FONT_SIZE = "text-[0.8125rem]";
+const NUMBER_FONT_SIZE = "text-[clamp(0.9375rem,4.2vw,1.375rem)]";
+
 export function Hanko({ state, myParticipantId, translate, onVote }: HankoProps) {
   const me = state.participants.find((entry) => entry.id === myParticipantId);
   const isSpectator = me?.role === "spectator";
@@ -25,7 +33,7 @@ export function Hanko({ state, myParticipantId, translate, onVote }: HankoProps)
   const [pressId, setPressId] = useState(0);
 
   return (
-    <Panel className="mx-4 mt-3 mb-4 flex flex-col gap-3.5 p-4">
+    <Panel className="mt-snug mb-room flex flex-col gap-snug p-room">
       <Label>{translate("vote.prompt")}</Label>
 
       {!state.isRevealed && !isSpectator && (
@@ -40,10 +48,11 @@ export function Hanko({ state, myParticipantId, translate, onVote }: HankoProps)
           translate={translate}
         />
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(54px,1fr))] gap-2">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(3.5rem,1fr))] gap-tight">
           {values.map((value) => {
             const isMine = myVote === value;
             const label = voteLabel(value, translate);
+            const isWord = label.length > 3;
 
             return (
               <button
@@ -53,7 +62,9 @@ export function Hanko({ state, myParticipantId, translate, onVote }: HankoProps)
                     : translate("a11y.voteButton", { value: label })
                 }
                 aria-pressed={isMine}
-                className="aspect-square min-h-11 cursor-pointer rounded-2xl border border-ink/20 bg-paper-raised px-0.5 font-display text-[clamp(0.9375rem,4.2vw,1.375rem)] font-bold text-ink transition-all duration-100 hover:-translate-y-0.5 hover:border-ink hover:shadow-[0_4px_0_0_var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-40 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-on-primary"
+                className={`aspect-square min-h-11 cursor-pointer rounded-2xl border border-ink/20 bg-paper-raised px-1 font-display ${
+                  isWord ? WORD_FONT_SIZE : NUMBER_FONT_SIZE
+                } font-bold text-ink transition-all duration-100 hover:-translate-y-0.5 hover:border-ink hover:shadow-[0_4px_0_0_var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-40 aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-on-primary`}
                 disabled={isSpectator}
                 key={value}
                 type="button"

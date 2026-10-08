@@ -34,9 +34,9 @@
     "totalPoints": "{{total}} points",
     "spectatorBadge": "Watching",
     "invite": "share",
-    "removedHint": "You can no longer see the room. Ask the owner for a new link.",
     "missingTitle": "Room not found",
-    "missingLink": "This link isn't a room"
+    "missingLink": "This link isn't a room",
+    "removedHint": "You can no longer see the room. Ask the owner for a new link."
   },
   "controls": {
     "reveal": "Reveal",
@@ -56,10 +56,16 @@
     "changeRole": "Make watcher",
     "changeToVoter": "Make voter",
     "rename": "Change name",
+    "renameSave": "Save",
+    "renameCancel": "Cancel",
     "confirmDeleteTitle": "Delete this room?",
     "confirmDeleteBody": "This room and every vote in it disappear for everyone. It cannot be brought back.",
     "confirmDeleteAccept": "Yes, delete it",
-    "confirmDeleteCancel": "Keep it"
+    "confirmDeleteCancel": "Keep it",
+    "confirmLeaveTitle": "Leave this room?",
+    "confirmLeaveBody": "You keep your seat for {{grace}} minutes after you go. After that it is freed for someone else.",
+    "confirmLeaveAccept": "Yes, leave",
+    "confirmLeaveCancel": "Stay here"
   },
   "vote": {
     "prompt": "Your estimate",
@@ -110,7 +116,8 @@
     "name": "Hanko",
     "tagline": "Your team's consensus.",
     "credit": "Made by",
-    "author": "skvggor"
+    "author": "skvggor",
+    "goHome": "Go to the start page"
   },
   "result": {
     "average": "Average",

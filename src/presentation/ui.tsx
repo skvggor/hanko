@@ -22,7 +22,7 @@ export function Button({
   ref?: Ref<HTMLButtonElement> | undefined;
 }) {
   const base =
-    "inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-full px-4 py-2 font-sans text-[0.8125rem] font-semibold tracking-[0.02em] transition-transform duration-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100";
+    "inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-full px-gutter py-tight font-sans text-[0.8125rem] font-semibold tracking-[0.02em] transition-transform duration-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100";
 
   const variants = {
     default: "border border-ink/30 text-ink hover:border-ink hover:bg-ink hover:text-paper",
@@ -88,7 +88,7 @@ export function Chip({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-chip px-2 py-0.5 text-[0.625rem] font-semibold tracking-[0.06em] uppercase ${tones[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-chip px-tight py-0.5 text-[0.625rem] font-semibold tracking-[0.06em] uppercase ${tones[tone]}`}
       title={title}
     >
       {children}
@@ -103,7 +103,7 @@ export function Chip({
 export function OwnerBadge({ label }: { label: string }) {
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-chip bg-ink py-0.5 pr-2 pl-1.5 text-[0.625rem] font-semibold tracking-[0.06em] text-paper uppercase"
+      className="inline-flex items-center gap-1.5 rounded-chip bg-ink py-0.5 pr-tight pl-1.5 text-[0.625rem] font-semibold tracking-[0.06em] text-paper uppercase"
       data-role="owner"
     >
       <svg aria-hidden="true" className="h-2.5 w-2.5" viewBox="0 0 10 10">

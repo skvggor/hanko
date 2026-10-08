@@ -34,9 +34,9 @@
     "totalPoints": "{{total}} pontos",
     "spectatorBadge": "Assistindo",
     "invite": "convidar",
-    "removedHint": "Você não vê mais a sala. Peça um novo link ao dono.",
     "missingTitle": "Sala não encontrada",
-    "missingLink": "Este link não é uma sala"
+    "missingLink": "Este link não é uma sala",
+    "removedHint": "Você não vê mais a sala. Peça um novo link ao dono."
   },
   "controls": {
     "reveal": "Revelar",
@@ -56,10 +56,16 @@
     "changeRole": "Virar observador",
     "changeToVoter": "Virar votante",
     "rename": "Mudar nome",
+    "renameSave": "Salvar",
+    "renameCancel": "Cancelar",
     "confirmDeleteTitle": "Apagar esta sala?",
     "confirmDeleteBody": "Esta sala e todos os votos dela somem para todo mundo. Não é possível desfazer.",
     "confirmDeleteAccept": "Sim, apagar",
-    "confirmDeleteCancel": "Manter"
+    "confirmDeleteCancel": "Manter",
+    "confirmLeaveTitle": "Sair desta sala?",
+    "confirmLeaveBody": "Você mantém seu lugar por {{grace}} minutos depois de sair. Depois disso ele é liberado para outra pessoa.",
+    "confirmLeaveAccept": "Sim, sair",
+    "confirmLeaveCancel": "Ficar aqui"
   },
   "vote": {
     "prompt": "Sua estimativa",
@@ -110,7 +116,8 @@
     "name": "Hanko",
     "tagline": "O consenso da sua equipe.",
     "credit": "Feito por",
-    "author": "skvggor"
+    "author": "skvggor",
+    "goHome": "Ir para a página inicial"
   },
   "result": {
     "average": "Média",

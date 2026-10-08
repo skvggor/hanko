@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { createTranslator } from "@application/i18n";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -152,7 +152,7 @@ function pushDeleted() {
 }
 
 const roomState = {
-  id: "room-1",
+  id: "abcd2345",
   deckId: "fibonacci",
   round: 1,
   isRevealed: false,
@@ -171,7 +171,7 @@ const roomState = {
 
 function renderRoom() {
   return render(
-    <RoomScreen roomId="room-1" translate={createTranslator("en-US")} />,
+    <RoomScreen roomId="abcd2345" translate={createTranslator("en-US")} />,
   );
 }
 
@@ -189,7 +189,7 @@ describe("RoomScreen", () => {
 
     vi.stubGlobal("location", {
       origin: "https://hanko.pages.dev",
-      pathname: "/room/room-1",
+      pathname: "/room/abcd2345",
       protocol: "https:",
     });
     vi.stubGlobal("navigator", { language: "en-US" });
@@ -235,7 +235,7 @@ describe("RoomScreen", () => {
     await joinAs("Ana");
 
     await waitFor(() => {
-      expect(setItem).toHaveBeenCalledWith("hanko:name:room-1", "Ana");
+      expect(setItem).toHaveBeenCalledWith("hanko:name:abcd2345", "Ana");
     });
   });
 
@@ -626,7 +626,7 @@ describe("RoomScreen owner controls", () => {
 
     vi.stubGlobal("location", {
       origin: "https://hanko.pages.dev",
-      pathname: "/room/room-1",
+      pathname: "/room/abcd2345",
       protocol: "https:",
     });
     vi.stubGlobal("navigator", { language: "en-US" });
@@ -759,35 +759,58 @@ describe("RoomScreen owner controls", () => {
     expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(1);
   });
 
-  it("takes a new name from the rename prompt", async () => {
-    vi.stubGlobal("prompt", vi.fn(() => "Ana Maria"));
+  // The rename goes through the app's own modal now, so these drive the field instead of
+  // a stubbed window.prompt. The wire message is what the room cares about either way.
+  async function renameTo(name: string) {
+    await userEvent.click(await screen.findByRole("button", { name: "Change name" }));
+    const field = screen.getByLabelText("Your name");
+    await userEvent.clear(field);
+    if (name.length > 0) await userEvent.type(field, name);
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }),
+    );
+  }
+
+  it("takes a new name from the rename modal", async () => {
     await enterRoom();
     pushState(ownerState);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Change name" }));
+    await renameTo("Ana Maria");
 
     expect(harness.sent).toContainEqual({ type: "set-name", name: "Ana Maria" });
   });
 
-  it("sends nothing when the rename prompt is dismissed", async () => {
-    vi.stubGlobal("prompt", vi.fn(() => null));
+  it("sends nothing when the rename modal is dismissed", async () => {
     await enterRoom();
     pushState(ownerState);
 
     await userEvent.click(await screen.findByRole("button", { name: "Change name" }));
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }),
+    );
 
     expect(harness.sent).toHaveLength(0);
   });
 
-  it("keeps the old name when the prompt returns an empty string", async () => {
-    vi.stubGlobal("prompt", vi.fn(() => ""));
+  it("refuses an empty name instead of sending one to the server", async () => {
+    await enterRoom();
+    pushState(ownerState);
+
+    await renameTo("");
+
+    expect(harness.sent).toHaveLength(0);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("never calls the browser's own prompt", async () => {
+    const prompt = vi.fn();
+    vi.stubGlobal("prompt", prompt);
     await enterRoom();
     pushState(ownerState);
 
     await userEvent.click(await screen.findByRole("button", { name: "Change name" }));
 
-    // An empty rename is the server's to reject, not the client's to swallow.
-    expect(harness.sent).toContainEqual({ type: "set-name", name: "" });
+    expect(prompt).not.toHaveBeenCalled();
   });
 
   it("asks the connection to delete the room, once the owner confirms", async () => {
@@ -835,7 +858,7 @@ describe("RoomScreen owner controls", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
 
-    expect(writeText).toHaveBeenCalledWith("https://hanko.pages.dev/room/room-1");
+    expect(writeText).toHaveBeenCalledWith("https://hanko.pages.dev/room/abcd2345");
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
   });
 
@@ -876,7 +899,7 @@ describe("RoomScreen deleting the room", () => {
 
     vi.stubGlobal("location", {
       origin: "https://hanko.pages.dev",
-      pathname: "/room/room-1",
+      pathname: "/room/abcd2345",
       protocol: "https:",
     });
     vi.stubGlobal("navigator", { language: "en-US" });
@@ -898,7 +921,7 @@ describe("RoomScreen deleting the room", () => {
     render(
       <RoomScreen
         onRoomDeleted={onRoomDeleted}
-        roomId="room-1"
+        roomId="abcd2345"
         translate={createTranslator("en-US")}
       />,
     );

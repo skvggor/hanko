@@ -90,7 +90,7 @@ export function ChatPanel({
     <div className="chat-dock" data-open="true">
       <section aria-label={translate("chat.title")} className="chat-panel">
         <header className="chat-panel__header">
-          <h2 className="flex items-center gap-2 font-display text-[0.8125rem] font-bold text-ink">
+          <h2 className="flex items-center gap-tight font-display text-[0.8125rem] font-bold text-ink">
             <ChatsCircle aria-hidden="true" size={16} weight="fill" />
             {translate("chat.title")}
           </h2>

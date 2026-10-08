@@ -10,6 +10,8 @@ import type { Translator } from "@application/i18n";
 import { readVotedState } from "@application/votedState";
 import { Button, Chip, Label, Meter, OwnerBadge, Panel } from "@presentation/ui";
 import { ShareSnippet } from "@presentation/ShareSnippet";
+import { PromptDialog } from "@presentation/PromptDialog";
+import { validateName } from "@domain/name";
 import {
   ArrowCounterClockwise,
   Crown,
@@ -60,7 +62,7 @@ function MiniButton({
   return (
     <button
       aria-pressed={pressed}
-      className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1 font-sans text-[0.625rem] font-semibold tracking-[0.06em] uppercase transition-colors ${
+      className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full px-snug py-1 font-sans text-[0.625rem] font-semibold tracking-[0.06em] uppercase transition-colors ${
         pressed
           ? tone === "primary"
             ? "bg-primary text-on-primary"
@@ -94,6 +96,7 @@ export function RoomBoard({
   onRename,
   deleteButtonRef,
 }: RoomBoardProps) {
+  const [renaming, setRenaming] = useState<string | null>(null);
   const amOwner = state.ownerId !== null && state.ownerId === myParticipantId;
   const voted = readVotedState(state);
 
@@ -105,10 +108,10 @@ export function RoomBoard({
   const watchers = state.participants.length - voters;
 
   return (
-    <div className="flex flex-col gap-3 px-4">
-      <Panel className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2.5">
-          <span className="rounded-chip bg-ink/8 px-2.5 py-1 text-[0.6875rem] font-semibold tracking-[0.04em] text-ink-dim">
+    <div className="flex flex-col gap-snug px-gutter">
+      <Panel className="flex flex-col gap-snug p-room sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-snug">
+          <span className="rounded-chip bg-ink/8 px-snug py-1 text-[0.6875rem] font-semibold tracking-[0.04em] text-ink-dim">
             {translate("room.round", { round: state.round })}
           </span>
           <span className="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-ink-dim">
@@ -130,8 +133,8 @@ export function RoomBoard({
       </Panel>
 
       {state.participants.length > 0 && !state.isRevealed && (
-        <Panel className="flex flex-col gap-2 p-3.5">
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <Panel className="flex flex-col gap-tight p-room">
+          <div className="flex flex-wrap items-center justify-between gap-x-snug gap-y-1">
             <span
               className={`text-[0.8125rem] font-semibold ${voted.complete ? "text-secondary" : "text-ink"}`}
             >
@@ -166,7 +169,7 @@ export function RoomBoard({
 
           return (
             <div
-              className={`flex min-h-12 flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-line px-3.5 py-2 last:border-b-0 ${participant.isConnected ? "" : "opacity-50"}`}
+              className={`flex min-h-12 flex-wrap items-center gap-x-snug gap-y-1 border-b border-line px-room py-snug last:border-b-0 ${participant.isConnected ? "" : "opacity-50"}`}
               key={participant.id}
             >
               <span className="text-[0.9375rem] font-semibold text-ink">
@@ -194,15 +197,7 @@ export function RoomBoard({
 
               <span className="ml-auto flex flex-wrap items-center gap-1.5">
                 {isMe && (
-                  <MiniButton
-                    onClick={() => {
-                      const next = globalThis.prompt(
-                        translate("controls.rename"),
-                        participant.name,
-                      );
-                      if (next !== null) onRename(next);
-                    }}
-                  >
+                  <MiniButton onClick={() => setRenaming(participant.name)}>
                     <PencilSimple aria-hidden="true" size={12} weight="bold" />
                     {translate("controls.rename")}
                   </MiniButton>
@@ -247,8 +242,8 @@ export function RoomBoard({
       </Panel>
 
       {amOwner && (
-        <Panel className="flex flex-col gap-3 p-3.5">
-          <div className="flex flex-wrap items-center gap-2">
+        <Panel className="flex flex-col gap-snug p-room">
+          <div className="flex flex-wrap items-center gap-tight">
             {state.isRevealed ? (
               <Button onClick={onNextRound} variant="primary">
                 <ArrowCounterClockwise aria-hidden="true" size={16} weight="bold" />
@@ -267,7 +262,7 @@ export function RoomBoard({
             </Button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+          <div className="flex flex-wrap items-center gap-tight border-t border-line pt-snug">
             <span className="inline-flex items-center gap-1 text-ink-faint">
               <SlidersHorizontal aria-hidden="true" size={14} weight="bold" />
               <Label>{translate("controls.changeDeck")}</Label>
@@ -300,6 +295,25 @@ export function RoomBoard({
             {translate("controls.deleteRoom")}
           </Button>
         </Panel>
+      )}
+
+      {renaming !== null && (
+        <PromptDialog
+          acceptLabel={translate("controls.renameSave")}
+          cancelLabel={translate("controls.renameCancel")}
+          initialValue={renaming}
+          label={translate("join.placeholder")}
+          title={translate("controls.rename")}
+          validate={(value) => {
+            const validation = validateName(value);
+            return validation.valid ? null : translate(`session.${validation.reason}`);
+          }}
+          onAccept={(value) => {
+            setRenaming(null);
+            onRename(value);
+          }}
+          onCancel={() => setRenaming(null)}
+        />
       )}
     </div>
   );
@@ -350,7 +364,7 @@ function SessionNameField({
       >
         {translate("session.label")}
       </label>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-tight">
         <input
           className="session-input"
           id="session-name"

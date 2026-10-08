@@ -27,7 +27,7 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
   }
 
   return (
-    <form className="mx-auto flex w-full max-w-105 flex-col gap-3.5 px-4 pt-2 pb-4" onSubmit={submit}>
+    <form className="mx-auto flex w-full max-w-105 flex-col gap-snug px-gutter pt-snug pb-room" onSubmit={submit}>
       <h2 className="font-display m-0 text-[1.625rem] leading-tight font-bold tracking-[-0.02em] text-ink">
         {translate("join.heading")}
       </h2>
@@ -43,7 +43,7 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
         aria-invalid={error !== null}
         autoComplete="off"
         autoFocus
-        className="min-h-12 w-full rounded-2xl border border-ink/20 bg-paper-raised px-4 py-3 font-sans text-[1.0625rem] text-ink aria-invalid:border-primary"
+        className="min-h-12 w-full rounded-2xl border border-ink/20 bg-paper-raised px-gutter py-snug font-sans text-[1.0625rem] text-ink aria-invalid:border-primary"
         id="gate-name"
         onChange={(event) => {
           setName(event.target.value);
@@ -53,14 +53,14 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
         value={name}
       />
 
-      <fieldset className="m-0 flex flex-wrap gap-2 rounded-2xl border border-line bg-paper-raised p-2.5">
+      <fieldset className="m-0 flex flex-wrap gap-tight rounded-2xl border border-line bg-paper-raised p-snug">
         <legend className="px-1 text-[0.625rem] font-semibold tracking-[0.16em] text-ink-faint uppercase">
           {translate("join.title")}
         </legend>
         {(["voter", "spectator"] as const).map((option) => (
           <button
             aria-pressed={role === option}
-            className="min-h-10 flex-1 cursor-pointer rounded-full border border-ink/20 px-3 py-2 font-sans text-[0.6875rem] font-semibold tracking-[0.04em] text-ink-dim transition-colors hover:border-ink hover:text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-paper"
+            className="min-h-10 flex-1 cursor-pointer rounded-full border border-ink/20 px-snug py-tight font-sans text-[0.6875rem] font-semibold tracking-[0.04em] text-ink-dim transition-colors hover:border-ink hover:text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-paper"
             key={option}
             type="button"
             onClick={() => setRole(option)}

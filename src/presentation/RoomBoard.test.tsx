@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RoomBoard, type RoomBoardProps } from "@presentation/RoomBoard";
@@ -248,19 +248,29 @@ describe("RoomBoard", () => {
     expect(screen.getAllByRole("button", { name: "Change name" })).toHaveLength(1);
   });
 
-  it("calls onRename with the prompted name", async () => {
-    const handlers = renderBoard();
-    await userEvent.click(screen.getByRole("button", { name: "Change name" }));
-    expect(handlers.onRename).toHaveBeenCalledWith("Ana Maria");
-  });
-
-  it("skips renaming when the prompt is dismissed", async () => {
-    vi.stubGlobal("prompt", vi.fn(() => null));
+  it("refuses a name the validator rejects, without closing the modal", async () => {
     const handlers = renderBoard();
 
     await userEvent.click(screen.getByRole("button", { name: "Change name" }));
+    await userEvent.clear(screen.getByLabelText("Your name"));
+    await userEvent.type(screen.getByLabelText("Your name"), "1234");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }));
 
     expect(handlers.onRename).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("explains why the name was refused", async () => {
+    renderBoard();
+
+    await userEvent.click(screen.getByRole("button", { name: "Change name" }));
+    await userEvent.clear(screen.getByLabelText("Your name"));
+    await userEvent.type(screen.getByLabelText("Your name"), "1234");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }));
+
+    expect(within(screen.getByRole("dialog")).getByRole("alert").textContent).toBe(
+      "That name has characters we cannot show",
+    );
   });
 
   it("shows the room link as one clean snippet", () => {
@@ -468,4 +478,216 @@ describe("RoomBoard voted markers", () => {
     });
   });
 
+});
+
+describe("RoomBoard participant rows", () => {
+  function renderBoard(participants: PublicRoomState["participants"]) {
+    return render(
+      <RoomBoard
+        copied={false}
+        deleteButtonRef={undefined}
+        myParticipantId="p1"
+        onCopyLink={vi.fn()}
+        onDeleteRoom={vi.fn()}
+        onNextRound={vi.fn()}
+        onRemoveParticipant={vi.fn()}
+        onRename={vi.fn()}
+        onResetRound={vi.fn()}
+        onReveal={vi.fn()}
+        onSetDeck={vi.fn()}
+        onSetRole={vi.fn()}
+        onSetRoomName={vi.fn()}
+        onTransferOwnership={vi.fn()}
+        shareUrl="https://example.test/room/abc12345"
+        state={state({ participants })}
+        translate={translate}
+      />,
+    );
+  }
+
+  function rowOf(container: Element, name: string): Element {
+    const row = [...container.querySelectorAll("div")].find((element) =>
+      element.className.includes("border-b border-line") &&
+      element.textContent?.startsWith(name),
+    );
+    if (!row) throw new Error(`no row for ${name}`);
+    return row;
+  }
+
+  const member = (id: string, name: string) => ({
+    id,
+    name,
+    role: "voter" as const,
+    isOwner: false,
+    isConnected: true,
+    hasVoted: false,
+  });
+
+  it("gives a row the same side padding as every other panel", () => {
+    const { container } = renderBoard([member("p2", "fgfgdf")]);
+
+    expect(rowOf(container, "fgfgdf").className).toContain("px-room");
+  });
+
+  it("gives a row enough vertical padding to breathe", () => {
+    const { container } = renderBoard([member("p2", "fgfgdf")]);
+
+    expect(rowOf(container, "fgfgdf").className).toContain("py-snug");
+  });
+
+  it("paces every row the same, whichever controls the owner gets", () => {
+    const { container } = renderBoard([member("p2", "fgfgdf")]);
+
+    const classes = rowOf(container, "fgfgdf").className;
+
+    // The row wraps when the owner adds three more buttons to it. The padding cannot
+    // depend on which side of that wrap a participant lands, or the list looks ragged.
+    expect(classes).toContain("py-snug");
+    expect(classes).not.toMatch(/py-(tight|1|2|3|4)\b/);
+  });
+});
+
+describe("RoomBoard rename", () => {
+  function fieldValue(): string {
+    const field = screen.getByLabelText("Your name");
+    if (!(field instanceof HTMLInputElement)) throw new Error("not a text field");
+    return field.value;
+  }
+
+  function renderBoard() {
+    return render(
+      <RoomBoard
+        copied={false}
+        deleteButtonRef={undefined}
+        myParticipantId="p1"
+        onCopyLink={vi.fn()}
+        onDeleteRoom={vi.fn()}
+        onNextRound={vi.fn()}
+        onRemoveParticipant={vi.fn()}
+        onRename={vi.fn()}
+        onResetRound={vi.fn()}
+        onReveal={vi.fn()}
+        onSetDeck={vi.fn()}
+        onSetRole={vi.fn()}
+        onSetRoomName={vi.fn()}
+        onTransferOwnership={vi.fn()}
+        shareUrl="https://example.test/room/abcd2345"
+        state={state({
+          participants: [
+            {
+              id: "p1",
+              name: "Marcos",
+              role: "voter",
+              isOwner: true,
+              isConnected: true,
+              hasVoted: false,
+            },
+          ],
+        })}
+        translate={translate}
+      />,
+    );
+  }
+
+  it("asks for the new name in a modal of our own", () => {
+    renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Change name" }));
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("opens with the current name already in the field", () => {
+    renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Change name" }));
+
+    expect(fieldValue()).toBe("Marcos");
+  });
+
+  it("sends the name that was typed", () => {
+    const onRename = vi.fn();
+    render(
+      <RoomBoard
+        copied={false}
+        deleteButtonRef={undefined}
+        myParticipantId="p1"
+        onCopyLink={vi.fn()}
+        onDeleteRoom={vi.fn()}
+        onNextRound={vi.fn()}
+        onRemoveParticipant={vi.fn()}
+        onRename={onRename}
+        onResetRound={vi.fn()}
+        onReveal={vi.fn()}
+        onSetDeck={vi.fn()}
+        onSetRole={vi.fn()}
+        onSetRoomName={vi.fn()}
+        onTransferOwnership={vi.fn()}
+        shareUrl="https://example.test/room/abcd2345"
+        state={state({
+          participants: [
+            {
+              id: "p1",
+              name: "Marcos",
+              role: "voter",
+              isOwner: true,
+              isConnected: true,
+              hasVoted: false,
+            },
+          ],
+        })}
+        translate={translate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Change name" }));
+    fireEvent.change(screen.getByLabelText("Your name"), { target: { value: "Marcos G" } });
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }));
+
+    expect(onRename).toHaveBeenCalledWith("Marcos G");
+  });
+
+  it("sends nothing when the modal is dismissed", () => {
+    const onRename = vi.fn();
+    render(
+      <RoomBoard
+        copied={false}
+        deleteButtonRef={undefined}
+        myParticipantId="p1"
+        onCopyLink={vi.fn()}
+        onDeleteRoom={vi.fn()}
+        onNextRound={vi.fn()}
+        onRemoveParticipant={vi.fn()}
+        onRename={onRename}
+        onResetRound={vi.fn()}
+        onReveal={vi.fn()}
+        onSetDeck={vi.fn()}
+        onSetRole={vi.fn()}
+        onSetRoomName={vi.fn()}
+        onTransferOwnership={vi.fn()}
+        shareUrl="https://example.test/room/abcd2345"
+        state={state({
+          participants: [
+            {
+              id: "p1",
+              name: "Marcos",
+              role: "voter",
+              isOwner: true,
+              isConnected: true,
+              hasVoted: false,
+            },
+          ],
+        })}
+        translate={translate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Change name" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(onRename).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });

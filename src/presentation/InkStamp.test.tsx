@@ -114,3 +114,51 @@ describe("HankoStamp", () => {
     expect(container.querySelector("[data-phase]")).toBeNull();
   });
 });
+describe("InkStamp long labels", () => {
+  function sealOf(container: Element): Element {
+    const seal = container.querySelector("[data-seal]");
+    if (!seal) throw new Error("no seal");
+    return seal;
+  }
+
+  function fontRem(element: Element): number {
+    const match = /text-\[([\d.]+)rem\]/.exec(element.className);
+    if (!match?.[1]) throw new Error(`no fixed font size on ${element.className}`);
+    return Number(match[1]);
+  }
+
+  it("shrinks a word so the ring still contains it", () => {
+    const { container } = render(<InkStamp label="Coffee" value="Coffee" />);
+
+    expect(fontRem(sealOf(container))).toBeLessThan(1.25);
+  });
+
+  it("keeps a number large, since a number is what the seal is for", () => {
+    const { container } = render(<InkStamp label="13" value="13" />);
+
+    expect(fontRem(sealOf(container))).toBeGreaterThan(2);
+  });
+
+  it("scales down as the label gets longer rather than clipping at one threshold", () => {
+    const { container: short } = render(<InkStamp label="13" value="13" />);
+    const { container: longer } = render(<InkStamp label="Café" value="Café" />);
+
+    expect(fontRem(sealOf(longer))).toBeLessThan(fontRem(sealOf(short)));
+  });
+
+  it("stamps the same label the vote card shows, not the raw value", () => {
+    const translate = createTranslator("pt-BR");
+    const { container } = render(
+      <HankoStamp myVote="coffee" pressId={0} translate={translate} />,
+    );
+
+    expect(sealOf(container).textContent).toBe("Café");
+  });
+
+  it("still describes the stamp for a screen reader", () => {
+    const translate = createTranslator("pt-BR");
+    render(<HankoStamp myVote="coffee" pressId={0} translate={translate} />);
+
+    expect(screen.getByRole("img").getAttribute("aria-label")).toContain("Café");
+  });
+});

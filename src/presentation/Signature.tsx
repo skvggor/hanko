@@ -4,13 +4,15 @@ import { Wordmark } from "@presentation/Wordmark";
 
 export function BrandMark({ translate }: { translate: Translator }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <Wordmark size={38} />
-      <div className="flex flex-col items-start">
-        <h1 className="font-display m-0 text-[1.625rem] leading-none font-bold tracking-[-0.02em] text-ink">
+    <div className="flex items-center gap-snug">
+      <Wordmark size={28} />
+      {/* On a phone the disc keeps the brand and the wording steps aside, because the
+          one thing worth the width is which room this is. */}
+      <div className="hidden flex-col items-start sm:flex">
+        <h1 className="font-display m-0 text-[1.375rem] leading-none font-bold tracking-[-0.02em] text-ink">
           {translate("brand.name")}
         </h1>
-        <p className="m-0 text-[0.6875rem] font-medium tracking-[0.04em] text-ink-dim">
+        <p className="m-0 text-[0.625rem] font-medium tracking-[0.04em] text-ink-dim">
           {translate("brand.tagline")}
         </p>
       </div>
@@ -18,9 +20,22 @@ export function BrandMark({ translate }: { translate: Translator }) {
   );
 }
 
-export function Signature({ translate }: { translate: Translator }) {
+export interface SignatureProps {
+  translate: Translator;
+  /**
+   * The footer is pinned to the bottom of the page, so once the content is taller than
+   * the viewport there is always something behind it and the ink has to sit on a
+   * frosted surface rather than on the paper showing through.
+   */
+  glass?: boolean;
+}
+
+export function Signature({ translate, glass = false }: SignatureProps) {
   return (
-    <footer className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-[0.6875rem] tracking-[0.04em] text-ink-faint">
+    <footer
+      className="sticky bottom-0 z-20 flex h-[var(--chrome-height)] items-center justify-between gap-x-snug border-t border-line px-gutter text-[0.6875rem] tracking-[0.04em] text-ink-faint"
+      data-glass={glass}
+    >
       <span className="font-mono">© {BUILD_YEAR}</span>
       <span>
         {translate("brand.credit")}{" "}

@@ -71,7 +71,9 @@ export function Root() {
     <Shell
       errorCode={null}
       locale={locale}
+      onLeaveRoom={route.kind === "room" ? () => handleNavigate("/") : null}
       onLocaleChange={setLocale}
+      onNavigateHome={() => handleNavigate("/")}
       hasFloatingDock={route.kind === "room"}
       sessionName={route.kind === "room" ? sessionName : null}
       translate={translate}

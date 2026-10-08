@@ -45,13 +45,13 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-room"
       data-open="true"
     >
       <div
         aria-labelledby="confirm-delete-title"
         aria-modal="true"
-        className="w-full max-w-88 rounded-3xl border border-line bg-paper-raised p-5 text-center shadow-[0_18px_0_-6px_var(--color-ink)]"
+        className="w-full max-w-88 rounded-3xl border border-line bg-paper-raised p-room text-center shadow-[0_18px_0_-6px_var(--color-ink)]"
         role="dialog"
       >
         <h2
@@ -60,8 +60,8 @@ export function ConfirmDialog({
         >
           {title}
         </h2>
-        <p className="mt-2 mb-0 text-[0.8125rem] leading-relaxed text-ink-dim">{body}</p>
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
+        <p className="mt-snug mb-0 text-[0.8125rem] leading-relaxed text-ink-dim">{body}</p>
+        <div className="mt-room flex flex-wrap justify-center gap-tight">
           <Button onClick={onCancel} ref={cancelRef} variant="quiet">
             {cancelLabel}
           </Button>

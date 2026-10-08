@@ -167,3 +167,60 @@ describe("Hanko", () => {
     expect(screen.getByRole("button", { name: /votar café/i })).toBeTruthy();
   });
 });
+describe("Hanko long labels", () => {
+  function renderGrid() {
+    return render(
+      <Hanko
+        myParticipantId="p1"
+        onVote={vi.fn()}
+        state={state({ deckId: "fibonacci", myVote: null })}
+        translate={createTranslator("en-US")}
+      />,
+    );
+  }
+
+  /** The smallest the card's type ever renders, whether it is fixed or fluid. */
+  function fontRem(element: Element | null): number {
+    const className = element?.className ?? "";
+    const fixed = /text-\[([\d.]+)rem\]/.exec(className);
+    const fluid = /text-\[clamp\(([\d.]+)rem/.exec(className);
+    const size = fixed?.[1] ?? fluid?.[1];
+    if (size === undefined) throw new Error(`no font size on ${className}`);
+    return Number(size);
+  }
+
+  it("sets the word on the coffee card, so a long label has a card to fit in", () => {
+    renderGrid();
+
+    expect(screen.getByRole("button", { name: /Coffee/ })).toBeTruthy();
+  });
+
+  it("shrinks the word so it fits the card instead of spilling over the edge", () => {
+    renderGrid();
+
+    const coffee = fontRem(screen.getByRole("button", { name: /Coffee/ }));
+    const number = fontRem(screen.getByRole("button", { name: "Vote 13" }));
+
+    expect(coffee).toBeLessThan(number);
+  });
+
+  it("keeps the word inside a card wide enough to hold it", () => {
+    renderGrid();
+
+    const coffee = screen.getByRole("button", { name: /Coffee/ });
+    const columns = /minmax\(([\d.]+)rem/.exec(
+      coffee.parentElement?.className ?? "",
+    );
+
+    // Rough worst case for a six character word in the display face.
+    expect(Number(columns?.[1])).toBeGreaterThanOrEqual(fontRem(coffee) * 3.4);
+  });
+
+  it("keeps every card the same shape whatever it holds", () => {
+    renderGrid();
+
+    for (const name of ["Vote 8", "Vote ?", /Coffee/]) {
+      expect(screen.getByRole("button", { name }).className).toContain("aspect-square");
+    }
+  });
+});
