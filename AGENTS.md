@@ -263,6 +263,37 @@ comment.
 
 ## Testing
 
+### The loop is red, green, refactor
+
+Every feature and every fix starts with a test that fails. The cycle is not something to
+reach for when there is time left, and it is not satisfied by writing the test afterwards
+to match the code that already exists.
+
+1. **Red.** Write the smallest test that describes the behaviour you are about to add, and
+   run it. It has to fail, and it has to fail *because the behaviour is missing* — a
+   misspelled import or a typo in the assertion is not a red step, it is a broken test
+   that would have passed for the wrong reason. A test nobody ever watched fail has not
+   been shown to test anything.
+2. **Green.** Write the least code that makes it pass. The test is the specification, so
+   making it pass means implementing the behaviour, not special casing the fixture.
+   Returning a hardcoded expectation, relaxing the assertion, or widening the type until
+   the compiler agrees are all ways of buying a green run with nothing behind it.
+3. **Refactor.** Remove duplication and improve naming with the test green, re-running it
+   after each step. Refactoring is not permission to change behaviour: a new behaviour is
+   a new test and a new cycle, in that order.
+
+The step that gets skipped in practice is watching it fail. If production code has
+already been written, write the test that *would have* caught it, then delete the
+implementation, watch the test go red, and put it back. That round trip is the whole
+point: it is what proves the test is measuring the behaviour rather than agreeing with
+whatever the code happened to do.
+
+The gates in this repository catch mistakes after they are made. None of them can tell
+you a feature was never specified, so TDD is the only thing standing between a feature
+nobody tested and a build that is confidently green.
+
+### Conventions
+
 Tests are co-located next to the source they cover: `foo.ts` gets `foo.test.ts`, and
 `foo.tsx` gets `foo.test.tsx`. The environment is jsdom for everything, including the
 Worker and Durable Object tests, which run against hand rolled fakes rather than
