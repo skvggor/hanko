@@ -1,5 +1,5 @@
 import { act } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * main.tsx runs the whole boot on import, so every test has to import it fresh and
@@ -8,9 +8,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * default export are exactly what index.html depends on.
  */
 describe("main", () => {
+  beforeAll(async () => {
+    /**
+     * The first dynamic import of the entry point drags the whole component tree
+     * through the transform pipeline. Measured under the load of a pre-push hook, which
+     * runs lint, typecheck, coverage and the build at the same time, that single import
+     * took over six seconds and blew the default timeout before a single assertion ran.
+     *
+     * Paying it once here, outside any test, is what keeps the assertions honest.
+     * resetModules hands each test a fresh registry, so the throwing case still
+     * re-evaluates the module and still throws for the reason it is testing.
+     */
+    await import("@presentation/main").catch(() => {});
+    vi.resetModules();
+  });
+
   beforeEach(() => {
     vi.stubGlobal("location", {
-      origin: "https://hanko.pages.dev",
+      origin: "https://hanko.skvggor.workers.dev",
       pathname: "/",
       protocol: "https:",
     });
@@ -73,7 +88,7 @@ describe("main", () => {
 
   it("picks up a room route from the url it was served on", async () => {
     vi.stubGlobal("location", {
-      origin: "https://hanko.pages.dev",
+      origin: "https://hanko.skvggor.workers.dev",
       pathname: "/room/abcd2345",
       protocol: "https:",
     });

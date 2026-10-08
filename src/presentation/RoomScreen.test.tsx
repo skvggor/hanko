@@ -188,7 +188,7 @@ describe("RoomScreen", () => {
     harness.errors.length = 0;
 
     vi.stubGlobal("location", {
-      origin: "https://hanko.pages.dev",
+      origin: "https://hanko.skvggor.workers.dev",
       pathname: "/room/abcd2345",
       protocol: "https:",
     });
@@ -334,7 +334,7 @@ describe("RoomScreen", () => {
 
     pushState(roomState);
 
-    expect(await screen.findByText("hanko.pages.dev")).toBeTruthy();
+    expect(await screen.findByText("hanko.skvggor.workers.dev")).toBeTruthy();
   });
 
   describe("chat beside the estimate panel", () => {
@@ -625,7 +625,7 @@ describe("RoomScreen owner controls", () => {
     harness.errors.length = 0;
 
     vi.stubGlobal("location", {
-      origin: "https://hanko.pages.dev",
+      origin: "https://hanko.skvggor.workers.dev",
       pathname: "/room/abcd2345",
       protocol: "https:",
     });
@@ -858,7 +858,7 @@ describe("RoomScreen owner controls", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
 
-    expect(writeText).toHaveBeenCalledWith("https://hanko.pages.dev/room/abcd2345");
+    expect(writeText).toHaveBeenCalledWith("https://hanko.skvggor.workers.dev/room/abcd2345");
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
   });
 
@@ -898,7 +898,7 @@ describe("RoomScreen deleting the room", () => {
     onRoomDeleted.mockClear();
 
     vi.stubGlobal("location", {
-      origin: "https://hanko.pages.dev",
+      origin: "https://hanko.skvggor.workers.dev",
       pathname: "/room/abcd2345",
       protocol: "https:",
     });

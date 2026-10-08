@@ -49,7 +49,7 @@ vi.mock("@presentation/RoomScreen", () => ({
 function setPath(path: string) {
   vi.stubGlobal("location", {
     pathname: path,
-    origin: "https://hanko.pages.dev",
+    origin: "https://hanko.skvggor.workers.dev",
     protocol: "https:",
   });
 }
@@ -294,7 +294,7 @@ describe("Root after a room is deleted", () => {
     vi.stubGlobal("navigator", { language: "en-US" });
     vi.stubGlobal("location", {
       pathname: "/room/abcd2345",
-      origin: "https://hanko.pages.dev",
+      origin: "https://hanko.skvggor.workers.dev",
       protocol: "https:",
     });
     vi.stubGlobal("history", {
@@ -302,7 +302,7 @@ describe("Root after a room is deleted", () => {
         harness.pushState.push(path);
         vi.stubGlobal("location", {
           pathname: path,
-          origin: "https://hanko.pages.dev",
+          origin: "https://hanko.skvggor.workers.dev",
           protocol: "https:",
         });
       },
@@ -374,7 +374,7 @@ describe("Root on a room link that cannot exist", () => {
     vi.stubGlobal("navigator", { language: "en-US" });
     vi.stubGlobal("location", {
       pathname: "/room/texto",
-      origin: "https://hanko.pages.dev",
+      origin: "https://hanko.skvggor.workers.dev",
       protocol: "https:",
     });
     vi.stubGlobal("history", {

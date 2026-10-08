@@ -39,8 +39,8 @@ function createFakeSocket(): FakeWebSocket {
 function useSecureLocation(): void {
   vi.stubGlobal("location", {
     protocol: "https:",
-    host: "hanko.pages.dev",
-    href: "https://hanko.pages.dev/room/abc12345",
+    host: "hanko.skvggor.workers.dev",
+    href: "https://hanko.skvggor.workers.dev/room/abc12345",
   });
 }
 
@@ -97,7 +97,7 @@ describe("RoomConnection", () => {
 
     expect(url.pathname).toBe("/api/room/abc12345/socket");
     expect(url.protocol).toBe("wss:");
-    expect(url.host).toBe("hanko.pages.dev");
+    expect(url.host).toBe("hanko.skvggor.workers.dev");
   });
 
   it("uses an insecure protocol on a local page", async () => {

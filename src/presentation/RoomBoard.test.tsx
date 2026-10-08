@@ -54,7 +54,7 @@ function renderWithContainer(
     <RoomBoard
       copied={false}
       myParticipantId="p1"
-      shareUrl="https://hanko.pages.dev/room/room-1"
+      shareUrl="https://hanko.skvggor.workers.dev/room/room-1"
       state={state(overrides)}
       translate={translate}
       {...handlers}
@@ -84,7 +84,7 @@ function renderBoard(overrides: Partial<PublicRoomState> = {}, props: Partial<Ro
     <RoomBoard
       copied={false}
       myParticipantId="p1"
-      shareUrl="https://hanko.pages.dev/room/room-1"
+      shareUrl="https://hanko.skvggor.workers.dev/room/room-1"
       state={state(overrides)}
       translate={translate}
       {...handlers}
@@ -277,7 +277,7 @@ describe("RoomBoard", () => {
     const { container } = renderWithContainer();
     const chip = container.querySelector(".snippet__chip");
 
-    expect(chip?.textContent).toContain("hanko.pages.dev/room/room-1");
+    expect(chip?.textContent).toContain("hanko.skvggor.workers.dev/room/room-1");
   });
 
   it("confirms a copied link on the chip", () => {

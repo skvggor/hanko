@@ -13,7 +13,7 @@ function renderSnippet(overrides: Partial<Parameters<typeof ShareSnippet>[0]> = 
       copyLabel="Copy link"
       label="share"
       onCopy={onCopy}
-      url="https://hanko.pages.dev/room/room-1"
+      url="https://hanko.skvggor.workers.dev/room/room-1"
       {...overrides}
     />,
   );
@@ -23,7 +23,7 @@ function renderSnippet(overrides: Partial<Parameters<typeof ShareSnippet>[0]> = 
 describe("ShareSnippet", () => {
   it("drops the scheme so the host reads as the subject", () => {
     renderSnippet();
-    expect(screen.getByText("hanko.pages.dev")).toBeTruthy();
+    expect(screen.getByText("hanko.skvggor.workers.dev")).toBeTruthy();
   });
 
   it("never doubles the slash", () => {
@@ -41,12 +41,12 @@ describe("ShareSnippet", () => {
         copyLabel="Copy link"
         label="share"
         onCopy={vi.fn()}
-        url="https://hanko.pages.dev/room/room-1"
+        url="https://hanko.skvggor.workers.dev/room/room-1"
       />,
     );
 
     const chip = container.querySelector(".snippet__chip");
-    expect(chip?.textContent).toContain("hanko.pages.dev/room/room-1");
+    expect(chip?.textContent).toContain("hanko.skvggor.workers.dev/room/room-1");
   });
 
   it("does not repeat the scheme anywhere", () => {
@@ -80,7 +80,7 @@ describe("ShareSnippet", () => {
         copyLabel="Copy link"
         label="share"
         onCopy={vi.fn()}
-        url="https://hanko.pages.dev/room/room-1"
+        url="https://hanko.skvggor.workers.dev/room/room-1"
       />,
     );
 
@@ -95,7 +95,7 @@ describe("ShareSnippet", () => {
         copyLabel="Copy link"
         label="share"
         onCopy={vi.fn()}
-        url="https://hanko.pages.dev/room/room-1"
+        url="https://hanko.skvggor.workers.dev/room/room-1"
       />,
     );
 
@@ -109,8 +109,8 @@ describe("ShareSnippet", () => {
   });
 
   it("handles a url with no path", () => {
-    expect(() => renderSnippet({ url: "https://hanko.pages.dev" })).not.toThrow();
-    expect(screen.getByText("hanko.pages.dev")).toBeTruthy();
+    expect(() => renderSnippet({ url: "https://hanko.skvggor.workers.dev" })).not.toThrow();
+    expect(screen.getByText("hanko.skvggor.workers.dev")).toBeTruthy();
   });
 
   it("survives an empty url", () => {
@@ -125,7 +125,7 @@ describe("ShareSnippet", () => {
         copyLabel="Copy link"
         label="share"
         onCopy={vi.fn()}
-        url="https://hanko.pages.dev/room/room-1"
+        url="https://hanko.skvggor.workers.dev/room/room-1"
       />,
     );
 

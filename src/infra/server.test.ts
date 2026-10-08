@@ -478,7 +478,7 @@ describe("Room over WebSocket", () => {
     it("refuses a websocket handshake from another origin", async () => {
       const response = await room.fetch(
         new Request("https://room.internal/socket", {
-          headers: { origin: "https://evil.example", host: "hanko.pages.dev" },
+          headers: { origin: "https://evil.example", host: "hanko.skvggor.workers.dev" },
         }),
       );
 

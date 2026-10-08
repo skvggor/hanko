@@ -63,7 +63,7 @@ function createEnv() {
 }
 
 function post(path: string): Request {
-  return new Request(`https://hanko.pages.dev${path}`, { method: "POST" });
+  return new Request(`https://hanko.skvggor.workers.dev${path}`, { method: "POST" });
 }
 
 async function callFetch(request: Request) {
@@ -107,12 +107,12 @@ describe("generateRoomId", () => {
 describe("defaultWorker.fetch", () => {
   describe("static assets", () => {
     it("serves the frontend for non api routes", async () => {
-      const { result } = await callFetch(new Request("https://hanko.pages.dev/"));
+      const { result } = await callFetch(new Request("https://hanko.skvggor.workers.dev/"));
       expect(await result.text()).toBe("asset:/");
     });
 
     it("serves client side routes as html", async () => {
-      const { result } = await callFetch(new Request("https://hanko.pages.dev/room/abcd2345"));
+      const { result } = await callFetch(new Request("https://hanko.skvggor.workers.dev/room/abcd2345"));
       expect(await result.text()).toBe("asset:/room/abcd2345");
     });
   });
@@ -158,7 +158,7 @@ describe("defaultWorker.fetch", () => {
     it("rewrites the socket path before it reaches the room object", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abcd2345/socket"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/abcd2345/socket"),
         env,
       );
 
@@ -169,7 +169,7 @@ describe("defaultWorker.fetch", () => {
     it("rewrites the state path before it reaches the room object", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abcd2345/state"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/abcd2345/state"),
         env,
       );
 
@@ -180,7 +180,7 @@ describe("defaultWorker.fetch", () => {
     it("defaults a bare room path to the state endpoint", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abcd2345"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/abcd2345"),
         env,
       );
 
@@ -191,7 +191,7 @@ describe("defaultWorker.fetch", () => {
     it("forwards the participant token", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abcd2345/state?token=t1"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/abcd2345/state?token=t1"),
         env,
       );
 
@@ -202,7 +202,7 @@ describe("defaultWorker.fetch", () => {
     it("preserves the request method", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abcd2345/command", { method: "POST" }),
+        new Request("https://hanko.skvggor.workers.dev/api/room/abcd2345/command", { method: "POST" }),
         env,
       );
 
@@ -214,11 +214,11 @@ describe("defaultWorker.fetch", () => {
     it("reuses the same object for the same room id", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abcd2345/state"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/abcd2345/state"),
         env,
       );
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abcd2345/socket"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/abcd2345/socket"),
         env,
       );
 
@@ -228,14 +228,14 @@ describe("defaultWorker.fetch", () => {
 
   describe("validation", () => {
     it("rejects a missing room id", async () => {
-      const { result } = await callFetch(new Request("https://hanko.pages.dev/api/room/"));
+      const { result } = await callFetch(new Request("https://hanko.skvggor.workers.dev/api/room/"));
       expect(result.status).toBe(400);
       expect(await result.json()).toEqual({ error: "missing_room" });
     });
 
     it("rejects a room id containing separators", async () => {
       const { result } = await callFetch(
-        new Request("https://hanko.pages.dev/api/room/ab%2Fcd"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/ab%2Fcd"),
       );
       expect(result.status).toBe(400);
       expect(await result.json()).toEqual({ error: "invalid_room_id" });
@@ -243,19 +243,19 @@ describe("defaultWorker.fetch", () => {
 
     it("rejects a room id with symbols", async () => {
       const { result } = await callFetch(
-        new Request("https://hanko.pages.dev/api/room/ab$cd!"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/ab$cd!"),
       );
       expect(result.status).toBe(400);
     });
 
     it("rejects a room id that is too short", async () => {
-      const { result } = await callFetch(new Request("https://hanko.pages.dev/api/room/ab"));
+      const { result } = await callFetch(new Request("https://hanko.skvggor.workers.dev/api/room/ab"));
       expect(result.status).toBe(400);
     });
 
     it("rejects a room id with uppercase letters", async () => {
       const { result } = await callFetch(
-        new Request("https://hanko.pages.dev/api/room/ABCDEFGH"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/ABCDEFGH"),
       );
       expect(result.status).toBe(400);
     });
@@ -263,7 +263,7 @@ describe("defaultWorker.fetch", () => {
     it("accepts the shortest valid room id", async () => {
       const env = createEnv();
       await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abcd/state"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/abcd/state"),
         env,
       );
       expect(env.ROOMS.get(env.ROOMS.idFromName("abcd"))).toBeDefined();
@@ -280,7 +280,7 @@ describe("defaultWorker.fetch", () => {
       stub.responses.push(Response.json({ id: "abcd2345", round: 3 }));
 
       const result = await defaultWorker.fetch(
-        new Request("https://hanko.pages.dev/api/room/abcd2345/state"),
+        new Request("https://hanko.skvggor.workers.dev/api/room/abcd2345/state"),
         env,
       );
 

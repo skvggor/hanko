@@ -3,13 +3,13 @@ import { isAllowedOrigin } from "@infra/origin";
 import { InMemoryRateLimiter, SingleWindowRateLimiter } from "@infra/rateLimit";
 
 describe("isAllowedOrigin", () => {
-  const request = (origin: string | null, host = "hanko.pages.dev") =>
-    new Request("https://hanko.pages.dev/api/room/abc12345/socket", {
+  const request = (origin: string | null, host = "hanko.skvggor.workers.dev") =>
+    new Request("https://hanko.skvggor.workers.dev/api/room/abc12345/socket", {
       headers: origin === null ? {} : { origin, host },
     });
 
   it("allows a same origin handshake", () => {
-    expect(isAllowedOrigin(request("https://hanko.pages.dev"))).toBe(true);
+    expect(isAllowedOrigin(request("https://hanko.skvggor.workers.dev"))).toBe(true);
   });
 
   it("refuses a cross site handshake", () => {
@@ -17,11 +17,11 @@ describe("isAllowedOrigin", () => {
   });
 
   it("refuses a subdomain of the site", () => {
-    expect(isAllowedOrigin(request("https://hanko.pages.dev.evil.example"))).toBe(false);
+    expect(isAllowedOrigin(request("https://hanko.skvggor.workers.dev.evil.example"))).toBe(false);
   });
 
   it("refuses a port mismatch on the same host", () => {
-    expect(isAllowedOrigin(request("https://hanko.pages.dev:8443"))).toBe(false);
+    expect(isAllowedOrigin(request("https://hanko.skvggor.workers.dev:8443"))).toBe(false);
   });
 
   it("allows a client that sends no origin at all", () => {
@@ -33,8 +33,8 @@ describe("isAllowedOrigin", () => {
   });
 
   it("allows when the host header is absent", () => {
-    const bare = new Request("https://hanko.pages.dev/socket", {
-      headers: { origin: "https://hanko.pages.dev" },
+    const bare = new Request("https://hanko.skvggor.workers.dev/socket", {
+      headers: { origin: "https://hanko.skvggor.workers.dev" },
     });
     expect(isAllowedOrigin(bare)).toBe(true);
   });
