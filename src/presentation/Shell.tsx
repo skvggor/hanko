@@ -50,7 +50,7 @@ export function Shell({
           {(["en-US", "pt-BR"] as const).map((option) => (
             <button
               aria-pressed={locale === option}
-              className="min-h-8 cursor-pointer rounded-full border border-ink/25 px-3 py-1 font-sans text-[11px] font-semibold tracking-[0.08em] text-ink-dim transition-colors hover:border-ink hover:text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-paper"
+              className="min-h-8 cursor-pointer rounded-full border border-ink/25 px-3 py-1 font-sans text-[0.6875rem] font-semibold tracking-[0.08em] text-ink-dim transition-colors hover:border-ink hover:text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-paper"
               key={option}
               type="button"
               onClick={() => onLocaleChange(option)}
@@ -69,14 +69,25 @@ export function Shell({
 
       {errorCode !== null && (
         <p
-          className="mx-4 mb-3 rounded-2xl bg-primary/10 px-3.5 py-2 text-[13px] font-semibold text-primary"
+          className="mx-4 mb-3 rounded-2xl bg-primary/10 px-3.5 py-2 text-[0.8125rem] font-semibold text-primary"
           role="alert"
         >
           {translate(`errors.${errorCode}`)}
         </p>
       )}
 
-      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</main>
+      {/**
+       * The chrome stays pinned and only the content moves, so the wordmark and the
+       * credit keep their place while the room itself sits in the middle of whatever
+       * room is left over. The frame is what does the centring horizontally, and
+       * because its cap is in rem it widens with the fluid root instead of sitting at
+       * one fixed column on a large display.
+       */}
+      <main className="flex flex-1 flex-col items-center justify-center">
+        <div className="mx-auto flex w-full max-w-115 flex-col" data-frame>
+          {children}
+        </div>
+      </main>
 
       <Signature translate={translate} />
     </div>

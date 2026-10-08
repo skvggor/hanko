@@ -332,3 +332,100 @@ describe("Shell reduced motion", () => {
     expect(renderShell()?.getAttribute("data-reduced-motion")).toBe("false");
   });
 });
+
+describe("Shell centring", () => {
+  function renderShell(props: Partial<Parameters<typeof Shell>[0]> = {}) {
+    return render(
+      <Shell
+        errorCode={null}
+        locale="en-US"
+        onLocaleChange={vi.fn()}
+        translate={translate}
+        {...props}
+      >
+        <p>x</p>
+      </Shell>,
+    );
+  }
+
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+  });
+
+  it("holds the header at the top of the column", () => {
+    const { container } = renderShell();
+    const root = container.firstElementChild;
+
+    expect(root?.firstElementChild?.tagName).toBe("HEADER");
+  });
+
+  it("holds the footer at the bottom of the column", () => {
+    const { container } = renderShell();
+    const root = container.firstElementChild;
+
+    expect(root?.lastElementChild?.tagName).toBe("FOOTER");
+  });
+
+  it("keeps the chrome out of the centred frame", () => {
+    const { container } = renderShell();
+    const frame = container.querySelector("[data-frame]");
+
+    expect(frame?.querySelector("header")).toBeNull();
+    expect(frame?.querySelector("footer")).toBeNull();
+  });
+
+  it("gives the content the space between the header and the footer", () => {
+    const { container } = renderShell();
+
+    expect(container.querySelector("main")?.className).toContain("flex-1");
+  });
+
+  it("centres the content in that space instead of leaving it at the top", () => {
+    const { container } = renderShell();
+
+    expect(container.querySelector("main")?.className).toContain("justify-center");
+  });
+
+  it("gives the app a frame to centre inside", () => {
+    const { container } = renderShell();
+
+    expect(container.querySelector("[data-frame]")).toBeTruthy();
+  });
+
+  it("centres the frame horizontally", () => {
+    const { container } = renderShell();
+
+    expect(container.querySelector("[data-frame]")?.className).toContain("mx-auto");
+  });
+
+  it("caps the frame width so the app never stretches across a 4k display", () => {
+    const { container } = renderShell();
+
+    expect(container.querySelector("[data-frame]")?.className).toContain("max-w-");
+  });
+
+  it("keeps the content able to grow past the frame rather than clipping it", () => {
+    const { container } = renderShell();
+
+    expect(container.firstElementChild?.className).toContain("min-h-screen");
+  });
+
+  it("centres the room as well as the landing page", () => {
+    const { container } = renderShell({ hasFloatingDock: true });
+
+    expect(container.querySelector("main")?.className).toContain("justify-center");
+  });
+
+  it("still reserves room for the floating dock", () => {
+    const { container } = renderShell({ hasFloatingDock: true });
+
+    expect(container.firstElementChild?.className).toContain("pb-24");
+  });
+
+  it("leaves the language switcher in the header where it can be reached from anywhere", () => {
+    const { container } = renderShell();
+
+    expect(container.querySelector("header nav")).toBeTruthy();
+  });
+});
