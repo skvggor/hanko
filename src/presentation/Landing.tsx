@@ -15,8 +15,6 @@ export function Landing({ translate, onNavigate, notice = null }: LandingProps) 
   const [failed, setFailed] = useState(false);
 
   async function openRoom() {
-    if (pending) return;
-
     setPending(true);
     setFailed(false);
 

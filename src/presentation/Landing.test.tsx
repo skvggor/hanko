@@ -55,7 +55,10 @@ describe("Landing", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Start a room" }));
 
-    await screen.findByRole("button", { name: "Creating..." });
+    const button = await screen.findByRole("button", { name: "Creating..." });
+    // The disabled button is the whole of the double click protection, because a room
+    // is a Durable Object and creating a second one is not free.
+    expect(button.hasAttribute("disabled")).toBe(true);
   });
 
 

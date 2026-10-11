@@ -20,8 +20,6 @@ export function MissingRoom({ translate, onNavigate }: MissingRoomProps) {
   const [failed, setFailed] = useState(false);
 
   async function openRoom() {
-    if (pending) return;
-
     setPending(true);
     setFailed(false);
 
