@@ -12,17 +12,12 @@ export interface NameGateProps {
 export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
   const [name, setName] = useState(suggestedName ?? "");
   const [role, setRole] = useState<ParticipantRole>("voter");
-  const [error, setError] = useState<string | null>(null);
 
   const trimmed = name.trim();
   const canSubmit = trimmed.length > 0;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!canSubmit) {
-      setError(translate("errors.name_required"));
-      return;
-    }
     onJoin(trimmed, role);
   }
 
@@ -40,14 +35,12 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
         {translate("join.placeholder")}
       </label>
       <input
-        aria-invalid={error !== null}
         autoComplete="off"
         autoFocus
-        className="min-h-12 w-full rounded-2xl border border-ink/20 bg-paper-raised px-gutter py-snug font-sans text-[1.0625rem] text-ink aria-invalid:border-primary"
+        className="min-h-12 w-full rounded-2xl border border-ink/20 bg-paper-raised px-gutter py-snug font-sans text-[1.0625rem] text-ink"
         id="gate-name"
         onChange={(event) => {
           setName(event.target.value);
-          setError(null);
         }}
         placeholder={translate("join.placeholder")}
         value={name}
@@ -71,12 +64,6 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
           </button>
         ))}
       </fieldset>
-
-      {error !== null && (
-        <p className="m-0 text-[0.8125rem] font-semibold text-primary" role="alert">
-          {error}
-        </p>
-      )}
 
       <Button disabled={!canSubmit} type="submit" variant="primary">
         {translate("join.submit")}
