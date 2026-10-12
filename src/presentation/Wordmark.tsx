@@ -5,7 +5,7 @@ import { useState, type PointerEvent } from "react";
  * The pointer walks across them, each one lifting and settling on its own curve, so
  * the mark feels built rather than printed. Everything collapses to rest on leave.
  */
-export function Wordmark({ size = 36 }: { size?: number }) {
+export function Wordmark({ size = 36 }: Readonly<{ size?: number }>) {
   const [probe, setProbe] = useState<{ x: number; y: number } | null>(null);
 
   function track(event: PointerEvent<SVGSVGElement>) {

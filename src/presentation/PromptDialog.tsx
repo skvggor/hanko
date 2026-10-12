@@ -28,7 +28,7 @@ export function PromptDialog({
   validate,
   onAccept,
   onCancel,
-}: PromptDialogProps) {
+}: Readonly<PromptDialogProps>) {
   const [draft, setDraft] = useState(initialValue);
   const [problem, setProblem] = useState<string | null>(null);
   const fieldRef = useRef<HTMLInputElement>(null);

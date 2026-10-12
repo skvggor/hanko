@@ -25,7 +25,7 @@ function voteLabel(value: string, translate: Translator): string {
 const WORD_FONT_SIZE = "text-[0.8125rem]";
 const NUMBER_FONT_SIZE = "text-[clamp(0.9375rem,4.2vw,1.375rem)]";
 
-export function Hanko({ state, myParticipantId, translate, onVote }: HankoProps) {
+export function Hanko({ state, myParticipantId, translate, onVote }: Readonly<HankoProps>) {
   const me = state.participants.find((entry) => entry.id === myParticipantId);
   const isSpectator = me?.role === "spectator";
   const values = getDeck(state.deckId);

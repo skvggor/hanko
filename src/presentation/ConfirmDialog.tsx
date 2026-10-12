@@ -24,7 +24,7 @@ export function ConfirmDialog({
   cancelLabel,
   onAccept,
   onCancel,
-}: ConfirmDialogProps) {
+}: Readonly<ConfirmDialogProps>) {
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {

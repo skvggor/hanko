@@ -2,7 +2,7 @@ import type { Translator } from "@application/i18n";
 import { BUILD_YEAR } from "@config/version";
 import { Wordmark } from "@presentation/Wordmark";
 
-export function BrandMark({ translate }: { translate: Translator }) {
+export function BrandMark({ translate }: Readonly<{ translate: Translator }>) {
   return (
     <div className="flex items-center gap-snug">
       <Wordmark size={28} />
@@ -30,7 +30,7 @@ export interface SignatureProps {
   glass?: boolean;
 }
 
-export function Signature({ translate, glass = false }: SignatureProps) {
+export function Signature({ translate, glass = false }: Readonly<SignatureProps>) {
   return (
     <footer
       className="sticky bottom-0 z-20 flex h-[var(--chrome-height)] items-center justify-between gap-x-snug border-t border-line px-gutter text-[0.6875rem] tracking-[0.04em] text-ink-faint"

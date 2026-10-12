@@ -21,6 +21,7 @@
     "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
+    "allowJs": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "skipLibCheck": true,
@@ -46,6 +47,7 @@
   },
   "include": [
     "src",
+    "scripts",
     "vite.config.ts",
     "vitest.config.ts",
     "eslint.config.js",

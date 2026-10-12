@@ -18,6 +18,10 @@ pre-commit:
 # gates across the whole tree and inlines the production build, because the push is
 # what deploys: a Worker bundle that does not compile is worth finding here rather
 # than after wrangler has already replaced the live one.
+#
+# The sonar gate brings its own instance up in Docker and takes it down again, so a
+# push needs the daemon running. That is the price of a gate that sees across files:
+# duplication is invisible to anything that only reads one of them at a time.
 pre-push:
   parallel: true
   commands:
@@ -29,3 +33,5 @@ pre-push:
       run: npx vitest run --coverage
     build:
       run: npm run build
+    sonar:
+      run: npm run sonar
