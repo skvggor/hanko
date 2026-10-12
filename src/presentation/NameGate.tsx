@@ -10,12 +10,7 @@ export interface NameGateProps {
   pending?: boolean;
 }
 
-/**
- * The room does not answer until the join frame has been through the socket and back,
- * and until it does the gate is still on screen. Left as it was, the form simply sat
- * there with the name still typed in and nothing moving, so a person who had just
- * pressed Enter had no way to tell the press had landed.
- */
+/** The gate stays on screen until the room answers, so it has to say that it is waiting. */
 export function NameGate({
   translate,
   suggestedName,

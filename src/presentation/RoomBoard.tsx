@@ -49,8 +49,7 @@ export interface RoomBoardProps {
 }
 
 /**
- * Pressed and unpressed are different affordances rather than two shades of one, so the
- * resting and the held states are named here instead of being picked apart inline.
+ * Pressed and unpressed are different affordances rather than two shades of one.
  */
 function miniButtonClasses(pressed: boolean, tone: "neutral" | "primary"): string {
   if (!pressed) return "text-ink-dim hover:bg-ink/8 hover:text-ink";

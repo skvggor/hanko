@@ -12,9 +12,8 @@ export function Button({
   ref,
 }: Readonly<{
   /**
-   * Working is not the same as unavailable. A busy control is mid request, so it keeps
-   * its full weight and shows a spinner; fading it would read as broken, which is the
-   * opposite of what the label beside the spinner is saying.
+   * Working is not the same as unavailable: a busy control is mid request, so it keeps
+   * its full weight and shows a spinner, where fading it would read as broken.
    */
   busy?: boolean;
   children: ReactNode;

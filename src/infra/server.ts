@@ -64,9 +64,8 @@ const JOIN_WINDOW_MS = 60_000;
 const MAX_SOCKETS = 80;
 
 /**
- * What a command leaves behind. Most of them only change the room and let the shared tail
- * write it, but a few persist and broadcast on their own account because they have more
- * to do than swap one snapshot for another, and those have to be able to say so.
+ * What a command leaves behind. Most only change the room and let the shared tail write
+ * it; a few persist and broadcast on their own, and those have to be able to say so.
  */
 interface CommandOutcome {
   room: RoomSnapshot;
@@ -283,9 +282,9 @@ export class Room {
 
   /**
    * Who is on the other end of this socket, and whether the command they sent is one only
-   * the owner may send. Every rejection here is answered with the reason rather than a
-   * dropped connection, because a person who renamed themselves by accident is not the
-   * same as an intruder and should not be left guessing which one they are.
+   * the owner may send. Every rejection is answered with its reason rather than a dropped
+   * connection, because someone who renamed themselves by accident is not an intruder and
+   * should not be left guessing which one they are.
    */
   async #authorize(
     socket: WebSocket,
@@ -315,9 +314,8 @@ export class Room {
   }
 
   /**
-   * The commands are a table rather than a chain, so they are matched by name and each one
-   * is written out where it can be read on its own. The two that persist and broadcast for
-   * themselves say so by finishing; everything else falls through to the shared tail.
+   * The commands are a table rather than a chain, so each one is matched by name and
+   * written out where it can be read on its own.
    */
   async #applyCommand(
     socket: WebSocket,

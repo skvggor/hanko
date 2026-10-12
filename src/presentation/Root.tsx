@@ -12,9 +12,8 @@ import { Shell } from "@presentation/Shell";
 import { MissingRoom } from "@presentation/MissingRoom";
 
 /**
- * The three routes are three different screens rather than three states of one, so they
- * are chosen by name here instead of by a chain of conditionals in the markup. Narrowing
- * on the route is what lets each screen receive only the props it declares.
+ * The three routes are three different screens rather than three states of one, and
+ * narrowing on the route is what lets each receive only the props it declares.
  */
 function routeScreen({
   notice,

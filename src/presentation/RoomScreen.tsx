@@ -211,11 +211,10 @@ export function RoomScreen({
    */
   const joining = draftName !== null && state === null && errorCode === null;
 
-  /**
-   * Removal outranks everything, then there is no room to be in yet, and only after a
-   * name has been sent and answered is there a board. Spelled out because the third
-   * case is the only one where the room has actually said anything.
-   */
+/**
+ * Removal outranks everything, then there is no room to be in yet, and only after a name
+ * has been sent and answered is there a board.
+ */
   let body: ReactNode;
 
   if (wasRemoved) {

@@ -12,7 +12,6 @@ export interface VoteTally {
     vote: string | null;
     points: number | null;
   }>;
-  /** Number of people who marked a number. */
   counted: number;
   /** Number of people still to vote or watching. */
   pending: number;
@@ -25,7 +24,6 @@ export interface VoteTally {
   range: number | null;
   /** Votes parked on "?" because they need a conversation. */
   needsDiscussion: number;
-  /** Votes parked on coffee. */
   coffee: number;
   /** How many people picked each value, ordered by the scale. */
   distribution: Array<{ value: string; count: number }>;
@@ -37,11 +35,7 @@ export interface VoteTally {
   consensus: Consensus;
 }
 
-/**
- * The extremes and the gap between them. All three are absent together when nobody
- * picked a number, so they are decided in one place instead of three, and the result
- * object stops carrying the conditionals that produce them.
- */
+/** The extremes and the gap, which are all three absent when nobody picked a number. */
 function spread(countedPoints: readonly number[]): Pick<VoteTally, "min" | "max" | "range"> {
   if (countedPoints.length === 0) return { min: null, max: null, range: null };
 
@@ -51,11 +45,7 @@ function spread(countedPoints: readonly number[]): Pick<VoteTally, "min" | "max"
   return { min, max, range: max - min };
 }
 
-/**
- * Reads the revealed votes and derives everything the result sheet shows. People
- * watching are pending, never counted, so a spectator never skews the average.
- */
-
+/** A spectator is pending and never counted, so they cannot skew the average. */
 export function tallyReveals(
   entries: VoteTally["entries"],
   scale: readonly VoteValue[] | readonly string[],
