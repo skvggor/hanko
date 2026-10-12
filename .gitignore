@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 .wrangler/
+.scannerwork/
 .dev.vars
 *.local
 .DS_Store
