@@ -4,6 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { ShareSnippet } from "@presentation/ShareSnippet";
 import { Wordmark } from "@presentation/Wordmark";
 
+function chip(name = "Copy link"): HTMLElement {
+  return screen.getByRole("button", { name });
+}
+
 function renderSnippet(overrides: Partial<Parameters<typeof ShareSnippet>[0]> = {}) {
   const onCopy = vi.fn();
   render(
@@ -34,19 +38,8 @@ describe("ShareSnippet", () => {
   });
 
   it("renders the whole link with a single separator", () => {
-    const { container } = render(
-      <ShareSnippet
-        copied={false}
-        copiedLabel="Copied"
-        copyLabel="Copy link"
-        label="share"
-        onCopy={vi.fn()}
-        url="https://hanko.skvggor.workers.dev/room/room-1"
-      />,
-    );
-
-    const chip = container.querySelector(".snippet__chip");
-    expect(chip?.textContent).toContain("hanko.skvggor.workers.dev/room/room-1");
+    renderSnippet();
+    expect(chip().textContent).toContain("hanko.skvggor.workers.dev/room/room-1");
   });
 
   it("does not repeat the scheme anywhere", () => {
@@ -62,7 +55,7 @@ describe("ShareSnippet", () => {
   it("copies when the chip is clicked", async () => {
     const onCopy = renderSnippet();
 
-    await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    await userEvent.click(chip());
 
     expect(onCopy).toHaveBeenCalledTimes(1);
   });
@@ -73,34 +66,19 @@ describe("ShareSnippet", () => {
   });
 
   it("carries the copy affordance inside the chip", () => {
-    const { container } = render(
-      <ShareSnippet
-        copied={false}
-        copiedLabel="Copied"
-        copyLabel="Copy link"
-        label="share"
-        onCopy={vi.fn()}
-        url="https://hanko.skvggor.workers.dev/room/room-1"
-      />,
-    );
-
-    expect(container.querySelector(".snippet__icon")).not.toBeNull();
+    renderSnippet();
+    expect(chip().querySelector("svg")).not.toBeNull();
   });
 
   it("flips the chip when the link is copied", () => {
-    const { container } = render(
-      <ShareSnippet
-        copied
-        copiedLabel="Copied"
-        copyLabel="Copy link"
-        label="share"
-        onCopy={vi.fn()}
-        url="https://hanko.skvggor.workers.dev/room/room-1"
-      />,
-    );
+    renderSnippet({ copied: true });
+    expect(chip("Copied").getAttribute("data-copied")).toBe("true");
+  });
 
-    const chip = container.querySelector(".snippet__chip");
-    expect(chip?.getAttribute("data-copied")).toBe("true");
+  it("is the button itself, not a field wrapped in a button", () => {
+    renderSnippet();
+    expect(chip().tagName).toBe("BUTTON");
+    expect(chip().getAttribute("type")).toBe("button");
   });
 
   it("asks for the confirm label once copied", () => {
@@ -116,22 +94,38 @@ describe("ShareSnippet", () => {
   it("survives an empty url", () => {
     expect(() => renderSnippet({ url: "" })).not.toThrow();
   });
+});
 
-  it("is the button itself, not a field wrapped in a button", () => {
-    const { container } = render(
-      <ShareSnippet
-        copied={false}
-        copiedLabel="Copied"
-        copyLabel="Copy link"
-        label="share"
-        onCopy={vi.fn()}
-        url="https://hanko.skvggor.workers.dev/room/room-1"
-      />,
-    );
+/*
+ * Asserted through the class the chip wears rather than the stylesheet, because
+ * jsdom runs no animation. A character level warp was the other candidate and it costs
+ * a WebGL renderer, a frame loop and a link a screen reader cannot read as a link.
+ */
+describe("ShareSnippet copy feedback", () => {
+  it("stamps the chip while the copy is confirmed", () => {
+    renderSnippet({ copied: true });
+    expect(chip("Copied").className).toContain("copy-stamp");
+  });
 
-    const chip = container.querySelector(".snippet__chip");
-    expect(chip?.tagName).toBe("BUTTON");
-    expect(chip?.getAttribute("type")).toBe("button");
+  it("leaves the chip unstamped while nothing is copied", () => {
+    renderSnippet();
+    expect(chip().className).not.toContain("copy-stamp");
+  });
+
+  /* `hover:bg-ink` in a shared list ties with `hover:bg-accent`, and the pointer is
+     still resting on the chip it just clicked. */
+  it("keeps the copied palette from colliding with the resting one", () => {
+    renderSnippet({ copied: true });
+    const classes = chip("Copied").className;
+
+    expect(classes).toContain("bg-accent");
+    expect(classes).not.toContain("bg-secondary");
+    expect(classes).not.toContain("hover:bg-ink");
+  });
+
+  it("keeps the chip off its own width so the link has no shelf in front of it", () => {
+    renderSnippet();
+    expect(chip().className).not.toMatch(/\bw-\[|\bflex-1\b|\bmargin-l/);
   });
 });
 

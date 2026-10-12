@@ -12,7 +12,7 @@ export interface ShareSnippetProps {
 /**
  * The room link as a single chip: the whole thing is the target, so there is no
  * separate button to hunt for. The scheme is dropped because it carries no
- * information here, and the room id is tinted so the eye lands on what to share.
+ * information here.
  */
 export function ShareSnippet({
   url,
@@ -30,26 +30,30 @@ export function ShareSnippet({
   const roomId = segments[segments.length - 1] ?? "";
 
   return (
-    <div className="snippet">
-      <span className="snippet__tag">{label}</span>
+    <div className="flex min-w-0 flex-col items-start gap-hair">
+      <span className="font-mono text-[0.5625rem] font-semibold tracking-[0.14em] uppercase text-ink-faint">
+        {label}
+      </span>
 
       <button
         aria-label={copied ? copiedLabel : copyLabel}
-        className="snippet__chip"
+        className={`flex min-w-0 max-w-full items-center rounded-chip border border-transparent px-hair py-hair font-mono text-[0.71875rem] leading-[1.3] transition-[background,border-color,transform] duration-150 focus-visible:border-ink focus-visible:outline-offset-[3px] active:scale-[0.99] ${
+          copied ? "copy-stamp bg-accent text-ink hover:bg-accent" : "bg-secondary hover:bg-ink text-paper-raised"
+        }`}
         data-copied={copied}
         type="button"
         onClick={onCopy}
       >
-        <span className="snippet__host">{host}</span>
-        <span className="snippet__slash">/room/</span>
-        <span className="snippet__path">{roomId}</span>
+        {/* The host is the same in every room, so it truncates before the id does. */}
+        <span className="truncate font-semibold">{host}</span>
+        <span className="shrink-0 opacity-65">/room/</span>
+        <span className="shrink-0 font-semibold whitespace-nowrap">{roomId}</span>
 
-        <span aria-hidden="true" className="snippet__icon">
-          {copied ? (
-            <CheckIcon size={13} weight="bold" />
-          ) : (
-            <CopyIcon size={13} weight="bold" />
-          )}
+        <span
+          aria-hidden="true"
+          className="flex shrink-0 items-center justify-center pl-tight opacity-85"
+        >
+          {copied ? <CheckIcon size={13} weight="bold" /> : <CopyIcon size={13} weight="bold" />}
         </span>
       </button>
     </div>

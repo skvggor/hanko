@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RoomBoard, type RoomBoardProps } from "@presentation/RoomBoard";
 import type { PublicRoomState } from "@domain/protocol";
@@ -274,10 +276,11 @@ describe("RoomBoard", () => {
   });
 
   it("shows the room link as one clean snippet", () => {
-    const { container } = renderWithContainer();
-    const chip = container.querySelector(".snippet__chip");
+    renderWithContainer();
 
-    expect(chip?.textContent).toContain("hanko.skvggor.workers.dev/room/room-1");
+    expect(screen.getByRole("button", { name: "Copy link" }).textContent).toContain(
+      "hanko.skvggor.workers.dev/room/room-1",
+    );
   });
 
   it("confirms a copied link on the chip", () => {
@@ -293,11 +296,21 @@ describe("RoomBoard", () => {
   it("asks the room to copy the link", async () => {
     const handlers = renderBoard();
 
-    await userEvent.click(document.querySelector(".snippet__chip")!);
+    await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
 
     expect(handlers.onCopyLink).toHaveBeenCalled();
   });
 
+  /* The cap stretched the pill past its content; jsdom cannot see that, so read source. */
+  it("does not widen the link chip past its own content", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/presentation/RoomBoard.tsx"),
+      "utf8",
+    );
+    const wrapper = /<div className="([^"]+)">\s*<ShareSnippet/.exec(source);
+
+    expect(wrapper?.[1]).not.toMatch(/max-w-|flex-1/);
+  });
 
   it("does not show owner actions on my own row", () => {
     renderBoard();

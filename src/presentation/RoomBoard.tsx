@@ -123,7 +123,7 @@ export function RoomBoard({
           </span>
         </div>
 
-        <div className="min-w-0 flex-1 sm:max-w-72">
+        <div className="min-w-0 sm:ml-auto">
           <ShareSnippet
             copied={copied}
             copyLabel={translate("room.copyLink")}
