@@ -1,4 +1,4 @@
-import { Check, Copy } from "@phosphor-icons/react";
+import { CheckIcon, CopyIcon } from "@phosphor-icons/react";
 
 export interface ShareSnippetProps {
   url: string;
@@ -21,7 +21,7 @@ export function ShareSnippet({
   copyLabel,
   copiedLabel,
   onCopy,
-}: ShareSnippetProps) {
+}: Readonly<ShareSnippetProps>) {
   const withoutScheme = url.replace(/^https?:\/\//, "");
   const slashIndex = withoutScheme.indexOf("/");
 
@@ -46,9 +46,9 @@ export function ShareSnippet({
 
         <span aria-hidden="true" className="snippet__icon">
           {copied ? (
-            <Check size={13} weight="bold" />
+            <CheckIcon size={13} weight="bold" />
           ) : (
-            <Copy size={13} weight="bold" />
+            <CopyIcon size={13} weight="bold" />
           )}
         </span>
       </button>

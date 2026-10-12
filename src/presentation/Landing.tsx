@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CreateRoomError, createRoom } from "@application/createRoom";
+import { pendingAtLeast } from "@application/minimumPending";
 import { roomPath } from "@application/routing";
 import type { Translator } from "@application/i18n";
 import { Button } from "@presentation/ui";
@@ -10,16 +11,19 @@ export interface LandingProps {
   notice?: string | null;
 }
 
-export function Landing({ translate, onNavigate, notice = null }: LandingProps) {
+export function Landing({ translate, onNavigate, notice = null }: Readonly<LandingProps>) {
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
 
   async function openRoom() {
+    const startedAt = Date.now();
+
     setPending(true);
     setFailed(false);
 
     try {
       const roomId = await createRoom();
+      await pendingAtLeast(startedAt);
       onNavigate(roomPath(roomId));
     } catch (error) {
       if (error instanceof CreateRoomError) {
@@ -34,8 +38,8 @@ export function Landing({ translate, onNavigate, notice = null }: LandingProps) 
   return (
     <section className="mx-auto flex w-full max-w-115 flex-col items-center gap-stack px-gutter pt-room text-center">
       <Button
+        busy={pending}
         className="min-h-13 px-gutter text-[0.9375rem]"
-        disabled={pending}
         variant="primary"
         onClick={() => {
           void openRoom();

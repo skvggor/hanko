@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Landing } from "@presentation/Landing";
 import { createTranslator } from "@application/i18n";
+import { MINIMUM_PENDING_MS } from "@application/minimumPending";
 
 const translate = createTranslator("en-US");
 
@@ -59,6 +60,32 @@ describe("Landing", () => {
     // The disabled button is the whole of the double click protection, because a room
     // is a Durable Object and creating a second one is not free.
     expect(button.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("marks the button as working rather than unavailable", async () => {
+    render(<Landing onNavigate={vi.fn()} translate={translate} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Start a room" }));
+
+    const button = await screen.findByRole("button", { name: "Creating..." });
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.className).not.toContain("disabled:opacity-40");
+  });
+
+  it("holds the creating state long enough for anyone to see it", async () => {
+    const onNavigate = vi.fn();
+    render(<Landing onNavigate={onNavigate} translate={translate} />);
+
+    const clickedAt = Date.now();
+    await userEvent.click(screen.getByRole("button", { name: "Start a room" }));
+
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(onNavigate).toHaveBeenCalledWith("/room/abcd2345");
+    });
+
+    expect(Date.now() - clickedAt).toBeGreaterThanOrEqual(MINIMUM_PENDING_MS);
   });
 
 

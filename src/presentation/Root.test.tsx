@@ -105,7 +105,10 @@ describe("Root", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start a room" }));
 
     expect(harness.fetchCalls).toEqual(["called"]);
-    expect(harness.pushState).toEqual(["/room/nd9k2qx7"]);
+
+    await waitFor(() => {
+      expect(harness.pushState).toEqual(["/room/nd9k2qx7"]);
+    });
   });
 
   it("renders the room screen after navigating", async () => {
@@ -415,7 +418,9 @@ describe("Root on a room link that cannot exist", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Start a room" }));
 
-    expect(harness.pushState).toEqual(["/room/nd9k2qx7"]);
+    await waitFor(() => {
+      expect(harness.pushState).toEqual(["/room/nd9k2qx7"]);
+    });
   });
 
   it("still offers the language switcher, since the chrome is not the problem", () => {

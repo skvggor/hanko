@@ -1,4 +1,5 @@
 import { createRoom, CreateRoomError } from "@application/createRoom";
+import { pendingAtLeast } from "@application/minimumPending";
 import { roomPath } from "@application/routing";
 import type { Translator } from "@application/i18n";
 import { Button } from "@presentation/ui";
@@ -15,16 +16,20 @@ export interface MissingRoomProps {
  * thing to say is that the link itself is wrong, because otherwise landing here looks
  * like the room was deleted and the reader goes looking for a way to recover it.
  */
-export function MissingRoom({ translate, onNavigate }: MissingRoomProps) {
+export function MissingRoom({ translate, onNavigate }: Readonly<MissingRoomProps>) {
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
 
   async function openRoom() {
+    const startedAt = Date.now();
+
     setPending(true);
     setFailed(false);
 
     try {
-      onNavigate(roomPath(await createRoom()));
+      const roomId = await createRoom();
+      await pendingAtLeast(startedAt);
+      onNavigate(roomPath(roomId));
     } catch (error) {
       if (error instanceof CreateRoomError) {
         setFailed(true);
@@ -45,8 +50,8 @@ export function MissingRoom({ translate, onNavigate }: MissingRoomProps) {
       </p>
 
       <Button
+        busy={pending}
         className="mt-snug"
-        disabled={pending}
         variant="primary"
         onClick={() => {
           void openRoom();

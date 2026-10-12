@@ -1,4 +1,12 @@
 /*
+ * @import has to precede every other at-rule or the browser drops it silently, and the
+ * Tailwind build happens to absorb this one regardless. Leaving it mid-file therefore
+ * costs nothing today and takes the whole design system with it the day the stylesheet
+ * is read by anything other than the Vite plugin.
+ */
+@import "tailwindcss";
+
+/*
  * Space Grotesk Variable, self hosted. Only the two subsets we actually render are
  * declared: latin covers English, latin-ext covers the Portuguese accents. The
  * vietnamese subset ships with the package and is deliberately skipped.
@@ -26,8 +34,6 @@
     U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
     U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
-
-@import "tailwindcss";
 
 @theme {
   --color-paper: #f0ece3;
@@ -540,6 +546,16 @@ footer {
       transparent
     );
     animation: meter-sweep 1500ms ease-in-out infinite;
+  }
+
+  .button-spinner {
+    animation: button-spinner 900ms linear infinite;
+  }
+}
+
+@keyframes button-spinner {
+  to {
+    transform: rotate(360deg);
   }
 }
 

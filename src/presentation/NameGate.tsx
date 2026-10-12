@@ -7,9 +7,21 @@ export interface NameGateProps {
   translate: Translator;
   suggestedName: string | null;
   onJoin: (name: string, role: ParticipantRole) => void;
+  pending?: boolean;
 }
 
-export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
+/**
+ * The room does not answer until the join frame has been through the socket and back,
+ * and until it does the gate is still on screen. Left as it was, the form simply sat
+ * there with the name still typed in and nothing moving, so a person who had just
+ * pressed Enter had no way to tell the press had landed.
+ */
+export function NameGate({
+  translate,
+  suggestedName,
+  onJoin,
+  pending = false,
+}: Readonly<NameGateProps>) {
   const [name, setName] = useState(suggestedName ?? "");
   const [role, setRole] = useState<ParticipantRole>("voter");
 
@@ -37,7 +49,8 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
       <input
         autoComplete="off"
         autoFocus
-        className="min-h-12 w-full rounded-2xl border border-ink/20 bg-paper-raised px-gutter py-snug font-sans text-[1.0625rem] text-ink"
+        className="min-h-12 w-full rounded-2xl border border-ink/20 bg-paper-raised px-gutter py-snug font-sans text-[1.0625rem] text-ink disabled:opacity-60"
+        disabled={pending}
         id="gate-name"
         onChange={(event) => {
           setName(event.target.value);
@@ -53,7 +66,8 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
         {(["voter", "spectator"] as const).map((option) => (
           <button
             aria-pressed={role === option}
-            className="min-h-10 flex-1 cursor-pointer rounded-full border border-ink/20 px-snug py-tight font-sans text-[0.6875rem] font-semibold tracking-[0.04em] text-ink-dim transition-colors hover:border-ink hover:text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-paper"
+            className="min-h-10 flex-1 cursor-pointer rounded-full border border-ink/20 px-snug py-tight font-sans text-[0.6875rem] font-semibold tracking-[0.04em] text-ink-dim transition-colors hover:border-ink hover:text-ink aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-paper disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={pending}
             key={option}
             type="button"
             onClick={() => setRole(option)}
@@ -65,8 +79,8 @@ export function NameGate({ translate, suggestedName, onJoin }: NameGateProps) {
         ))}
       </fieldset>
 
-      <Button disabled={!canSubmit} type="submit" variant="primary">
-        {translate("join.submit")}
+      <Button busy={pending} disabled={!canSubmit} type="submit" variant="primary">
+        {pending ? translate("join.entering") : translate("join.submit")}
       </Button>
     </form>
   );

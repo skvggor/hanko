@@ -281,6 +281,25 @@ describe("RoomScreen", () => {
     expect(screen.getByText("1 here")).toBeTruthy();
   });
 
+  it("holds the name gate as working until the room answers", async () => {
+    renderRoom();
+    await joinAs("Ana");
+
+    const button = await screen.findByRole("button", { name: "Entering..." });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("lets the name be corrected when the room refuses the join", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    await screen.findByRole("button", { name: "Entering..." });
+
+    pushError("name_required");
+
+    expect(screen.getByRole("button", { name: "Enter" }).hasAttribute("disabled")).toBe(false);
+  });
+
   it("forwards a vote to the connection", async () => {
     renderRoom();
     await joinAs("Ana");

@@ -1,6 +1,8 @@
 import type { ReactNode, Ref } from "react";
+import { CircleNotchIcon } from "@phosphor-icons/react";
 
 export function Button({
+  busy = false,
   children,
   className = "",
   onClick,
@@ -8,7 +10,13 @@ export function Button({
   type = "button",
   disabled = false,
   ref,
-}: {
+}: Readonly<{
+  /**
+   * Working is not the same as unavailable. A busy control is mid request, so it keeps
+   * its full weight and shows a spinner; fading it would read as broken, which is the
+   * opposite of what the label beside the spinner is saying.
+   */
+  busy?: boolean;
   children: ReactNode;
   className?: string;
   onClick?: () => void;
@@ -20,9 +28,14 @@ export function Button({
    * a ref rather than forcing every caller to drop down to a bare element.
    */
   ref?: Ref<HTMLButtonElement> | undefined;
-}) {
+}>) {
   const base =
-    "inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-full px-gutter py-tight font-sans text-[0.8125rem] font-semibold tracking-[0.02em] transition-transform duration-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100";
+    "inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-full px-gutter py-tight font-sans text-[0.8125rem] font-semibold tracking-[0.02em] transition-transform duration-100 active:scale-[0.98]";
+
+  const idle =
+    "disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100";
+
+  const working = "cursor-progress disabled:active:scale-100";
 
   const variants = {
     default: "border border-ink/30 text-ink hover:border-ink hover:bg-ink hover:text-paper",
@@ -33,12 +46,21 @@ export function Button({
 
   return (
     <button
-      className={`${base} ${variants[variant]} ${className}`}
-      disabled={disabled}
+      aria-busy={busy || undefined}
+      className={`${base} ${busy ? working : idle} ${variants[variant]} ${className}`}
+      disabled={disabled || busy}
       onClick={onClick}
       ref={ref}
       type={type}
     >
+      {busy && (
+        <CircleNotchIcon
+          aria-hidden="true"
+          className="button-spinner"
+          size={15}
+          weight="bold"
+        />
+      )}
       {children}
     </button>
   );
@@ -62,7 +84,7 @@ export function Panel({
   );
 }
 
-export function Label({ children }: { children: ReactNode }) {
+export function Label({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <p className="m-0 text-[0.625rem] font-semibold tracking-[0.16em] text-ink-faint uppercase">
       {children}
@@ -74,11 +96,11 @@ export function Chip({
   children,
   tone = "neutral",
   title,
-}: {
+}: Readonly<{
   children: ReactNode;
   tone?: "neutral" | "primary" | "secondary" | "accent";
   title?: string;
-}) {
+}>) {
   const tones = {
     neutral: "bg-ink/8 text-ink-dim",
     primary: "bg-primary/12 text-primary",
@@ -100,7 +122,7 @@ export function Chip({
  * The owner marker: a filled disc with a notch, echoing the wordmark so ownership
  * reads as a shape before anyone reads the word.
  */
-export function OwnerBadge({ label }: { label: string }) {
+export function OwnerBadge({ label }: Readonly<{ label: string }>) {
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-chip bg-ink py-0.5 pr-tight pl-1.5 text-[0.625rem] font-semibold tracking-[0.06em] text-paper uppercase"
@@ -124,12 +146,12 @@ export function Meter({
   label,
   tone = "secondary",
   pending = false,
-}: {
+}: Readonly<{
   value: number;
   label: string;
   tone?: "primary" | "secondary";
   pending?: boolean;
-}) {
+}>) {
   const clamped = Math.min(1, Math.max(0, value));
   const filled = Math.round(clamped * 100);
 

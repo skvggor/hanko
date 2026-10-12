@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MESSAGE_LIMIT, type ChatMessage } from "@domain/chat";
 import type { PublicRoomState } from "@domain/protocol";
 import type { DeckId } from "@domain/deck";
@@ -64,7 +64,7 @@ export function RoomScreen({
   onSessionNameChange,
   onRoomDeleted,
   translate,
-}: RoomScreenProps) {
+}: Readonly<RoomScreenProps>) {
   const [state, setState] = useState<PublicRoomState | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draftName, setDraftName] = useState<string | null>(null);
@@ -204,6 +204,83 @@ export function RoomScreen({
   const isOwner =
     state !== null && state.ownerId === connection.participantId;
 
+  /**
+   * The gate stays on screen until the room answers, so it has to say that it is waiting
+   * rather than sitting there looking untouched. An error ends the wait, because the
+   * person is being told the name was refused and the next thing they do is fix it.
+   */
+  const joining = draftName !== null && state === null && errorCode === null;
+
+  /**
+   * Removal outranks everything, then there is no room to be in yet, and only after a
+   * name has been sent and answered is there a board. Spelled out because the third
+   * case is the only one where the room has actually said anything.
+   */
+  let body: ReactNode;
+
+  if (wasRemoved) {
+    body = (
+      <div className="mt-stack mb-room rounded-3xl border border-line bg-paper-raised p-gutter text-center">
+        <p className="m-0 font-display text-[1.0625rem] font-bold text-ink">
+          {translate("errors.participant_removed")}
+        </p>
+        <p className="mt-snug mb-0 text-[0.8125rem] text-ink-dim">
+          {translate("room.removedHint")}
+        </p>
+      </div>
+    );
+  } else if (state === null || draftName === null) {
+    body = (
+      <NameGate
+        onJoin={join}
+        pending={joining}
+        suggestedName={suggestedName}
+        translate={translate}
+      />
+    );
+  } else {
+    body = (
+      <>
+        <RoomBoard
+          copied={copied}
+          myParticipantId={connection.participantId}
+          onCopyLink={handleCopyLink}
+          onDeleteRoom={handleDeleteRoom}
+          onNextRound={handleNextRound}
+          onRemoveParticipant={handleRemoveParticipant}
+          onRename={handleRename}
+          onResetRound={handleResetRound}
+          onReveal={handleReveal}
+          onSetDeck={handleSetDeck}
+          onSetRole={handleSetRole}
+          onSetRoomName={handleSetRoomName}
+          onTransferOwnership={handleTransferOwnership}
+          deleteButtonRef={deleteTrigger}
+          shareUrl={shareUrl}
+          state={state}
+          translate={translate}
+        />
+
+        <Hanko
+          myParticipantId={connection.participantId}
+          onVote={handleVote}
+          state={state}
+          translate={translate}
+        />
+
+        <ChatPanel
+          connectedParticipantIds={connectedParticipantIds}
+          isOwner={isOwner}
+          messages={messages}
+          myParticipantId={connection.participantId}
+          onClear={handleClearMessages}
+          onSend={handleSendMessage}
+          translate={translate}
+        />
+      </>
+    );
+  }
+
   const issuedToken = connection.token;
 
   useEffect(() => {
@@ -228,57 +305,7 @@ export function RoomScreen({
         </p>
       )}
 
-      {wasRemoved ? (
-        <div className="mt-stack mb-room rounded-3xl border border-line bg-paper-raised p-gutter text-center">
-          <p className="m-0 font-display text-[1.0625rem] font-bold text-ink">
-            {translate("errors.participant_removed")}
-          </p>
-          <p className="mt-snug mb-0 text-[0.8125rem] text-ink-dim">
-            {translate("room.removedHint")}
-          </p>
-        </div>
-      ) : state === null || draftName === null ? (
-        <NameGate onJoin={join} suggestedName={suggestedName} translate={translate} />
-      ) : (
-        <>
-          <RoomBoard
-            copied={copied}
-            myParticipantId={connection.participantId}
-            onCopyLink={handleCopyLink}
-            onDeleteRoom={handleDeleteRoom}
-            onNextRound={handleNextRound}
-            onRemoveParticipant={handleRemoveParticipant}
-            onRename={handleRename}
-            onResetRound={handleResetRound}
-            onReveal={handleReveal}
-            onSetDeck={handleSetDeck}
-            onSetRole={handleSetRole}
-            onSetRoomName={handleSetRoomName}
-            onTransferOwnership={handleTransferOwnership}
-            deleteButtonRef={deleteTrigger}
-            shareUrl={shareUrl}
-            state={state}
-            translate={translate}
-          />
-
-          <Hanko
-            myParticipantId={connection.participantId}
-            onVote={handleVote}
-            state={state}
-            translate={translate}
-          />
-
-          <ChatPanel
-            connectedParticipantIds={connectedParticipantIds}
-            isOwner={isOwner}
-            messages={messages}
-            myParticipantId={connection.participantId}
-            onClear={handleClearMessages}
-            onSend={handleSendMessage}
-            translate={translate}
-          />
-        </>
-      )}
+      {body}
 
       {confirmingDelete && (
         <ConfirmDialog

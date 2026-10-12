@@ -5,6 +5,7 @@
     "hint": "Letters only. Accents are fine.",
     "placeholder": "Your name",
     "submit": "Enter",
+    "entering": "Entering...",
     "back": "Back",
     "watchInstead": "Watch instead",
     "participateInstead": "Join as voter"

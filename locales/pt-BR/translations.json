@@ -5,6 +5,7 @@
     "hint": "Apenas letras. Acentos são permitidos.",
     "placeholder": "Seu nome",
     "submit": "Entrar",
+    "entering": "Entrando...",
     "back": "Voltar",
     "watchInstead": "Apenas assistir",
     "participateInstead": "Participar como votante"

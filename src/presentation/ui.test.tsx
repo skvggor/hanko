@@ -53,6 +53,51 @@ describe("Button", () => {
     expect(screen.getByRole("button").hasAttribute("disabled")).toBe(true);
   });
 
+  it("fades a control that is merely unavailable", () => {
+    render(<Button disabled>Reveal</Button>);
+    expect(screen.getByRole("button").className).toContain("disabled:opacity-40");
+  });
+
+  it("stays legible while it is working rather than looking unavailable", () => {
+    render(<Button busy>Reveal</Button>);
+    expect(screen.getByRole("button").className).not.toContain("disabled:opacity-40");
+  });
+
+  it("shows work happening with a spinner", () => {
+    const { container } = render(<Button busy>Reveal</Button>);
+    expect(container.querySelector("svg")).toBeTruthy();
+  });
+
+  it("carries no spinner when it is idle", () => {
+    const { container } = render(<Button>Reveal</Button>);
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("cannot be pressed a second time while it is working", () => {
+    const onClick = vi.fn();
+    render(
+      <Button busy onClick={onClick}>
+        Reveal
+      </Button>,
+    );
+
+    expect(screen.getByRole("button").hasAttribute("disabled")).toBe(true);
+
+    return userEvent.click(screen.getByRole("button")).then(() => {
+      expect(onClick).not.toHaveBeenCalled();
+    });
+  });
+
+  it("marks itself busy for assistive tech", () => {
+    render(<Button busy>Reveal</Button>);
+    expect(screen.getByRole("button").getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("leaves aria-busy off when it is idle", () => {
+    render(<Button>Reveal</Button>);
+    expect(screen.getByRole("button").hasAttribute("aria-busy")).toBe(false);
+  });
+
   it("keeps a minimum touch target", () => {
     render(<Button>Reveal</Button>);
     expect(screen.getByRole("button").className).toContain("min-h-11");

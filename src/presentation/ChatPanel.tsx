@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ArrowUp,
-  ChatsCircle,
-  Minus,
-  Trash,
+  ArrowUpIcon,
+  ChatsCircleIcon,
+  MinusIcon,
+  TrashIcon,
 } from "@phosphor-icons/react";
 import { MESSAGE_MAX_LENGTH, type ChatMessage } from "@domain/chat";
 import type { Translator } from "@application/i18n";
@@ -32,7 +32,7 @@ export function ChatPanel({
   onClear,
   onSend,
   translate,
-}: ChatPanelProps) {
+}: Readonly<ChatPanelProps>) {
   const [open, setOpen] = useState(prefersWideScreen);
   const [draft, setDraft] = useState("");
   const [readUpTo, setReadUpTo] = useState<number | null>(null);
@@ -77,7 +77,7 @@ export function ChatPanel({
           type="button"
           onClick={openPanel}
         >
-          <ChatsCircle aria-hidden="true" size={22} weight="fill" />
+          <ChatsCircleIcon aria-hidden="true" size={22} weight="fill" />
           {unread > 0 && (
             <span className="chat-launcher__badge">{unread > 9 ? "9+" : unread}</span>
           )}
@@ -91,7 +91,7 @@ export function ChatPanel({
       <section aria-label={translate("chat.title")} className="chat-panel">
         <header className="chat-panel__header">
           <h2 className="flex items-center gap-tight font-display text-[0.8125rem] font-bold text-ink">
-            <ChatsCircle aria-hidden="true" size={16} weight="fill" />
+            <ChatsCircleIcon aria-hidden="true" size={16} weight="fill" />
             {translate("chat.title")}
           </h2>
 
@@ -103,7 +103,7 @@ export function ChatPanel({
                 type="button"
                 onClick={onClear}
               >
-                <Trash aria-hidden="true" size={15} weight="bold" />
+                <TrashIcon aria-hidden="true" size={15} weight="bold" />
               </button>
             )}
             <button
@@ -112,7 +112,7 @@ export function ChatPanel({
               type="button"
               onClick={minimizePanel}
             >
-              <Minus aria-hidden="true" size={15} weight="bold" />
+              <MinusIcon aria-hidden="true" size={15} weight="bold" />
             </button>
           </div>
         </header>
@@ -165,7 +165,7 @@ export function ChatPanel({
             disabled={draft.trim().length === 0}
             type="submit"
           >
-            <ArrowUp aria-hidden="true" size={16} weight="bold" />
+            <ArrowUpIcon aria-hidden="true" size={16} weight="bold" />
           </button>
         </form>
       </section>

@@ -81,6 +81,41 @@ describe("NameGate", () => {
     expect(screen.getByRole("button", { name: "Enter" }).hasAttribute("disabled")).toBe(true);
   });
 
+  it("says it is entering instead of sitting there unchanged", () => {
+    render(
+      <NameGate onJoin={vi.fn()} pending suggestedName="Ana" translate={translate} />,
+    );
+
+    const button = screen.getByRole("button", { name: "Entering..." });
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.className).not.toContain("disabled:opacity-40");
+  });
+
+  it("locks the name field while it waits for the room", () => {
+    render(
+      <NameGate onJoin={vi.fn()} pending suggestedName="Ana" translate={translate} />,
+    );
+
+    expect(screen.getByLabelText("Your name").hasAttribute("disabled")).toBe(true);
+  });
+
+  it("locks the role choice while it waits for the room", () => {
+    render(
+      <NameGate onJoin={vi.fn()} pending suggestedName="Ana" translate={translate} />,
+    );
+
+    expect(screen.getByRole("button", { name: "Watch instead" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+  });
+
+  it("leaves the form editable when it is not waiting", () => {
+    render(<NameGate onJoin={vi.fn()} suggestedName="Ana" translate={translate} />);
+
+    expect(screen.getByRole("button", { name: "Enter" }).hasAttribute("disabled")).toBe(false);
+  });
+
   it("renders in portuguese", () => {
     render(
       <NameGate
