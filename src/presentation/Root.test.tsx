@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Root } from "@presentation/Root";
@@ -441,5 +441,76 @@ describe("Root on a room link that cannot exist", () => {
     render(<Root />);
 
     expect(screen.queryByText("texto")).toBeNull();
+  });
+});
+
+describe("Root brand placement", () => {
+  beforeEach(() => {
+    harness.fetchCalls.length = 0;
+    harness.pushState.length = 0;
+
+    vi.stubGlobal("navigator", { language: "en-US" });
+    setPath("/");
+    vi.stubGlobal("history", {
+      pushState(_state: unknown, _title: string, path: string) {
+        harness.pushState.push(path);
+        setPath(path);
+      },
+    });
+    vi.stubGlobal("localStorage", { getItem: vi.fn(() => null), setItem: vi.fn() });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the brand out of the header on the home screen", () => {
+    render(<Root />);
+
+    expect(document.querySelector("[data-logo]")).toBeNull();
+  });
+
+  it("keeps the brand in the header inside a room", () => {
+    setPath("/room/abcd2345");
+    render(<Root />);
+
+    expect(document.querySelector("[data-logo]")).toBeTruthy();
+  });
+
+  it("keeps the brand in the header when the link is not a room", () => {
+    setPath("/room/TOO-LONG-AND-UPPERCASE");
+    render(<Root />);
+
+    expect(document.querySelector("[data-logo]")).toBeTruthy();
+  });
+
+  it("sends you home from a room once you confirm leaving it", () => {
+    setPath("/room/abcd2345");
+    render(<Root />);
+
+    const brand = document.querySelector("[data-logo]");
+    if (!brand) throw new Error("the room screen does not carry the brand");
+    fireEvent.click(brand);
+    fireEvent.click(screen.getByRole("button", { name: "Yes, leave" }));
+
+    expect(harness.pushState).toEqual(["/"]);
+  });
+
+  it("falls back to the home screen when the page has no location to read", () => {
+    vi.stubGlobal("location", undefined);
+    render(<Root />);
+
+    expect(screen.getByRole("button", { name: "Start a room" })).toBeTruthy();
+  });
+
+  it("reads a back step as the home screen when the page has no location to read", () => {
+    render(<Root />);
+    vi.stubGlobal("location", undefined);
+
+    act(() => {
+      globalThis.dispatchEvent(new Event("popstate"));
+    });
+
+    expect(screen.getByRole("button", { name: "Start a room" })).toBeTruthy();
   });
 });

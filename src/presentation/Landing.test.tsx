@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Landing } from "@presentation/Landing";
+import { BrandMark } from "@presentation/Signature";
 import { createTranslator } from "@application/i18n";
 import { MINIMUM_PENDING_MS } from "@application/minimumPending";
 
@@ -128,5 +129,34 @@ describe("Landing", () => {
     expect(
       screen.getByText("Crie uma sala e compartilhe o link."),
     ).toBeTruthy();
+  });
+
+  it("puts the mark and the name above the call to action", () => {
+    const { container } = render(<Landing onNavigate={vi.fn()} translate={translate} />);
+    const mark = container.querySelector("[data-ring='top']");
+    const heading = screen.getByRole("heading", { level: 1 });
+    const button = screen.getByRole("button", { name: "Start a room" });
+    if (!mark) throw new Error("the home screen does not carry the mark");
+
+    expect(mark.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(heading.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it("sets the name and the tagline the way the chrome does", () => {
+    const { container: home } = render(<Landing onNavigate={vi.fn()} translate={translate} />);
+    const { container: chrome } = render(<BrandMark translate={translate} />);
+
+    expect(home.querySelector("h1")?.className).toBe(chrome.querySelector("h1")?.className);
+    expect(home.querySelector("p")?.className).toBe(chrome.querySelector("p")?.className);
+  });
+
+  it("carries the tagline under the name", () => {
+    render(<Landing onNavigate={vi.fn()} translate={translate} />);
+
+    expect(screen.getByText("Your team's consensus.")).toBeTruthy();
   });
 });

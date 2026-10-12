@@ -1,20 +1,42 @@
 import type { Translator } from "@application/i18n";
 import { BUILD_YEAR } from "@config/version";
-import { Wordmark } from "@presentation/Wordmark";
+import { Logo } from "@presentation/Logo";
 
-export function BrandMark({ translate }: Readonly<{ translate: Translator }>) {
+/**
+ * One type recipe for the lockup, sized in em against itself: only the lockup's own size
+ * changes between the chrome and the home screen, so the brand reads as one thing in both.
+ */
+const NAME_TYPE = "font-display m-0 text-[1em] leading-none font-bold tracking-[-0.02em] text-ink";
+const TAGLINE_TYPE = "m-0 text-[0.45em] font-medium tracking-[0.04em] text-ink-dim";
+
+export interface BrandMarkProps {
+  translate: Translator;
+  /** Header is the chrome. Hero is the home screen, where the lockup is the content. */
+  size?: "header" | "hero";
+}
+
+export function BrandMark({ translate, size = "header" }: Readonly<BrandMarkProps>) {
+  const name = <h1 className={NAME_TYPE}>{translate("brand.name")}</h1>;
+  const tagline = <p className={TAGLINE_TYPE}>{translate("brand.tagline")}</p>;
+
+  if (size === "hero") {
+    return (
+      <div className="flex flex-col items-center gap-snug text-center text-[2.5rem]">
+        <Logo className="h-28 w-28 text-primary-bright" />
+        {name}
+        {tagline}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-snug">
-      <Wordmark size={28} />
-      {/* On a phone the disc keeps the brand and the wording steps aside, because the
+    <div className="flex items-center gap-snug text-[1.375rem]">
+      <Logo className="h-8 w-8 shrink-0 text-primary-bright" />
+      {/* On a phone the mark keeps the brand and the wording steps aside, because the
           one thing worth the width is which room this is. */}
       <div className="hidden flex-col items-start sm:flex">
-        <h1 className="font-display m-0 text-[1.375rem] leading-none font-bold tracking-[-0.02em] text-ink">
-          {translate("brand.name")}
-        </h1>
-        <p className="m-0 text-[0.625rem] font-medium tracking-[0.04em] text-ink-dim">
-          {translate("brand.tagline")}
-        </p>
+        {name}
+        {tagline}
       </div>
     </div>
   );

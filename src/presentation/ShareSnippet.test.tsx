@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ShareSnippet } from "@presentation/ShareSnippet";
-import { Wordmark } from "@presentation/Wordmark";
 
 function chip(name = "Copy link"): HTMLElement {
   return screen.getByRole("button", { name });
@@ -126,52 +125,5 @@ describe("ShareSnippet copy feedback", () => {
   it("keeps the chip off its own width so the link has no shelf in front of it", () => {
     renderSnippet();
     expect(chip().className).not.toMatch(/\bw-\[|\bflex-1\b|\bmargin-l/);
-  });
-});
-
-describe("Wordmark", () => {
-  it("draws three primitives", () => {
-    const { container } = render(<Wordmark />);
-    expect(container.querySelectorAll(".wordmark__square")).toHaveLength(1);
-    expect(container.querySelectorAll(".wordmark__disc")).toHaveLength(1);
-    expect(container.querySelectorAll(".wordmark__quarter")).toHaveLength(1);
-    expect(container.querySelectorAll(".wordmark__core")).toHaveLength(1);
-  });
-
-  it("is hidden from screen readers", () => {
-    const { container } = render(<Wordmark />);
-    expect(container.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
-  });
-
-  it("rests with no pointer influence", () => {
-    const { container } = render(<Wordmark />);
-    const svg = container.querySelector("svg");
-
-    expect(svg?.style.getPropertyValue("--lift-disc")).toBe("0");
-  });
-
-  it("lifts the primitives as the pointer crosses", () => {
-    const { container } = render(<Wordmark />);
-    const svg = container.querySelector("svg");
-    if (svg === null) throw new Error("no wordmark");
-
-    svg.dispatchEvent(
-      new PointerEvent("pointermove", { clientX: 20, clientY: 20, bubbles: true }),
-    );
-
-    expect(svg.style.getPropertyValue("--lift-disc")).not.toBe("");
-  });
-
-  it("settles back when the pointer leaves", () => {
-    const { container } = render(<Wordmark />);
-    const svg = container.querySelector("svg");
-    if (svg === null) throw new Error("no wordmark");
-
-    svg.dispatchEvent(
-      new PointerEvent("pointermove", { clientX: 20, clientY: 20, bubbles: true }),
-    );
-    svg.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true }));
-
-    expect(svg.style.getPropertyValue("--lift-disc")).toBe("0");
   });
 });

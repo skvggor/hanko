@@ -3,6 +3,7 @@ import { CreateRoomError, createRoom } from "@application/createRoom";
 import { pendingAtLeast } from "@application/minimumPending";
 import { roomPath } from "@application/routing";
 import type { Translator } from "@application/i18n";
+import { BrandMark } from "@presentation/Signature";
 import { Button } from "@presentation/ui";
 
 export interface LandingProps {
@@ -37,6 +38,8 @@ export function Landing({ translate, onNavigate, notice = null }: Readonly<Landi
 
   return (
     <section className="mx-auto flex w-full max-w-115 flex-col items-center gap-stack px-gutter pt-room text-center">
+      <BrandMark size="hero" translate={translate} />
+
       <Button
         busy={pending}
         className="min-h-13 px-gutter text-[0.9375rem]"

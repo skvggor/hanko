@@ -14,6 +14,8 @@ export interface ShellProps {
   locale: Locale;
   sessionName?: string | null;
   hasFloatingDock?: boolean;
+  /** The brand is content on the home screen rather than chrome, and the track it leaves is held open so the switcher stays put. */
+  brandInHeader?: boolean;
   onLocaleChange: (locale: Locale) => void;
   onNavigateHome: () => void;
   /** Null when there is no room to leave, which is what lets the logo skip the warning. */
@@ -27,6 +29,7 @@ export function Shell({
   locale,
   sessionName = null,
   hasFloatingDock = false,
+  brandInHeader = true,
   onLocaleChange,
   onNavigateHome,
   onLeaveRoom,
@@ -98,15 +101,19 @@ export function Shell({
         className="sticky top-0 z-20 grid h-[var(--chrome-height)] grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-tight border-b border-line px-gutter"
         data-glass={scrolled}
       >
-        <button
-          aria-label={translate("brand.goHome")}
-          className="cursor-pointer"
-          data-logo
-          onClick={openLogo}
-          type="button"
-        >
-          <BrandMark translate={translate} />
-        </button>
+        {brandInHeader ? (
+          <button
+            aria-label={translate("brand.goHome")}
+            className="cursor-pointer"
+            data-logo
+            onClick={openLogo}
+            type="button"
+          >
+            <BrandMark translate={translate} />
+          </button>
+        ) : (
+          <div aria-hidden="true" />
+        )}
         {/**
          * The slot is rendered even with nothing to put in it. A grid places children
          * by position, so an absent title would slide the switcher into the middle

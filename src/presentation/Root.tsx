@@ -106,6 +106,7 @@ export function Root() {
 
   return (
     <Shell
+      brandInHeader={route.kind !== "home"}
       errorCode={null}
       locale={locale}
       onLeaveRoom={route.kind === "room" ? () => handleNavigate("/") : null}

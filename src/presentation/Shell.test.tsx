@@ -1038,4 +1038,27 @@ describe("Shell logo as navigation", () => {
 
     expect(screen.getByRole("dialog").textContent).toContain("Sprint 42");
   });
+
+  it("leaves the brand out of the header when the screen carries it", () => {
+    renderShell({ brandInHeader: false });
+
+    expect(document.querySelector("[data-logo]")).toBeNull();
+  });
+
+  it("keeps the language switcher where it was when the brand leaves the header", () => {
+    renderShell({ brandInHeader: false });
+
+    const bar = document.querySelector("header");
+    const nav = bar?.querySelector("nav");
+
+    expect(bar?.children).toHaveLength(3);
+    expect(bar?.firstElementChild?.hasAttribute("data-logo")).toBe(false);
+    expect(nav).toBe(bar?.lastElementChild);
+  });
+
+  it("carries the brand in the header on every other screen", () => {
+    renderShell();
+
+    expect(document.querySelector("[data-logo]")).toBeTruthy();
+  });
 });
