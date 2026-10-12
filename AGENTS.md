@@ -39,16 +39,22 @@ npm run typecheck      # BOTH tsconfigs: client and worker
 npm run lint           # eslint .
 npm test               # vitest run
 npm run test:coverage  # vitest run --coverage (enforces the 80% gate)
+npm run sonar          # SonarQube gate on a throwaway instance (needs Docker)
 npm run deploy         # coverage, then build, then wrangler deploy
 ```
 
 `pre-commit` runs ESLint on staged files with `--max-warnings=0`, both `tsc --noEmit`
 passes, the coverage run and a secret scan. `pre-push` runs the same gates plus the
-production build across the whole tree. `typecheck`, `lint` and `test:coverage` must all
-be green before a change is done.
+production build and `npm run sonar` across the whole tree. `typecheck`, `lint`,
+`test:coverage` and `npm run sonar` must all be green before a change is done.
 
 `npm run build` only typechecks the client config, so run the full `typecheck` rather than
 relying on `build`.
+
+The sonar gate brings up its own instance in Docker and takes it down again, so a push
+needs the daemon running. Set `SONAR_KEEP_ALIVE=1` to leave the instance up at
+`http://localhost:9000`, signing in as `admin`/`admin`; it is then yours to remove with
+`docker rm -f hanko-sonar`.
 
 ## Architecture
 
@@ -250,6 +256,24 @@ Coverage is gated at 80% on statements, branches, functions and lines, across ev
 A layer left out of the gate is a layer where a regression is free, so adding a layer means
 adding it to the thresholds. The thresholds are on the total, so check a new file's own
 numbers rather than assuming the aggregate speaks for it.
+
+### What the sonar gate is for
+
+Everything else here reads one file at a time, which is why the coverage gate never found
+the same function written out twice in two files and why the analyser found a conditional
+in the result sheet whose two branches were identical. `npm run sonar` is the one gate that
+sees across files, and it is the only reason duplication is not invisible here.
+
+The instance exists for one analysis and is destroyed with it, so what outlives a run is the
+exit code and nothing else. That is deliberate: there is no server to keep in sync and no
+dashboard to forget about. The cost is that a gate on a database with no history has no
+"new code" period, so every condition applies to the whole repository. A fresh
+implementation therefore has to meet the bar of the entire codebase.
+
+The gate counts code smells against a budget declared in `scripts/sonar-scan.mjs`. It is a
+ratchet, not a target: lower it when the number comes down, and a lowering is a deliberate
+edit that shows up in the diff next to the reason. Raising it to make a run pass defeats the
+gate, and the run passing is not the point of it.
 
 Test names are behavioural sentences in the present tense: `"refuses a full room"`,
 `"keeps the seat of someone who just left"`.

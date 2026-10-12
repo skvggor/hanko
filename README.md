@@ -131,6 +131,18 @@ removes cross-site WebSocket hijacking.
 **Seats are reclaimed after a grace window.** Without that, a room could fill with dead
 slots and refuse everyone while a single socket stayed open.
 
+**The quality gate lives on an instance that does not survive the run.** SonarQube is the
+only thing in the setup that sees across files, and it needs a server; so the server is a
+container that comes up, answers, and is destroyed, leaving nothing but the exit code. The
+cost is that a gate on a database with no history has no "new code" period, so every
+condition applies to the whole repository and a fresh implementation has to meet the bar of
+the entire codebase. Keeping it that way costs a push the Docker daemon, which is a fair
+trade for a duplication check that nothing else in the repository can perform.
+
+**The code smell budget is a ratchet, not a target.** `scripts/sonar-scan.mjs` declares one
+number and the gate holds the repository to it. It moves when the number moves, and a
+raising is visible in the diff next to the reason it was raised.
+
 ## Layout
 
 ```
@@ -156,13 +168,19 @@ There are no barrel `index.ts` files; import the concrete module.
 | `npm run lint`         | ESLint over the tree                                |
 | `npm test`             | The test suite                                      |
 | `npm run test:coverage`| The suite, enforcing the 80% gate                   |
+| `npm run sonar`       | The SonarQube gate, on a throwaway instance          |
 | `npm run deploy`       | Coverage, then build, then `wrangler deploy`        |
 
 `npm run build` only typechecks the client config. Use `npm run typecheck` to cover both.
 
 A `pre-commit` hook runs ESLint on staged files with `--max-warnings=0`, both typecheck
 passes, the coverage run and a secret scan. A `pre-push` hook runs the same gates plus the
-production build across the whole tree.
+production build and the sonar gate across the whole tree.
+
+The sonar gate brings up its own instance in Docker and takes it down again, so a push
+needs the daemon running. Set `SONAR_KEEP_ALIVE=1` to leave the instance up at
+`http://localhost:9000`, signing in as `admin`/`admin`; it is then yours to remove with
+`docker rm -f hanko-sonar`.
 
 ## Testing
 
@@ -171,6 +189,11 @@ run against hand-rolled fakes rather than `workerd`.
 
 Coverage is gated at 80% on statements, branches, functions and lines, and the gate covers
 **every layer**. A layer left out of the gate is a layer where a regression is free.
+
+Everything else in the gates reads one file at a time, which is why the coverage gate never
+found the same function written out twice in two files and why the analyser found a
+conditional in the result sheet whose two branches were identical. `npm run sonar` is the
+one gate that sees across files, so it is the only reason duplication is not invisible here.
 
 A few conventions are enforced by reading the source rather than the rendered output,
 because jsdom cannot see them:
