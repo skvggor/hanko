@@ -269,11 +269,6 @@ export function resetRound(room: RoomSnapshot): RoomSnapshot {
   };
 }
 
-export function deleteRoom(room: RoomSnapshot): null {
-  void room;
-  return null;
-}
-
 export function setParticipantRole(
   room: RoomSnapshot,
   participantId: string,

@@ -63,6 +63,22 @@ const JOIN_WINDOW_MS = 60_000;
  */
 const MAX_SOCKETS = 80;
 
+/**
+ * What a command leaves behind. Most of them only change the room and let the shared tail
+ * write it, but a few persist and broadcast on their own account because they have more
+ * to do than swap one snapshot for another, and those have to be able to say so.
+ */
+interface CommandOutcome {
+  room: RoomSnapshot;
+  finished: boolean;
+}
+
+/** Who is asking and what they are allowed to ask about. */
+interface AuthorizedActor {
+  room: RoomSnapshot;
+  actor: Participant;
+}
+
 export class Room {
   #room: RoomSnapshot | null = null;
   #roomId: string | null = null;
@@ -253,137 +269,216 @@ export class Room {
   async #handleCommand(socket: WebSocket, message: ClientMessage): Promise<void> {
     if (!this.#spend(socket, message)) return;
 
+    const session = await this.#authorize(socket, message);
+
+    if (session === null) return;
+
+    const outcome = await this.#applyCommand(socket, message, session);
+
+    if (outcome.finished) return;
+
+    await this.#save(outcome.room);
+    this.#broadcast();
+  }
+
+  /**
+   * Who is on the other end of this socket, and whether the command they sent is one only
+   * the owner may send. Every rejection here is answered with the reason rather than a
+   * dropped connection, because a person who renamed themselves by accident is not the
+   * same as an intruder and should not be left guessing which one they are.
+   */
+  async #authorize(
+    socket: WebSocket,
+    message: ClientMessage,
+  ): Promise<AuthorizedActor | null> {
     const identity = this.#identity(socket);
 
     if (identity === null || identity.token === null) {
       this.#fail(socket, ERROR_CODES.unauthorized);
-      return;
+      return null;
     }
 
-    let room = await this.#load(this.#currentRoomId());
+    const room = await this.#load(this.#currentRoomId());
     const actor = findByToken(room, identity.token);
 
     if (actor === undefined) {
       this.#fail(socket, ERROR_CODES.unauthorized);
-      return;
+      return null;
     }
 
-    const requiresOwner = OWNER_ONLY_COMMANDS.has(message.type);
-
-    if (requiresOwner && room.ownerId !== actor.id) {
+    if (OWNER_ONLY_COMMANDS.has(message.type) && room.ownerId !== actor.id) {
       this.#fail(socket, ERROR_CODES.notOwner);
-      return;
+      return null;
     }
+
+    return { room, actor };
+  }
+
+  /**
+   * The commands are a table rather than a chain, so they are matched by name and each one
+   * is written out where it can be read on its own. The two that persist and broadcast for
+   * themselves say so by finishing; everything else falls through to the shared tail.
+   */
+  async #applyCommand(
+    socket: WebSocket,
+    message: ClientMessage,
+    session: AuthorizedActor,
+  ): Promise<CommandOutcome> {
+    const { room, actor } = session;
 
     switch (message.type) {
-      case "vote": {
-        if (!isVoteValue(room.deckId, message.value)) {
-          this.#fail(socket, ERROR_CODES.invalidVote);
-          return;
-        }
-        room = castVote(room, actor.id, message.value);
-        break;
-      }
-      case "reveal":
-        room = reveal(room);
-        break;
-      case "next-round":
-        room = startNextRound(room);
-        break;
-      case "reset-round":
-        room = resetRound(room);
-        break;
-      case "set-deck": {
-        if (!isDeckId(message.deckId)) {
-          this.#fail(socket, ERROR_CODES.invalidVote);
-          return;
-        }
-        room = setDeck(room, message.deckId);
-        break;
-      }
+      case "vote":
+        return this.#applyVote(socket, message, room, actor);
+      case "set-deck":
+        return this.#applyDeck(socket, message, room);
       case "set-role":
-        if (message.role !== "voter" && message.role !== "spectator") {
-          this.#fail(socket, ERROR_CODES.unauthorized);
-          return;
-        }
-        room = setParticipantRole(room, message.participantId, message.role);
-        break;
-      case "set-name": {
-        const validation = validateName(message.name);
-        if (!validation.valid) {
-          this.#fail(
-            socket,
-            validation.reason === "empty"
-              ? ERROR_CODES.nameRequired
-              : ERROR_CODES.nameInvalid,
-          );
-          return;
-        }
-        room = setParticipantName(room, actor.id, validation.name);
-        break;
-      }
+        return this.#applyRole(socket, message, room);
+      case "set-name":
+        return this.#applyName(socket, message, room, actor);
+      case "set-room-name":
+        return this.#applyRoomName(socket, message, room);
+      case "chat":
+        return this.#applyChat(socket, message, room, actor);
+      case "reveal":
+      case "next-round":
+      case "reset-round":
+        return { room: this.#advanceRoom(message, room), finished: false };
       case "transfer-ownership":
-        room = transferOwnership(room, message.participantId);
-        break;
+        return { room: transferOwnership(room, message.participantId), finished: false };
       case "remove-participant": {
         const removed = message.participantId;
-        room = removeParticipant(room, removed);
-        await this.#save(room);
+
+        await this.#save(removeParticipant(room, removed));
         this.#broadcast();
         this.#disconnectParticipantSockets(removed);
-        return;
-      }
-      case "chat": {
-        const text = normalizeMessageText(message.text);
-        if (text.length === 0) {
-          this.#fail(socket, ERROR_CODES.emptyMessage);
-          return;
-        }
-        const sent: ChatMessage = {
-          id: crypto.randomUUID(),
-          authorId: actor.id,
-          authorName: actor.name,
-          text,
-          sentAt: Date.now(),
-        };
 
-        await this.#save(appendMessage(room, sent));
-        this.#broadcast({ type: "chat", message: sent });
-        return;
+        return { room, finished: true };
       }
-      case "set-room-name": {
-        if (message.name === null) {
-          room = clearRoomName(room);
-          break;
-        }
-
-        const validation = validateSessionName(message.name);
-        if (!validation.valid) {
-          this.#fail(
-            socket,
-            validation.reason === "empty"
-              ? ERROR_CODES.sessionNameRequired
-              : ERROR_CODES.sessionNameInvalid,
-          );
-          return;
-        }
-
-        room = setRoomName(room, validation.name);
-        break;
-      }
-      case "clear-chat":
-        room = clearMessages(room);
-        break;
       case "delete-room":
         this.#broadcast({ type: "room-deleted" });
         await this.#wipe();
-        return;
+        return { room, finished: true };
+      case "clear-chat":
+        return { room: clearMessages(room), finished: false };
       default:
-        return;
+        return { room, finished: true };
+    }
+  }
+
+  #advanceRoom(message: ClientMessage, room: RoomSnapshot): RoomSnapshot {
+    if (message.type === "reveal") return reveal(room);
+    if (message.type === "next-round") return startNextRound(room);
+    return resetRound(room);
+  }
+
+  #applyVote(
+    socket: WebSocket,
+    message: Extract<ClientMessage, { type: "vote" }>,
+    room: RoomSnapshot,
+    actor: Participant,
+  ): CommandOutcome {
+    if (!isVoteValue(room.deckId, message.value)) {
+      this.#fail(socket, ERROR_CODES.invalidVote);
+      return { room, finished: true };
     }
 
-    await this.#save(room);
-    this.#broadcast();
+    return { room: castVote(room, actor.id, message.value), finished: false };
+  }
+
+  #applyDeck(
+    socket: WebSocket,
+    message: Extract<ClientMessage, { type: "set-deck" }>,
+    room: RoomSnapshot,
+  ): CommandOutcome {
+    if (!isDeckId(message.deckId)) {
+      this.#fail(socket, ERROR_CODES.invalidVote);
+      return { room, finished: true };
+    }
+
+    return { room: setDeck(room, message.deckId), finished: false };
+  }
+
+  #applyRole(
+    socket: WebSocket,
+    message: Extract<ClientMessage, { type: "set-role" }>,
+    room: RoomSnapshot,
+  ): CommandOutcome {
+    if (message.role !== "voter" && message.role !== "spectator") {
+      this.#fail(socket, ERROR_CODES.unauthorized);
+      return { room, finished: true };
+    }
+
+    return { room: setParticipantRole(room, message.participantId, message.role), finished: false };
+  }
+
+  #applyName(
+    socket: WebSocket,
+    message: Extract<ClientMessage, { type: "set-name" }>,
+    room: RoomSnapshot,
+    actor: Participant,
+  ): CommandOutcome {
+    const validation = validateName(message.name);
+
+    if (!validation.valid) {
+      this.#fail(
+        socket,
+        validation.reason === "empty" ? ERROR_CODES.nameRequired : ERROR_CODES.nameInvalid,
+      );
+      return { room, finished: true };
+    }
+
+    return { room: setParticipantName(room, actor.id, validation.name), finished: false };
+  }
+
+  #applyRoomName(
+    socket: WebSocket,
+    message: Extract<ClientMessage, { type: "set-room-name" }>,
+    room: RoomSnapshot,
+  ): CommandOutcome {
+    if (message.name === null) {
+      return { room: clearRoomName(room), finished: false };
+    }
+
+    const validation = validateSessionName(message.name);
+
+    if (!validation.valid) {
+      this.#fail(
+        socket,
+        validation.reason === "empty"
+          ? ERROR_CODES.sessionNameRequired
+          : ERROR_CODES.sessionNameInvalid,
+      );
+      return { room, finished: true };
+    }
+
+    return { room: setRoomName(room, validation.name), finished: false };
+  }
+
+  async #applyChat(
+    socket: WebSocket,
+    message: Extract<ClientMessage, { type: "chat" }>,
+    room: RoomSnapshot,
+    actor: Participant,
+  ): Promise<CommandOutcome> {
+    const text = normalizeMessageText(message.text);
+
+    if (text.length === 0) {
+      this.#fail(socket, ERROR_CODES.emptyMessage);
+      return { room, finished: true };
+    }
+
+    const sent: ChatMessage = {
+      id: crypto.randomUUID(),
+      authorId: actor.id,
+      authorName: actor.name,
+      text,
+      sentAt: Date.now(),
+    };
+
+    await this.#save(appendMessage(room, sent));
+    this.#broadcast({ type: "chat", message: sent });
+
+    return { room, finished: true };
   }
 
   async #handleDeparture(socket: WebSocket): Promise<void> {

@@ -12,7 +12,6 @@ import {
   REMOVED_TOKEN_LIMIT,
   appendMessage,
   createRoom,
-  deleteRoom,
   disconnectParticipant,
   findByToken,
   joinRoom,
@@ -375,12 +374,6 @@ describe("availableVotes", () => {
   it("mirrors the active deck", () => {
     const room = setDeck(roomWith(draft("ana")), "linear");
     expect(availableVotes(room)).toHaveLength(10);
-  });
-});
-
-describe("deleteRoom", () => {
-  it("returns null", () => {
-    expect(deleteRoom(roomWith(draft("ana")))).toBeNull();
   });
 });
 /**
