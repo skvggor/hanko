@@ -3,7 +3,7 @@ pre-commit:
   commands:
     lint:
       glob: "*.{ts,tsx,js}"
-      run: npx eslint {staged_files} --max-warnings=0
+      run: npx eslint {staged_files} --max-warnings=0 --no-warn-ignored
     typecheck:
       glob: "*.{ts,tsx}"
       run: npx tsc --noEmit && npx tsc --noEmit -p tsconfig.worker.json
