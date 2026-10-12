@@ -33,7 +33,7 @@ export function Shell({
   translate,
   errorCode,
   children,
-}: ShellProps) {
+}: Readonly<ShellProps>) {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [scrollable, setScrollable] = useState(false);

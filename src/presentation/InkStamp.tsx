@@ -33,7 +33,7 @@ export interface InkStampProps {
  * The seal impression: a disc with an ink ring bleeding outward, settling to a
  * hollow mark so a committed vote reads as permanent rather than pending.
  */
-export function InkStamp({ value, label, pressId = 0 }: InkStampProps) {
+export function InkStamp({ value, label, pressId = 0 }: Readonly<InkStampProps>) {
   const [driedStamp, setDriedStamp] = useState<string | null>(null);
   const stamp = value === null ? null : `${pressId}:${value}`;
 
@@ -83,14 +83,13 @@ export interface HankoStampProps {
   translate: Translator;
 }
 
-export function HankoStamp({ myVote, pressId, translate }: HankoStampProps) {
+export function HankoStamp({ myVote, pressId, translate }: Readonly<HankoStampProps>) {
   /**
    * The card and the seal have to say the same thing. Stamping the raw value would
    * leave the seal reading "coffee" on a card that reads "Café", which reads as two
    * different votes rather than one vote shown twice.
    */
-  const stamped =
-    myVote === null ? null : myVote === "coffee" ? translate("vote.coffee") : myVote;
+  const stamped = myVote === "coffee" ? translate("vote.coffee") : myVote;
 
   return (
     <InkStamp

@@ -7,6 +7,39 @@ import { createTranslator } from "@application/i18n";
 
 const translate = createTranslator("en-US");
 
+/**
+ * These lived inside the describe blocks that used them, which meant the same function
+ * was written out four times and a fix to one copy left the other three behind. The
+ * markup they render is the contract under test, so there is one version of it.
+ */
+function renderShell(props: Partial<Parameters<typeof Shell>[0]> = {}) {
+  return render(
+    <Shell
+      errorCode={null}
+      locale="en-US"
+      onLocaleChange={vi.fn()}
+      onLeaveRoom={null}
+      onNavigateHome={vi.fn()}
+      translate={translate}
+      {...props}
+    >
+      <p>x</p>
+    </Shell>,
+  );
+}
+
+function header(container: Element): Element {
+  const element = container.querySelector("header");
+  if (!element) throw new Error("no header");
+  return element;
+}
+
+function footer(container: Element): Element {
+  const element = container.querySelector("footer");
+  if (!element) throw new Error("no footer");
+  return element;
+}
+
 describe("Shell", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
@@ -374,22 +407,6 @@ describe("Shell reduced motion", () => {
 });
 
 describe("Shell centring", () => {
-  function renderShell(props: Partial<Parameters<typeof Shell>[0]> = {}) {
-    return render(
-      <Shell
-        errorCode={null}
-        locale="en-US"
-        onLocaleChange={vi.fn()}
-        onLeaveRoom={null}
-        onNavigateHome={vi.fn()}
-        translate={translate}
-        {...props}
-      >
-        <p>x</p>
-      </Shell>,
-    );
-  }
-
   beforeEach(() => {
     vi.unstubAllGlobals();
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
@@ -473,22 +490,6 @@ describe("Shell centring", () => {
 });
 
 describe("Shell chrome", () => {
-  function renderShell(props: Partial<Parameters<typeof Shell>[0]> = {}) {
-    return render(
-      <Shell
-        errorCode={null}
-        locale="en-US"
-        onLocaleChange={vi.fn()}
-        onLeaveRoom={null}
-        onNavigateHome={vi.fn()}
-        translate={translate}
-        {...props}
-      >
-        <p>x</p>
-      </Shell>,
-    );
-  }
-
   function stubViewport(scrollY: number, { scrollHeight, innerHeight }: {
     scrollHeight: number;
     innerHeight: number;
@@ -499,18 +500,6 @@ describe("Shell chrome", () => {
       configurable: true,
       value: scrollHeight,
     });
-  }
-
-  function header(container: Element): Element {
-    const element = container.querySelector("header");
-    if (!element) throw new Error("no header");
-    return element;
-  }
-
-  function footer(container: Element): Element {
-    const element = container.querySelector("footer");
-    if (!element) throw new Error("no footer");
-    return element;
   }
 
   beforeEach(() => {
@@ -646,22 +635,6 @@ describe("Shell chrome", () => {
 });
 
 describe("Shell chrome spacing", () => {
-  function renderShell(props: Partial<Parameters<typeof Shell>[0]> = {}) {
-    return render(
-      <Shell
-        errorCode={null}
-        locale="en-US"
-        onLocaleChange={vi.fn()}
-        onLeaveRoom={null}
-        onNavigateHome={vi.fn()}
-        translate={translate}
-        {...props}
-      >
-        <p>x</p>
-      </Shell>,
-    );
-  }
-
   function frame(container: Element): Element {
     const element = container.querySelector("[data-frame]");
     if (!element) throw new Error("no frame");
@@ -726,22 +699,6 @@ describe("Shell chrome spacing", () => {
 });
 
 describe("Shell room title", () => {
-  function renderShell(props: Partial<Parameters<typeof Shell>[0]> = {}) {
-    return render(
-      <Shell
-        errorCode={null}
-        locale="en-US"
-        onLocaleChange={vi.fn()}
-        onLeaveRoom={null}
-        onNavigateHome={vi.fn()}
-        translate={translate}
-        {...props}
-      >
-        <p>x</p>
-      </Shell>,
-    );
-  }
-
   beforeEach(() => {
     vi.unstubAllGlobals();
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
@@ -783,28 +740,6 @@ describe("Shell room title", () => {
 });
 
 describe("Shell room title in the header", () => {
-  function header(container: Element): Element {
-    const element = container.querySelector("header");
-    if (!element) throw new Error("no header");
-    return element;
-  }
-
-  function renderShell(sessionName?: string | null) {
-    return render(
-      <Shell
-        errorCode={null}
-        locale="en-US"
-        onLocaleChange={vi.fn()}
-        onLeaveRoom={null}
-        onNavigateHome={vi.fn()}
-        translate={translate}
-        {...(sessionName === undefined ? {} : { sessionName })}
-      >
-        <p>x</p>
-      </Shell>,
-    );
-  }
-
   function title(container: Element): Element | null {
     return container.querySelector("[data-room-title]");
   }
@@ -815,72 +750,50 @@ describe("Shell room title in the header", () => {
   });
 
   it("puts the room title in the header, where it stays put while the room scrolls", () => {
-    const { container } = renderShell("Sprint 42");
+    const { container } = renderShell({ sessionName: "Sprint 42" });
 
     expect(title(container)?.closest("header")).toBeTruthy();
   });
 
   it("centres the title between the wordmark and the language switcher", () => {
-    const { container } = renderShell("Sprint 42");
+    const { container } = renderShell({ sessionName: "Sprint 42" });
 
     expect(title(container)?.className).toContain("text-center");
   });
 
   it("shows the title once, not again above the room", () => {
-    const { container } = renderShell("Sprint 42");
+    const { container } = renderShell({ sessionName: "Sprint 42" });
 
     expect(container.querySelectorAll(".session-name")).toHaveLength(1);
     expect(container.querySelectorAll("[data-room-title]")).toHaveLength(1);
   });
 
   it("truncates a long title instead of shoving the chrome apart", () => {
-    const { container } = renderShell("A".repeat(80));
+    const { container } = renderShell({ sessionName: "A".repeat(80) });
 
     expect(title(container)?.className).toContain("truncate");
   });
 
   it("gives the title a middle track so it can centre on its own", () => {
-    const { container } = renderShell("Sprint 42");
+    const { container } = renderShell({ sessionName: "Sprint 42" });
 
     expect(header(container).className).toContain("grid-cols-[1fr_minmax(0,auto)_1fr]");
   });
 
   it("leaves the title empty when the room has not been named", () => {
-    const { container } = renderShell(null);
+    const { container } = renderShell({ sessionName: null });
 
     expect(title(container)?.textContent).toBe("");
   });
 
   it("treats an empty name as no name", () => {
-    const { container } = renderShell("");
+    const { container } = renderShell({ sessionName: "" });
 
     expect(title(container)?.textContent).toBe("");
   });
 });
 
 describe("Shell header tracks", () => {
-  function renderShell(sessionName?: string | null) {
-    return render(
-      <Shell
-        errorCode={null}
-        locale="en-US"
-        onLocaleChange={vi.fn()}
-        onLeaveRoom={null}
-        onNavigateHome={vi.fn()}
-        translate={translate}
-        {...(sessionName === undefined ? {} : { sessionName })}
-      >
-        <p>x</p>
-      </Shell>,
-    );
-  }
-
-  function header(container: Element): Element {
-    const element = container.querySelector("header");
-    if (!element) throw new Error("no header");
-    return element;
-  }
-
   function nav(container: Element): Element {
     const element = container.querySelector("header nav");
     if (!element) throw new Error("no nav");
@@ -897,26 +810,26 @@ describe("Shell header tracks", () => {
   // track, and a full bar with no room then had its language picker stranded next to
   // the wordmark instead of against the right edge.
   it("keeps the switcher in the right track when there is no title", () => {
-    const { container } = renderShell(null);
+    const { container } = renderShell({ sessionName: null });
 
     expect([...header(container).children].indexOf(nav(container))).toBe(2);
   });
 
   it("keeps the switcher in the right track when there is a title", () => {
-    const { container } = renderShell("Sprint 42");
+    const { container } = renderShell({ sessionName: "Sprint 42" });
 
     expect([...header(container).children].indexOf(nav(container))).toBe(2);
   });
 
   it("still reserves the middle track when the room has no name", () => {
-    const { container } = renderShell(null);
+    const { container } = renderShell({ sessionName: null });
 
     expect(header(container).querySelector("[data-room-title]")).toBeTruthy();
   });
 
   it("aligns the switcher to the end of its track in both cases", () => {
-    const { container: bare } = renderShell(null);
-    const { container: named } = renderShell("Sprint 42");
+    const { container: bare } = renderShell({ sessionName: null });
+    const { container: named } = renderShell({ sessionName: "Sprint 42" });
 
     expect(nav(bare).className).toContain("justify-end");
     expect(nav(named).className).toContain("justify-end");
@@ -949,7 +862,7 @@ describe("Shell room title styling", () => {
   });
 
   it("sets the title in the chrome type size rather than the display size", () => {
-    const match = /\.session-name\s*\{[^}]*font-size:\s*([^;]+);/s.exec(themeSheet());
+    const match = /\.session-name\s*\{[^}]*?font-size:\s*(\S[^;]*);/s.exec(themeSheet());
     const size = match?.[1] ?? "";
 
     expect(size).not.toContain("2.2vw");
@@ -972,12 +885,6 @@ describe("Shell title on a phone", () => {
         <p>x</p>
       </Shell>,
     );
-  }
-
-  function header(container: Element): Element {
-    const element = container.querySelector("header");
-    if (!element) throw new Error("no header");
-    return element;
   }
 
   beforeEach(() => {

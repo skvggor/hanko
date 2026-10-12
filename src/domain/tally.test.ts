@@ -51,7 +51,7 @@ describe("tallyReveals", () => {
       SCALE,
     );
 
-    expect(result.average).toBe(1.7);
+    expect(result.average).toBeCloseTo(1.7, 5);
   });
 
   it("reports the extremes and the spread", () => {

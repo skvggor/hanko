@@ -38,6 +38,20 @@ export interface VoteTally {
 }
 
 /**
+ * The extremes and the gap between them. All three are absent together when nobody
+ * picked a number, so they are decided in one place instead of three, and the result
+ * object stops carrying the conditionals that produce them.
+ */
+function spread(countedPoints: readonly number[]): Pick<VoteTally, "min" | "max" | "range"> {
+  if (countedPoints.length === 0) return { min: null, max: null, range: null };
+
+  const min = Math.min(...countedPoints);
+  const max = Math.max(...countedPoints);
+
+  return { min, max, range: max - min };
+}
+
+/**
  * Reads the revealed votes and derives everything the result sheet shows. People
  * watching are pending, never counted, so a spectator never skews the average.
  */
@@ -68,8 +82,7 @@ export function tallyReveals(
   answered += needsDiscussion + coffee;
 
   const total = countedPoints.reduce((sum, value) => sum + value, 0);
-  const min = countedPoints.length === 0 ? null : Math.min(...countedPoints);
-  const max = countedPoints.length === 0 ? null : Math.max(...countedPoints);
+  const { min, max, range } = spread(countedPoints);
 
   const counts = new Map<string, number>();
 
@@ -92,7 +105,7 @@ export function tallyReveals(
     total,
     min,
     max,
-    range: min === null || max === null ? null : max - min,
+    range,
     needsDiscussion,
     coffee,
     distribution,

@@ -13,15 +13,15 @@ import { ShareSnippet } from "@presentation/ShareSnippet";
 import { PromptDialog } from "@presentation/PromptDialog";
 import { validateName } from "@domain/name";
 import {
-  ArrowCounterClockwise,
-  Crown,
-  Eye,
-  EyeSlash,
-  PencilSimple,
-  SlidersHorizontal,
-  Trash,
-  UserMinus,
-  Users,
+  ArrowCounterClockwiseIcon,
+  CrownIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  PencilSimpleIcon,
+  SlidersHorizontalIcon,
+  TrashIcon,
+  UserMinusIcon,
+  UsersIcon,
 } from "@phosphor-icons/react";
 
 export interface RoomBoardProps {
@@ -48,27 +48,31 @@ export interface RoomBoardProps {
   deleteButtonRef?: Ref<HTMLButtonElement> | undefined;
 }
 
+/**
+ * Pressed and unpressed are different affordances rather than two shades of one, so the
+ * resting and the held states are named here instead of being picked apart inline.
+ */
+function miniButtonClasses(pressed: boolean, tone: "neutral" | "primary"): string {
+  if (!pressed) return "text-ink-dim hover:bg-ink/8 hover:text-ink";
+
+  return tone === "primary" ? "bg-primary text-on-primary" : "bg-ink text-paper";
+}
+
 function MiniButton({
   children,
   onClick,
   pressed = false,
   tone = "neutral",
-}: {
+}: Readonly<{
   children: React.ReactNode;
   onClick: () => void;
   pressed?: boolean;
   tone?: "neutral" | "primary";
-}) {
+}>) {
   return (
     <button
       aria-pressed={pressed}
-      className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full px-snug py-1 font-sans text-[0.625rem] font-semibold tracking-[0.06em] uppercase transition-colors ${
-        pressed
-          ? tone === "primary"
-            ? "bg-primary text-on-primary"
-            : "bg-ink text-paper"
-          : "text-ink-dim hover:bg-ink/8 hover:text-ink"
-      }`}
+      className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full px-snug py-1 font-sans text-[0.625rem] font-semibold tracking-[0.06em] uppercase transition-colors ${miniButtonClasses(pressed, tone)}`}
       type="button"
       onClick={onClick}
     >
@@ -95,7 +99,7 @@ export function RoomBoard({
   onSetRoomName,
   onRename,
   deleteButtonRef,
-}: RoomBoardProps) {
+}: Readonly<RoomBoardProps>) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const amOwner = state.ownerId !== null && state.ownerId === myParticipantId;
   const voted = readVotedState(state);
@@ -115,7 +119,7 @@ export function RoomBoard({
             {translate("room.round", { round: state.round })}
           </span>
           <span className="inline-flex items-center gap-1.5 text-[0.8125rem] font-medium text-ink-dim">
-            <Users aria-hidden="true" size={15} weight="bold" />
+            <UsersIcon aria-hidden="true" size={15} weight="bold" />
             {translate("room.connected", { count: state.connectedCount })}
           </span>
         </div>
@@ -182,7 +186,7 @@ export function RoomBoard({
 
               {!isVoter && (
                 <Chip>
-                  <EyeSlash aria-hidden="true" size={10} weight="bold" />
+                  <EyeSlashIcon aria-hidden="true" size={10} weight="bold" />
                   {translate("room.spectatorBadge")}
                 </Chip>
               )}
@@ -198,7 +202,7 @@ export function RoomBoard({
               <span className="ml-auto flex flex-wrap items-center gap-1.5">
                 {isMe && (
                   <MiniButton onClick={() => setRenaming(participant.name)}>
-                    <PencilSimple aria-hidden="true" size={12} weight="bold" />
+                    <PencilSimpleIcon aria-hidden="true" size={12} weight="bold" />
                     {translate("controls.rename")}
                   </MiniButton>
                 )}
@@ -206,7 +210,7 @@ export function RoomBoard({
                 {amOwner && !isMe && (
                   <>
                     <MiniButton onClick={() => onTransferOwnership(participant.id)}>
-                      <Crown aria-hidden="true" size={12} weight="fill" />
+                      <CrownIcon aria-hidden="true" size={12} weight="fill" />
                       {translate("controls.transferOwnership")}
                     </MiniButton>
                     <MiniButton
@@ -222,7 +226,7 @@ export function RoomBoard({
                         : translate("controls.changeToVoter")}
                     </MiniButton>
                     <MiniButton onClick={() => onRemoveParticipant(participant.id)}>
-                      <UserMinus aria-hidden="true" size={12} weight="bold" />
+                      <UserMinusIcon aria-hidden="true" size={12} weight="bold" />
                       {translate("controls.removeParticipant")}
                     </MiniButton>
                   </>
@@ -246,25 +250,25 @@ export function RoomBoard({
           <div className="flex flex-wrap items-center gap-tight">
             {state.isRevealed ? (
               <Button onClick={onNextRound} variant="primary">
-                <ArrowCounterClockwise aria-hidden="true" size={16} weight="bold" />
+                <ArrowCounterClockwiseIcon aria-hidden="true" size={16} weight="bold" />
                 {translate("controls.nextRound")}
               </Button>
             ) : (
               <Button onClick={onReveal} variant="primary">
-                <Eye aria-hidden="true" size={16} weight="bold" />
+                <EyeIcon aria-hidden="true" size={16} weight="bold" />
                 {translate("controls.reveal")}
               </Button>
             )}
 
             <Button onClick={onResetRound} variant="quiet">
-              <Trash aria-hidden="true" size={16} weight="bold" />
+              <TrashIcon aria-hidden="true" size={16} weight="bold" />
               {translate("controls.resetRound")}
             </Button>
           </div>
 
           <div className="flex flex-wrap items-center gap-tight border-t border-line pt-snug">
             <span className="inline-flex items-center gap-1 text-ink-faint">
-              <SlidersHorizontal aria-hidden="true" size={14} weight="bold" />
+              <SlidersHorizontalIcon aria-hidden="true" size={14} weight="bold" />
               <Label>{translate("controls.changeDeck")}</Label>
             </span>
             {DECK_IDS.map((deckId) => (
@@ -291,7 +295,7 @@ export function RoomBoard({
             ref={deleteButtonRef}
             variant="danger"
           >
-            <Trash aria-hidden="true" size={16} weight="bold" />
+            <TrashIcon aria-hidden="true" size={16} weight="bold" />
             {translate("controls.deleteRoom")}
           </Button>
         </Panel>
@@ -328,7 +332,7 @@ function SessionNameField({
   current,
   onSetRoomName,
   translate,
-}: SessionNameFieldProps) {
+}: Readonly<SessionNameFieldProps>) {
   const [draft, setDraft] = useState(current ?? "");
   const [problem, setProblem] = useState<string | null>(null);
   const [seenCurrent, setSeenCurrent] = useState(current);

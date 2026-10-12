@@ -5,10 +5,10 @@ import type { Translator } from "@application/i18n";
 
 const STAGGER_MS = 90;
 
-const CONSENSUS_TONE: Record<Consensus, { bar: string; text: string }> = {
-  aligned: { bar: "bg-secondary", text: "text-secondary" },
-  close: { bar: "bg-accent", text: "text-ink" },
-  split: { bar: "bg-primary", text: "text-primary" },
+const CONSENSUS_TONE: Record<Consensus, { bar: string; text: string; wash: string }> = {
+  aligned: { bar: "bg-secondary", text: "text-secondary", wash: "bg-secondary/12" },
+  close: { bar: "bg-accent", text: "text-ink", wash: "bg-accent/40" },
+  split: { bar: "bg-primary", text: "text-primary", wash: "bg-primary/12" },
 };
 
 export interface RevealSheetProps {
@@ -37,7 +37,7 @@ function revealStyle(tiltDegrees: number): CSSProperties {
  * answers, then who said what. The average leads because it is the number the room
  * argued towards; the range sits under it as context, not as a competing headline.
  */
-export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
+export function RevealSheet({ entries, scale, translate }: Readonly<RevealSheetProps>) {
   const [revealedCount, setRevealedCount] = useState(0);
 
   useEffect(() => {
@@ -80,13 +80,7 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
               </span>
             )}
             <span
-              className={`rounded-chip px-snug py-1 text-[0.6875rem] font-bold tracking-[0.06em] uppercase ${
-                tally.consensus === "aligned"
-                  ? "bg-secondary/12 text-secondary"
-                  : tally.consensus === "close"
-                    ? "bg-accent/40 text-ink"
-                    : "bg-primary/12 text-primary"
-              }`}
+              className={`rounded-chip px-snug py-1 text-[0.6875rem] font-bold tracking-[0.06em] uppercase ${tone.wash} ${tone.text}`}
               data-consensus={tally.consensus}
             >
               {translate(`consensus.${tally.consensus}`)}
@@ -104,11 +98,7 @@ export function RevealSheet({ entries, scale, translate }: RevealSheetProps) {
           >
             {tally.distribution.map((row) => (
               <div
-                className={`flex min-w-6 items-center justify-center text-[0.75rem] font-bold ${
-                  row.value === "?" || row.value === "coffee"
-                    ? `${tone.bar} text-paper-raised`
-                    : `${tone.bar} text-paper-raised`
-                }`}
+                className={`flex min-w-6 items-center justify-center text-[0.75rem] font-bold ${tone.bar} text-paper-raised`}
                 key={row.value}
                 style={{ flexGrow: row.count, flexBasis: 0 }}
               >

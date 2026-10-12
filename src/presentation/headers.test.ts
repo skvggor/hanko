@@ -37,7 +37,7 @@ const isComment = (text: string): boolean => text.startsWith("#");
 const isUrlPattern = (text: string): boolean =>
   !text.includes(":") && !/\s/.test(text);
 
-const isHeaderPair = (text: string): boolean => /^[A-Za-z0-9-]+:\s*.+$/.test(text);
+const isHeaderPair = (text: string): boolean => /^[A-Za-z0-9-]+:\s*\S.*$/.test(text);
 
 describe("_headers", () => {
   // The catch-all rule is the one legitimate line reading exactly /*, and a path rule

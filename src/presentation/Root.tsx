@@ -1,15 +1,53 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { DEFAULT_LOCALE, createTranslator, type Locale } from "@application/i18n";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { DEFAULT_LOCALE, createTranslator, type Translator, type Locale } from "@application/i18n";
 import {
   pickLocale,
   readStoredLocale,
   writeStoredLocale,
 } from "@application/localePreference";
-import { parseRoute } from "@application/routing";
+import { parseRoute, type AppRoute } from "@application/routing";
 import { Landing } from "@presentation/Landing";
 import { RoomScreen } from "@presentation/RoomScreen";
 import { Shell } from "@presentation/Shell";
 import { MissingRoom } from "@presentation/MissingRoom";
+
+/**
+ * The three routes are three different screens rather than three states of one, so they
+ * are chosen by name here instead of by a chain of conditionals in the markup. Narrowing
+ * on the route is what lets each screen receive only the props it declares.
+ */
+function routeScreen({
+  notice,
+  onNavigate,
+  onRoomDeleted,
+  onSessionNameChange,
+  route,
+  translate,
+}: {
+  notice: string | null;
+  onNavigate: (path: string) => void;
+  onRoomDeleted: (errorCode: string) => void;
+  onSessionNameChange: (name: string | null) => void;
+  route: AppRoute;
+  translate: Translator;
+}): ReactNode {
+  if (route.kind === "room") {
+    return (
+      <RoomScreen
+        onRoomDeleted={onRoomDeleted}
+        onSessionNameChange={onSessionNameChange}
+        roomId={route.roomId}
+        translate={translate}
+      />
+    );
+  }
+
+  if (route.kind === "missing-room") {
+    return <MissingRoom onNavigate={onNavigate} translate={translate} />;
+  }
+
+  return <Landing notice={notice} onNavigate={onNavigate} translate={translate} />;
+}
 
 export function Root() {
   const [locale, setLocaleState] = useState<Locale>(() =>
@@ -78,18 +116,7 @@ export function Root() {
       sessionName={route.kind === "room" ? sessionName : null}
       translate={translate}
     >
-      {route.kind === "room" ? (
-        <RoomScreen
-          onRoomDeleted={handleRoomDeleted}
-          onSessionNameChange={handleSessionName}
-          roomId={route.roomId}
-          translate={translate}
-        />
-      ) : route.kind === "missing-room" ? (
-        <MissingRoom onNavigate={handleNavigate} translate={translate} />
-      ) : (
-        <Landing notice={notice} onNavigate={handleNavigate} translate={translate} />
-      )}
+      {routeScreen({ notice, onNavigate: handleNavigate, onRoomDeleted: handleRoomDeleted, onSessionNameChange: handleSessionName, route, translate })}
     </Shell>
   );
 }
