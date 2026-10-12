@@ -180,6 +180,103 @@ async function joinAs(name: string) {
   await userEvent.click(screen.getByRole("button", { name: "Enter" }));
 }
 
+/** The room stays the authority: every guess is withdrawn the moment it answers. */
+describe("RoomScreen optimistic vote", () => {
+  it("stamps the seal before the room has answered", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+
+    await userEvent.click(screen.getByRole("button", { name: "Vote 5" }));
+
+    expect(screen.getByRole("button", { name: /selected vote 5/i })).toBeTruthy();
+    expect(document.querySelector("[data-glyph]")?.textContent).toBe("5");
+  });
+
+  it("keeps the guess while the room has not answered", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+
+    await userEvent.click(screen.getByRole("button", { name: "Vote 5" }));
+
+    expect(harness.sent).toContainEqual({ type: "vote", value: "5" });
+    expect(screen.getByRole("button", { name: /selected vote 5/i })).toBeTruthy();
+  });
+
+  it("withdraws the guess once the room agrees", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+    await userEvent.click(screen.getByRole("button", { name: "Vote 5" }));
+    expect(screen.getByRole("button", { name: /selected vote 5/i })).toBeTruthy();
+
+    pushState({ ...roomState, myVote: "5" });
+
+    expect(screen.getByRole("button", { name: /selected vote 5/i })).toBeTruthy();
+  });
+
+  it("predicts an undo as well as a vote", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState({ ...roomState, myVote: "5" });
+
+    await userEvent.click(screen.getByRole("button", { name: /selected vote 5/i }));
+
+    expect(screen.queryByRole("button", { name: /selected vote 5/i })).toBeNull();
+    expect(screen.getByRole("button", { name: "Vote 5" })).toBeTruthy();
+  });
+
+  it("takes the room's answer over its own guess when they differ", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+    await userEvent.click(screen.getByRole("button", { name: "Vote 5" }));
+    expect(screen.getByRole("button", { name: /selected vote 5/i })).toBeTruthy();
+
+    pushState({ ...roomState, myVote: null });
+
+    expect(screen.getByRole("button", { name: "Vote 5" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /selected vote/i })).toBeNull();
+  });
+
+  it("drops the guess when the server refuses the vote", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+    await userEvent.click(screen.getByRole("button", { name: "Vote 5" }));
+    expect(screen.getByRole("button", { name: /selected vote 5/i })).toBeTruthy();
+
+    pushError("invalid_vote");
+
+    expect(screen.getByRole("button", { name: "Vote 5" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /selected vote/i })).toBeNull();
+  });
+
+  it("goes back to voting on the next tap after the room has agreed", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+    await userEvent.click(screen.getByRole("button", { name: "Vote 5" }));
+    pushState({ ...roomState, myVote: "5" });
+
+    await userEvent.click(screen.getByRole("button", { name: /selected vote 5/i }));
+
+    expect(screen.queryByRole("button", { name: /selected vote/i })).toBeNull();
+  });
+
+  it("predicts a second tap from what is on screen, not from the last answer", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+    await userEvent.click(screen.getByRole("button", { name: "Vote 5" }));
+
+    await userEvent.click(screen.getByRole("button", { name: /selected vote 5/i }));
+
+    expect(screen.queryByRole("button", { name: /selected vote/i })).toBeNull();
+  });
+});
+
 describe("RoomScreen", () => {
   beforeEach(() => {
     harness.sockets.length = 0;

@@ -31,7 +31,7 @@ function state(overrides: Partial<PublicRoomState> = {}): PublicRoomState {
 
 describe("Hanko", () => {
   it("renders the fibonacci scale", () => {
-    render(<Hanko myParticipantId="p1" onVote={vi.fn()} state={state()} translate={translate} />);
+    render(<Hanko myVote={null} myParticipantId="p1" onVote={vi.fn()} state={state()} translate={translate} />);
 
     for (const value of ["0", "1", "5", "13", "?", "Coffee"]) {
       expect(screen.getByRole("button", { name: `Vote ${value}` })).toBeTruthy();
@@ -41,7 +41,7 @@ describe("Hanko", () => {
   it("renders the t-shirt scale", () => {
     render(
       <Hanko
-        myParticipantId="p1"
+        myVote={null} myParticipantId="p1"
         onVote={vi.fn()}
         state={state({ deckId: "tshirt" })}
         translate={translate}
@@ -54,7 +54,7 @@ describe("Hanko", () => {
 
   it("calls onVote with the chosen value", async () => {
     const onVote = vi.fn();
-    render(<Hanko myParticipantId="p1" onVote={onVote} state={state()} translate={translate} />);
+    render(<Hanko myVote={null} myParticipantId="p1" onVote={onVote} state={state()} translate={translate} />);
 
     await userEvent.click(screen.getByRole("button", { name: /vote 8/i }));
 
@@ -66,6 +66,7 @@ describe("Hanko", () => {
       <Hanko
         myParticipantId="p1"
         onVote={vi.fn()}
+        myVote="5"
         state={state({ myVote: "5" })}
         translate={translate}
       />,
@@ -77,7 +78,7 @@ describe("Hanko", () => {
 
   it("disables the scale for a spectator", () => {
     render(
-      <Hanko myParticipantId="p2" onVote={vi.fn()} state={state()} translate={translate} />,
+      <Hanko myVote={null} myParticipantId="p2" onVote={vi.fn()} state={state()} translate={translate} />,
     );
 
     expect(screen.getByRole("button", { name: /vote 3/i }).hasAttribute("disabled")).toBe(true);
@@ -85,7 +86,7 @@ describe("Hanko", () => {
 
   it("keeps the scale enabled for a voter", () => {
     render(
-      <Hanko myParticipantId="p1" onVote={vi.fn()} state={state()} translate={translate} />,
+      <Hanko myVote={null} myParticipantId="p1" onVote={vi.fn()} state={state()} translate={translate} />,
     );
 
     expect(screen.getByRole("button", { name: /vote 3/i }).hasAttribute("disabled")).toBe(false);
@@ -94,7 +95,7 @@ describe("Hanko", () => {
   it("hides the scale before the reveal", () => {
     render(
       <Hanko
-        myParticipantId="p1"
+        myVote={null} myParticipantId="p1"
         onVote={vi.fn()}
         state={state({ reveals: [{ participantId: "p1", name: "Ana", role: "voter", vote: "8", points: 8 }] })}
         translate={translate}
@@ -108,7 +109,7 @@ describe("Hanko", () => {
     vi.useFakeTimers();
     render(
       <Hanko
-        myParticipantId="p1"
+        myVote={null} myParticipantId="p1"
         onVote={vi.fn()}
         state={state({
           isRevealed: true,
@@ -126,13 +127,13 @@ describe("Hanko", () => {
 
   it("hides the verdict until the owner reveals", () => {
     const { rerender } = render(
-      <Hanko myParticipantId="p1" onVote={vi.fn()} state={state()} translate={translate} />,
+      <Hanko myVote={null} myParticipantId="p1" onVote={vi.fn()} state={state()} translate={translate} />,
     );
     expect(document.querySelector("[data-complete]")).toBeNull();
 
     rerender(
       <Hanko
-        myParticipantId="p1"
+        myVote={null} myParticipantId="p1"
         onVote={vi.fn()}
         state={state({
           isRevealed: true,
@@ -147,7 +148,7 @@ describe("Hanko", () => {
 
   it("tells a spectator to wait for the reveal", () => {
     render(
-      <Hanko myParticipantId="p2" onVote={vi.fn()} state={state()} translate={translate} />,
+      <Hanko myVote={null} myParticipantId="p2" onVote={vi.fn()} state={state()} translate={translate} />,
     );
 
     expect(screen.getByText("Waiting for the owner to reveal")).toBeTruthy();
@@ -157,7 +158,7 @@ describe("Hanko", () => {
     const translatePortuguese = createTranslator("pt-BR");
     render(
       <Hanko
-        myParticipantId="p1"
+        myVote={null} myParticipantId="p1"
         onVote={vi.fn()}
         state={state()}
         translate={translatePortuguese}
@@ -171,7 +172,7 @@ describe("Hanko long labels", () => {
   function renderGrid() {
     return render(
       <Hanko
-        myParticipantId="p1"
+        myVote={null} myParticipantId="p1"
         onVote={vi.fn()}
         state={state({ deckId: "fibonacci", myVote: null })}
         translate={createTranslator("en-US")}

@@ -8,6 +8,8 @@ import { Label, Panel } from "@presentation/ui";
 
 export interface HankoProps {
   state: PublicRoomState;
+  /** The room's answer, or this side's guess until it lands. */
+  myVote: string | null;
   myParticipantId: string | null;
   translate: Translator;
   onVote: (value: string) => void;
@@ -25,11 +27,10 @@ function voteLabel(value: string, translate: Translator): string {
 const WORD_FONT_SIZE = "text-[0.8125rem]";
 const NUMBER_FONT_SIZE = "text-[clamp(0.9375rem,4.2vw,1.375rem)]";
 
-export function Hanko({ state, myParticipantId, translate, onVote }: Readonly<HankoProps>) {
+export function Hanko({ state, myVote, myParticipantId, translate, onVote }: Readonly<HankoProps>) {
   const me = state.participants.find((entry) => entry.id === myParticipantId);
   const isSpectator = me?.role === "spectator";
   const values = getDeck(state.deckId);
-  const myVote = state.myVote;
   const [pressId, setPressId] = useState(0);
 
   return (

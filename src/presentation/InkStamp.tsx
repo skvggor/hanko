@@ -34,7 +34,7 @@ export interface InkStampProps {
    * after being undone, so the animation replays instead of appearing already dry.
    */
   pressId?: number;
-  /** Injected so the markup can be tested without a timeline running underneath it. */
+  /** Injected so the markup can be tested without a timeline underneath it. */
   morph?: SealMorpher;
 }
 
@@ -62,9 +62,8 @@ function glyphElements(host: HTMLElement | null): HTMLElement[] {
  * presses in and bleeds outward, then settles hollow so a committed vote reads as
  * permanent rather than pending.
  *
- * The slot is never removed. It used to render nothing until there was a vote, which
- * pushed the panel and everything under it down by the height of the seal the moment a
- * card was tapped.
+ * The slot is never removed, because a slot that appears with the vote pushed the panel
+ * and everything under it down by the height of the seal.
  */
 export function InkStamp({
   value,
@@ -78,12 +77,9 @@ export function InkStamp({
   const glyphsRef = useRef<HTMLSpanElement | null>(null);
   const lastStamp = useRef("");
 
-  /** The stamp whose ink has come to rest, so a fresh press reads as wet again. */
+  /** Which stamp has come to rest, so a fresh press reads as wet again. */
   const [settled, setSettled] = useState<string | null>(null);
-  /**
-   * What the seal is still showing. A press leaves the value here so an undo has
-   * something to lift away instead of a hole where a number used to be.
-   */
+  /** What the seal is still showing, so an undo has something to lift away. */
   const [lifted, setLifted] = useState<string | null>(null);
 
   const shown = value ?? lifted;
@@ -93,6 +89,8 @@ export function InkStamp({
     if (lastStamp.current === stamp) return;
     lastStamp.current = stamp;
 
+    if (value !== null) setLifted(value);
+
     const abandon = morph({
       bleed: bleedRef.current,
       glyphs: glyphElements(glyphsRef.current),
@@ -100,7 +98,7 @@ export function InkStamp({
       placeholder: placeholderRef.current,
       seal: sealRef.current,
       settle: () => {
-        setLifted(value);
+        if (value === null) setLifted(null);
         setSettled(stamp);
       },
     });

@@ -91,6 +91,18 @@ export default tseslint.config(
   },
   {
     /**
+     * The seal remembers what it last stamped so an undo has something to animate away
+     * from, and only the effect can learn that. The rule is aimed at state derived from
+     * props, which is not this: the alternative was measured, and the vote vanished
+     * mid-animation at 93% opacity when an undo outran the press.
+     */
+    files: ["src/presentation/InkStamp.tsx"],
+    rules: {
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
+  {
+    /**
      * The scripts are Node rather than the browser, and one of them is what makes the
      * quality gate mean anything, so leaving them outside both gates is how a broken gate
      * goes unnoticed. They need their own block because the typed rules have to be told

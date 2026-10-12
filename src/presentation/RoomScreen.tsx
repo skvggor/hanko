@@ -73,6 +73,8 @@ export function RoomScreen({
   const [wasRemoved, setWasRemoved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  /** Waiting the round trip left a tap looking like it had done nothing. */
+  const [pendingVote, setPendingVote] = useState<string | null | undefined>(undefined);
   const deleteTrigger = useRef<HTMLButtonElement>(null);
 
   const connection = useMemo(() => new RoomConnection(roomId), [roomId]);
@@ -86,13 +88,18 @@ export function RoomScreen({
 
   useEffect(() => {
     const unsubscribeState = connection.subscribe((next) => {
+      // The Durable Object queues messages, so the first state after a vote is its answer.
+      setPendingVote(undefined);
       setState(next);
       setMessages(next.messages);
     });
     const unsubscribeChat = connection.onChatMessage((message) => {
       setMessages((previous) => [...previous, message].slice(-MESSAGE_LIMIT));
     });
-    const unsubscribeError = connection.onError(setErrorCode);
+    const unsubscribeError = connection.onError((code) => {
+      setPendingVote(undefined);
+      setErrorCode(code);
+    });
     const unsubscribeDeleted = connection.onDeleted(() => {
       setConfirmingDelete(false);
       setErrorCode("room_deleted");
@@ -164,8 +171,12 @@ export function RoomScreen({
     [connection],
   );
   const handleVote = useCallback(
-    (value: string) => connection.vote(value),
-    [connection],
+    (value: string) => {
+      const shown = pendingVote !== undefined ? pendingVote : (state?.myVote ?? null);
+      setPendingVote(shown === value ? null : value);
+      connection.vote(value);
+    },
+    [connection, pendingVote, state?.myVote],
   );
   const handleSetRoomName = useCallback(
     (name: string | null) => connection.setRoomName(name),
@@ -262,6 +273,7 @@ export function RoomScreen({
 
         <Hanko
           myParticipantId={connection.participantId}
+          myVote={pendingVote !== undefined ? pendingVote : (state?.myVote ?? null)}
           onVote={handleVote}
           state={state}
           translate={translate}

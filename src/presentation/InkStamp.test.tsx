@@ -6,12 +6,7 @@ import { createTranslator } from "@application/i18n";
 
 const translate = createTranslator("en-US");
 
-/**
- * The morph is injected rather than mocked, which is the same seam the room connection
- * uses for its socket. It also keeps jsdom out of the business of running a timeline: a
- * test drives the settle by calling it, instead of racing a clock against a library that
- * was never going to run there.
- */
+/** Injected like the socket factory, so jsdom never has to run a timeline. */
 function morphSpy(): SealMorpher {
   return vi.fn();
 }
@@ -125,14 +120,17 @@ describe("InkStamp morph", () => {
     expect(container.querySelector("[data-glyph]")).toBeNull();
   });
 
-  it("falls back to the placeholder when an undo outruns the press", () => {
+  it("still lifts the value when an undo outruns the press", () => {
     const morph = morphSpy();
     const { container, rerender } = render(<InkStamp label="Stamped 8" morph={morph} value="8" />);
 
     rerender(<InkStamp label="Waiting" morph={morph} value={null} />);
 
-    expect(container.querySelector("[data-placeholder]")).not.toBeNull();
-    expect(() => act(() => settleLast(morph))).not.toThrow();
+    expect(screen.getByText("8")).toBeTruthy();
+
+    act(() => settleLast(morph));
+
+    expect(container.querySelector("[data-glyph]")).toBeNull();
   });
 
   it("replays the press when the same value comes back after an undo", () => {

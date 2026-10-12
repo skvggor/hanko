@@ -1,9 +1,5 @@
 import { gsap } from "gsap";
 
-/**
- * What the seal is doing, and to what. The component owns the elements and the decision
- * to morph; this only knows how to move ink, which is why it lives apart from the markup.
- */
 export interface SealMorph {
   motion: "press" | "release";
   seal: HTMLElement | null;
@@ -11,17 +7,16 @@ export interface SealMorph {
   bleed: HTMLElement | null;
   /** One entry per character of whatever is inside the seal. */
   glyphs: readonly HTMLElement[];
-  /** Runs when the ink comes to rest, which is when the seal is allowed to dry. */
   settle: () => void;
 }
 
 /**
- * Returns how to abandon a morph in flight, so a vote that is undone before the ink has
- * landed does not leave two timelines writing to the same nodes.
+ * Returns how to abandon a morph in flight, so an undo that lands before the ink does
+ * not leave two timelines writing to the same nodes.
  */
 export type SealMorpher = (morph: SealMorph) => (() => void) | void;
 
-/** The outline a waiting seal wears, matched to the ring's resting border. */
+/** Hardcoded because it has to match the ring's resting border. */
 const PLACEHOLDER_COLOR = "#a8a294";
 const IDLE_COLOR = "#a8a294";
 const INK_COLOR = "#b8371e";
@@ -113,13 +108,11 @@ function releaseTimeline({ glyphs, placeholder, seal, settle }: SealMorph) {
 }
 
 /**
- * The morph itself. The reduced motion branch is the same story told instantly: ink lands
- * with no travel, which is what the stylesheet kill switch does everywhere else, and it
- * goes through matchMedia rather than the attribute so the listener comes for free.
+ * Reduced motion is the same story told instantly, and it reads the query itself because
+ * a timeline does not fall under the stylesheet switch the rest of the app uses.
  */
 export const morphSeal: SealMorpher = (morph) => {
-  // Shell guards the same query before it reads it, and matchMedia is absent under jsdom
-  // and under any server rendering, so a morph has to be able to run without one.
+  // Shell guards the same query the same way; it is absent under jsdom.
   if (typeof globalThis.matchMedia !== "function") {
     morph.settle();
     return;
