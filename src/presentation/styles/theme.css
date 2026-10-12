@@ -156,18 +156,6 @@ footer {
     border: 0;
   }
 
-  .stamp-press {
-    animation: stamp-press 460ms cubic-bezier(0.2, 1.5, 0.4, 1);
-  }
-
-  .stamp-bleed {
-    animation: stamp-bleed 560ms cubic-bezier(0.3, 0.8, 0.3, 1);
-  }
-
-  .stamp-settle {
-    animation: stamp-settle 280ms ease-out;
-  }
-
   .seal-in {
     animation: seal-in 480ms cubic-bezier(0.2, 1.4, 0.35, 1);
   }
@@ -483,41 +471,6 @@ footer {
   }
   100% {
     transform: translateX(420%);
-  }
-}
-
-@keyframes stamp-press {
-  0% {
-    transform: rotate(-16deg) scale(0.3);
-    opacity: 0;
-  }
-  60% {
-    transform: rotate(4deg) scale(1.12);
-    opacity: 1;
-  }
-  100% {
-    transform: rotate(-3deg) scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes stamp-bleed {
-  0% {
-    transform: rotate(-16deg) scale(1.6);
-    opacity: 0.55;
-  }
-  100% {
-    transform: rotate(-3deg) scale(1);
-    opacity: 0;
-  }
-}
-
-@keyframes stamp-settle {
-  0% {
-    transform: rotate(-3deg) scale(0.94);
-  }
-  100% {
-    transform: rotate(-3deg) scale(1);
   }
 }
 

@@ -82,8 +82,9 @@ server code and the Worker bundle cannot reach React. That is enforced by two ts
 stray import fails typecheck instead of silently bloating the Worker.
 
 Routing, state management, i18n and validation are all hand written. There is no router
-library, no state library and no i18n library, and the runtime dependency list is four
-packages: React, React DOM, Phosphor icons and the Space Grotesk variable font.
+library, no state library and no i18n library, and the runtime dependency list is five
+packages: React, React DOM, Phosphor icons, GSAP for the seal morph and the Space Grotesk
+variable font.
 
 ### Why one Durable Object per room
 

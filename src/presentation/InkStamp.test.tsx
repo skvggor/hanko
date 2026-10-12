@@ -1,119 +1,230 @@
 import { act, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { InkStamp, HankoStamp } from "@presentation/InkStamp";
+import { describe, expect, it, vi } from "vitest";
+import { InkStamp, HankoStamp, type SealMorpher } from "@presentation/InkStamp";
+import type { SealMorph } from "@presentation/sealMotion";
 import { createTranslator } from "@application/i18n";
 
 const translate = createTranslator("en-US");
 
-describe("InkStamp", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
+/**
+ * The morph is injected rather than mocked, which is the same seam the room connection
+ * uses for its socket. It also keeps jsdom out of the business of running a timeline: a
+ * test drives the settle by calling it, instead of racing a clock against a library that
+ * was never going to run there.
+ */
+function morphSpy(): SealMorpher {
+  return vi.fn();
+}
+
+function lastMotion(morpher: SealMorpher): SealMorph {
+  const call = vi.mocked(morpher).mock.calls.at(-1);
+  if (call === undefined) throw new Error("the morph never ran");
+
+  return call[0];
+}
+
+function settleLast(morpher: SealMorpher): void {
+  lastMotion(morpher).settle();
+}
+
+function stamp(value: string | null, overrides: Record<string, unknown> = {}) {
+  const morph = morphSpy();
+  const view = render(
+    <InkStamp label={value === null ? "Waiting" : `Stamped ${value}`} morph={morph} value={value} {...overrides} />,
+  );
+
+  return { morph, ...view };
+}
+
+function phase(container: Element): string | null {
+  return container.querySelector("[data-phase]")?.getAttribute("data-phase") ?? null;
+}
+
+describe("InkStamp slot", () => {
+  it("holds its place before anything is pressed", () => {
+    const { container } = stamp(null);
+
+    expect(container.querySelector("[data-seal]")).not.toBeNull();
+    expect(phase(container)).toBe("waiting");
   });
 
-  it("renders nothing without a vote", () => {
-    const { container } = render(<InkStamp label="idle" value={null} />);
-    expect(container.querySelector("[data-phase]")).toBeNull();
+  it("holds the same place once the vote is undone", () => {
+    const { container, morph, rerender } = stamp("8");
+
+    rerender(<InkStamp label="Waiting" morph={morph} value={null} />);
+
+    expect(container.querySelector("[data-seal]")).not.toBeNull();
   });
 
-  it("shows the stamped value", () => {
-    render(<InkStamp label="Stamped 8" value="8" />);
+  it("waits in a faint placeholder rather than an empty box", () => {
+    const { container } = stamp(null);
+
+    expect(container.querySelector("[data-placeholder]")).not.toBeNull();
+  });
+
+  it("keeps the placeholder mounted so it has something to morph back from", () => {
+    const { container } = stamp("8");
+
+    expect(container.querySelector("[data-placeholder]")).not.toBeNull();
+    expect(container.querySelector("[data-glyph]")).not.toBeNull();
+  });
+});
+
+describe("InkStamp morph", () => {
+  it("presses when the value arrives", () => {
+    const morph = morphSpy();
+    const { rerender } = render(<InkStamp label="Waiting" morph={morph} value={null} />);
+
+    rerender(<InkStamp label="Stamped 8" morph={morph} value="8" />);
+
+    expect(morph).toHaveBeenCalledTimes(1);
+    expect(lastMotion(morph).motion).toBe("press");
+  });
+
+  it("releases when the value goes away", () => {
+    const morph = morphSpy();
+    const { rerender } = render(<InkStamp label="Stamped 8" morph={morph} value="8" />);
+
+    rerender(<InkStamp label="Waiting" morph={morph} value={null} />);
+
+    expect(lastMotion(morph).motion).toBe("release");
+  });
+
+  it("splits the value into one glyph per character", () => {
+    const morph = morphSpy();
+    const { container } = render(<InkStamp label="Café" morph={morph} value="Café" />);
+
+    const glyphs = container.querySelectorAll("[data-glyph]");
+
+    expect(glyphs).toHaveLength(4);
+    expect([...glyphs].map((glyph) => glyph.textContent).join("")).toBe("Café");
+  });
+
+  it("dries the seal once the morph settles", () => {
+    const morph = morphSpy();
+    const { container } = render(<InkStamp label="Stamped 8" morph={morph} value="8" />);
+
+    expect(phase(container)).toBe("wet");
+
+    act(() => settleLast(morph));
+
+    expect(phase(container)).toBe("drying");
+  });
+
+  it("holds the value on screen until the ink has lifted", () => {
+    const morph = morphSpy();
+    const { container, rerender } = render(<InkStamp label="Stamped 8" morph={morph} value="8" />);
+
+    act(() => settleLast(morph));
+    rerender(<InkStamp label="Waiting" morph={morph} value={null} />);
+
     expect(screen.getByText("8")).toBeTruthy();
+
+    act(() => settleLast(morph));
+
+    expect(container.querySelector("[data-glyph]")).toBeNull();
   });
 
-  it("starts wet so the press animation plays", () => {
-    const { container } = render(<InkStamp label="seal" value="8" />);
-    expect(container.querySelector("[data-phase]")?.getAttribute("data-phase")).toBe("wet");
+  it("falls back to the placeholder when an undo outruns the press", () => {
+    const morph = morphSpy();
+    const { container, rerender } = render(<InkStamp label="Stamped 8" morph={morph} value="8" />);
+
+    rerender(<InkStamp label="Waiting" morph={morph} value={null} />);
+
+    expect(container.querySelector("[data-placeholder]")).not.toBeNull();
+    expect(() => act(() => settleLast(morph))).not.toThrow();
   });
 
-  it("dries after the bleed settles", () => {
-    const { container } = render(<InkStamp label="seal" value="8" />);
+  it("replays the press when the same value comes back after an undo", () => {
+    const morph = morphSpy();
+    const { rerender } = render(<InkStamp label="Waiting" morph={morph} pressId={0} value={null} />);
 
-    act(() => { vi.advanceTimersByTime(500); });
+    rerender(<InkStamp label="Stamped 8" morph={morph} pressId={0} value="8" />);
+    rerender(<InkStamp label="Waiting" morph={morph} pressId={1} value={null} />);
+    rerender(<InkStamp label="Stamped 8" morph={morph} pressId={1} value="8" />);
 
-    expect(container.querySelector("[data-phase]")?.getAttribute("data-phase")).toBe("drying");
+    expect(vi.mocked(morph).mock.calls.filter((call) => call[0].motion === "press"))
+      .toHaveLength(2);
   });
 
-  it("keeps the stamp visible after drying", () => {
-    const { container } = render(<InkStamp label="seal" value="8" />);
-    act(() => { vi.advanceTimersByTime(2000); });
+  it("does not run a morph on the first render", () => {
+    const morph = morphSpy();
 
-    expect(screen.getByText("8")).toBeTruthy();
-    expect(container.querySelector("[data-phase]")).not.toBeNull();
+    render(<InkStamp label="Waiting" morph={morph} value={null} />);
+
+    expect(morph).toHaveBeenCalledTimes(0);
   });
 
-  it("wipes when the vote is undone", () => {
-    const { container, rerender } = render(<InkStamp label="seal" value="8" />);
+  it("hands the morph the ring and the glyphs to animate", () => {
+    const morph = morphSpy();
+    const { container } = render(<InkStamp label="Stamped 8" morph={morph} value="8" />);
 
-    rerender(<InkStamp label="seal" value={null} />);
+    const { seal, glyphs } = vi.mocked(morph).mock.calls[0]?.[0] ?? { glyphs: [], seal: null };
 
-    expect(container.querySelector("[data-phase]")).toBeNull();
+    expect(seal).toBe(container.querySelector("[data-seal]"));
+    expect(glyphs).toHaveLength(1);
+  });
+});
+
+describe("InkStamp accessibility", () => {
+  it("describes the placeholder for assistive tech", () => {
+    render(<InkStamp label="Waiting for your estimate" morph={morphSpy()} value={null} />);
+
+    expect(screen.getByRole("img").getAttribute("aria-label")).toBe("Waiting for your estimate");
   });
 
-  it("replays the press when the vote changes", () => {
-    const { container, rerender } = render(<InkStamp label="seal" value="8" />);
-    act(() => { vi.advanceTimersByTime(500); });
+  it("describes the stamped value instead of the placeholder", () => {
+    render(<InkStamp label="Stamped 8" morph={morphSpy()} value="8" />);
 
-    rerender(<InkStamp label="seal" value="13" />);
-
-    expect(container.querySelector("[data-phase]")?.getAttribute("data-phase")).toBe("wet");
-    expect(screen.getByText("13")).toBeTruthy();
-  });
-
-  it("restarts the press when the press id changes", () => {
-    const { container, rerender } = render(
-      <InkStamp label="seal" pressId={0} value="8" />,
-    );
-    act(() => { vi.advanceTimersByTime(500); });
-
-    rerender(<InkStamp label="seal" pressId={1} value="8" />);
-
-    expect(container.querySelector("[data-phase]")?.getAttribute("data-phase")).toBe("wet");
-  });
-
-  it("renders an ink bleed layer", () => {
-    const { container } = render(<InkStamp label="seal" value="8" />);
-    expect(container.querySelector(".stamp-bleed")).not.toBeNull();
-  });
-
-  it("describes the stamp for assistive tech", () => {
-    render(<InkStamp label="Stamped 8" value="8" />);
     expect(screen.getByRole("img").getAttribute("aria-label")).toBe("Stamped 8");
   });
 
-  it("hides the decorative layers", () => {
-    const { container } = render(<InkStamp label="seal" value="8" />);
-    expect(container.querySelector("[data-seal]")?.getAttribute("aria-hidden")).toBe("true");
-    expect(container.querySelector(".stamp-bleed")?.getAttribute("aria-hidden")).toBe("true");
-  });
+  it("keeps every decorative layer out of the accessibility tree", () => {
+    const { container } = render(<InkStamp label="Stamped 8" morph={morphSpy()} value="8" />);
 
-  it("cancels the pending timer on unmount", () => {
-    const { unmount } = render(<InkStamp label="seal" value="8" />);
-    unmount();
-
-    expect(() => act(() => { vi.advanceTimersByTime(1000); })).not.toThrow();
+    for (const selector of ["[data-seal]", "[data-placeholder]", "[data-bleed]", "[data-glyph]"]) {
+      for (const node of container.querySelectorAll(selector)) {
+        expect(node.getAttribute("aria-hidden")).toBe("true");
+      }
+    }
   });
 });
 
 describe("HankoStamp", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
   it("labels the stamp with its value", () => {
-    render(<HankoStamp myVote="8" pressId={0} translate={translate} />);
+    render(<HankoStamp morph={morphSpy()} myVote="8" pressId={0} translate={translate} />);
     expect(screen.getByRole("img").getAttribute("aria-label")).toBe("Stamped 8");
   });
 
   it("translates the stamp label", () => {
-    render(<HankoStamp myVote="13" pressId={0} translate={createTranslator("pt-BR")} />);
+    render(<HankoStamp morph={morphSpy()} myVote="13" pressId={0} translate={createTranslator("pt-BR")} />);
     expect(screen.getByRole("img").getAttribute("aria-label")).toBe("Carimbado 13");
   });
 
-  it("renders nothing without a vote", () => {
-    const { container } = render(<HankoStamp myVote={null} pressId={0} translate={translate} />);
-    expect(container.querySelector("[data-phase]")).toBeNull();
+  it("waits in the placeholder without a vote", () => {
+    const { container } = render(
+      <HankoStamp morph={morphSpy()} myVote={null} pressId={0} translate={translate} />,
+    );
+
+    expect(phase(container)).toBe("waiting");
+    expect(container.querySelector("[data-placeholder]")).not.toBeNull();
+  });
+
+  it("stamps the same label the vote card shows, not the raw value", () => {
+    const { container } = render(
+      <HankoStamp
+        morph={morphSpy()}
+        myVote="coffee"
+        pressId={0}
+        translate={createTranslator("pt-BR")}
+      />,
+    );
+
+    expect([...container.querySelectorAll("[data-glyph]")].map((g) => g.textContent).join(""))
+      .toBe("Café");
   });
 });
+
 describe("InkStamp long labels", () => {
   function sealOf(container: Element): Element {
     const seal = container.querySelector("[data-seal]");
@@ -128,36 +239,33 @@ describe("InkStamp long labels", () => {
   }
 
   it("shrinks a word so the ring still contains it", () => {
-    const { container } = render(<InkStamp label="Coffee" value="Coffee" />);
+    const { container } = render(<InkStamp label="Coffee" morph={morphSpy()} value="Coffee" />);
 
     expect(fontRem(sealOf(container))).toBeLessThan(1.25);
   });
 
   it("keeps a number large, since a number is what the seal is for", () => {
-    const { container } = render(<InkStamp label="13" value="13" />);
+    const { container } = render(<InkStamp label="13" morph={morphSpy()} value="13" />);
 
     expect(fontRem(sealOf(container))).toBeGreaterThan(2);
   });
 
   it("scales down as the label gets longer rather than clipping at one threshold", () => {
-    const { container: short } = render(<InkStamp label="13" value="13" />);
-    const { container: longer } = render(<InkStamp label="Café" value="Café" />);
+    const { container: short } = render(<InkStamp label="13" morph={morphSpy()} value="13" />);
+    const { container: longer } = render(<InkStamp label="Café" morph={morphSpy()} value="Café" />);
 
     expect(fontRem(sealOf(longer))).toBeLessThan(fontRem(sealOf(short)));
   });
 
-  it("stamps the same label the vote card shows, not the raw value", () => {
-    const translate = createTranslator("pt-BR");
-    const { container } = render(
-      <HankoStamp myVote="coffee" pressId={0} translate={translate} />,
-    );
-
-    expect(sealOf(container).textContent).toBe("Café");
-  });
-
   it("still describes the stamp for a screen reader", () => {
-    const translate = createTranslator("pt-BR");
-    render(<HankoStamp myVote="coffee" pressId={0} translate={translate} />);
+    render(
+      <HankoStamp
+        morph={morphSpy()}
+        myVote="coffee"
+        pressId={0}
+        translate={createTranslator("pt-BR")}
+      />,
+    );
 
     expect(screen.getByRole("img").getAttribute("aria-label")).toContain("Café");
   });

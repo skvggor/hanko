@@ -70,6 +70,7 @@
   },
   "vote": {
     "prompt": "Your estimate",
+    "waiting": "Waiting for your estimate",
     "hint": "Choose once. Tap again to undo.",
     "coffee": "Coffee",
     "undo": "Undo",

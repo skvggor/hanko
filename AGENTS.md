@@ -23,9 +23,16 @@ server, Tailwind for styling, Vitest and Testing Library for tests, ESLint flat 
 Lefthook for the hooks. Read `package.json` for the versions. Routing, state management,
 i18n and validation are all hand written.
 
-Runtime dependencies are deliberately few: React, React DOM, Phosphor icons and the
+Runtime dependencies are deliberately few: React, React DOM, Phosphor icons, GSAP and the
 self-hosted Space Grotesk variable font. Do not add a dependency for something that is a
 page of code.
+
+GSAP is the one exception to "hand written", and it earns its place by carrying the seal's
+morph, which is a timeline of per character tweens rather than a two state transition. It
+arrives as a default parameter instead of a global, the same seam as
+`createDefaultSocketFactory()`, so `InkStamp` can be rendered and asserted in jsdom without
+a timeline running underneath it. Core only: no `SplitText`, because splitting text into
+spans GSAP owns is a fight with React for the same nodes.
 
 `package.json` has an `allowScripts` allowlist for `esbuild`, `workerd` and `lefthook`. Do
 not remove it: their postinstall binaries are required for the build.

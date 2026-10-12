@@ -452,6 +452,9 @@ describe("RoomScreen", () => {
         screen.getByText("Your estimate").closest("div")?.parentElement?.parentElement;
 
       const before = hanko()?.outerHTML;
+      const phaseBefore = container
+        .querySelector("[data-phase]")
+        ?.getAttribute("data-phase");
 
       // Bia sends; the server rebroadcasts the room to everyone, including me.
       pushState({
@@ -469,7 +472,9 @@ describe("RoomScreen", () => {
 
       expect(hanko()).not.toBeNull();
       expect(hanko()?.outerHTML).toBe(before);
-      expect(container.querySelector("[data-phase]")?.getAttribute("data-phase")).toBe("wet");
+      expect(container.querySelector("[data-phase]")?.getAttribute("data-phase")).toBe(
+        phaseBefore,
+      );
     });
 
     it("stops showing the room once the owner removes you", async () => {
@@ -579,27 +584,30 @@ describe("RoomScreen", () => {
       expect(replaced.map((node) => node.className || node.tagName)).toEqual([]);
     });
 
-    it("survives a broadcast while the seal is still drying", async () => {
+it("survives a broadcast while the seal is still drying", async () => {
       const { container } = renderRoom();
       await joinAs("Ana");
       pushState({ ...roomState, myVote: "8" });
 
+      const phase = () =>
+        container.querySelector("[data-phase]")?.getAttribute("data-phase");
       const input = await openChat();
-      expect(container.querySelector("[data-phase]")?.getAttribute("data-phase")).toBe("wet");
+      const before = phase();
+
+      expect(before).not.toBeNull();
 
       await userEvent.type(input, "oi{Enter}");
       pushState({
         ...roomState,
         myVote: "8",
         messages: [
-          { id: "m1", authorId: "p1", authorName: "Ana", text: "oi", sentAt: 1 },
+          { id: "m1", authorName: "Ana", authorId: "p1", role: "voter", text: "oi", sentAt: 1 },
         ],
       });
 
-      expect(container.querySelector("[data-phase]")?.getAttribute("data-phase")).toBe("wet");
+      expect(phase()).toBe(before);
     });
   });
-
 });
 
 describe("RoomScreen owner controls", () => {

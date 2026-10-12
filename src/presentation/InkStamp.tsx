@@ -1,7 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Translator } from "@application/i18n";
+import { morphSeal, type SealMorpher } from "@presentation/sealMotion";
 
-const STAMP_DURATION_MS = 460;
+export type { SealMorpher } from "@presentation/sealMotion";
+
+/**
+ * The waiting mark. A dash reads as an empty line to fill in, where a question mark would
+ * read as a vote of "?" and a set of dots would read as a loading state.
+ */
+const PLACEHOLDER = "—";
 
 /**
  * The seal is a fixed circle, and a circle only comfortably holds a handful of
@@ -19,7 +26,7 @@ function sealFontSize(label: string): string {
 }
 
 export interface InkStampProps {
-  /** Value currently stamped, or null when nothing is pressed. */
+  /** Value currently stamped, or null while the seal is still waiting. */
   value: string | null;
   label: string;
   /**
@@ -27,49 +34,132 @@ export interface InkStampProps {
    * after being undone, so the animation replays instead of appearing already dry.
    */
   pressId?: number;
+  /** Injected so the markup can be tested without a timeline running underneath it. */
+  morph?: SealMorpher;
+}
+
+type Phase = "waiting" | "wet" | "drying" | "lifting";
+
+function readPhase(value: string | null, shown: string | null, dried: boolean): Phase {
+  if (value === null) return shown === null ? "waiting" : "lifting";
+  return dried ? "drying" : "wet";
+}
+
+function readTone(value: string | null, shown: string | null, dried: boolean): string {
+  if (shown === null) return "border-line-strong bg-transparent text-line-strong";
+  if (value === null || !dried) return "border-primary bg-transparent text-primary";
+  return "border-primary bg-primary text-on-primary";
+}
+
+function glyphElements(host: HTMLElement | null): HTMLElement[] {
+  return [...(host?.children ?? [])].filter(
+    (node): node is HTMLElement => node instanceof HTMLElement,
+  );
 }
 
 /**
- * The seal impression: a disc with an ink ring bleeding outward, settling to a
- * hollow mark so a committed vote reads as permanent rather than pending.
+ * The seal impression: a ring that waits as a faint outline, takes the value as ink that
+ * presses in and bleeds outward, then settles hollow so a committed vote reads as
+ * permanent rather than pending.
+ *
+ * The slot is never removed. It used to render nothing until there was a vote, which
+ * pushed the panel and everything under it down by the height of the seal the moment a
+ * card was tapped.
  */
-export function InkStamp({ value, label, pressId = 0 }: Readonly<InkStampProps>) {
-  const [driedStamp, setDriedStamp] = useState<string | null>(null);
-  const stamp = value === null ? null : `${pressId}:${value}`;
+export function InkStamp({
+  value,
+  label,
+  pressId = 0,
+  morph = morphSeal,
+}: Readonly<InkStampProps>) {
+  const sealRef = useRef<HTMLSpanElement | null>(null);
+  const placeholderRef = useRef<HTMLSpanElement | null>(null);
+  const bleedRef = useRef<HTMLSpanElement | null>(null);
+  const glyphsRef = useRef<HTMLSpanElement | null>(null);
+  const lastStamp = useRef("");
+
+  /** The stamp whose ink has come to rest, so a fresh press reads as wet again. */
+  const [settled, setSettled] = useState<string | null>(null);
+  /**
+   * What the seal is still showing. A press leaves the value here so an undo has
+   * something to lift away instead of a hole where a number used to be.
+   */
+  const [lifted, setLifted] = useState<string | null>(null);
+
+  const shown = value ?? lifted;
+  const stamp = value === null ? "" : `${pressId}:${value}`;
 
   useEffect(() => {
-    if (stamp === null) return;
+    if (lastStamp.current === stamp) return;
+    lastStamp.current = stamp;
 
-    const timeout = setTimeout(() => setDriedStamp(stamp), STAMP_DURATION_MS);
-    return () => clearTimeout(timeout);
-  }, [stamp]);
+    const abandon = morph({
+      bleed: bleedRef.current,
+      glyphs: glyphElements(glyphsRef.current),
+      motion: value === null ? "release" : "press",
+      placeholder: placeholderRef.current,
+      seal: sealRef.current,
+      settle: () => {
+        setLifted(value);
+        setSettled(stamp);
+      },
+    });
 
-  if (stamp === null || value === null) return null;
+    return () => {
+      abandon?.();
+    };
+  }, [morph, stamp, value]);
 
-  const isWet = driedStamp !== stamp;
+  const phase = readPhase(value, shown, settled === stamp);
 
   return (
     <div
       className="relative mx-auto flex h-24 w-24 items-center justify-center"
-      data-phase={isWet ? "wet" : "drying"}
+      data-phase={phase}
     >
       <span
         aria-hidden="true"
-        className={`stamp-bleed absolute h-24 w-24 rounded-full border-[0.1875rem] border-primary ${isWet ? "opacity-100" : "opacity-0"}`}
-        key={`bleed-${stamp}`}
+        className="absolute h-24 w-24 rounded-full border-[0.1875rem] border-primary opacity-0"
+        data-bleed
+        ref={bleedRef}
       />
+
       <span
         aria-hidden="true"
-        className={`relative z-1 flex h-18 w-18 items-center justify-center rounded-full border-[0.1875rem] px-1 font-display ${sealFontSize(value)} font-bold ${
-          isWet
-            ? "stamp-press border-primary bg-primary text-on-primary"
-            : "stamp-settle border-primary bg-transparent text-primary"
-        }`}
+        className={`relative z-1 flex h-18 w-18 items-center justify-center rounded-full border-[0.1875rem] px-1 font-display ${sealFontSize(shown ?? "")} font-bold ${readTone(value, shown, settled === stamp)}`}
         data-seal
-        key={`seal-${stamp}`}
+        ref={sealRef}
       >
-        {value}
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 flex items-center justify-center text-[1.25rem] text-line-strong"
+          data-placeholder
+          ref={placeholderRef}
+        >
+          {PLACEHOLDER}
+        </span>
+
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 flex items-center justify-center"
+          data-glyphs
+          ref={glyphsRef}
+        >
+          {shown === null
+            ? null
+            : [...shown].map((character, index) => (
+                <span
+                  aria-hidden="true"
+                  className="inline-block"
+                  data-glyph
+                  key={`${index}:${character}`}
+                >
+                  {character}
+                </span>
+              ))}
+        </span>
       </span>
+
       <span aria-label={label} className="visually-hidden" role="img">
         {label}
       </span>
@@ -81,9 +171,15 @@ export interface HankoStampProps {
   myVote: string | null;
   pressId: number;
   translate: Translator;
+  morph?: SealMorpher;
 }
 
-export function HankoStamp({ myVote, pressId, translate }: Readonly<HankoStampProps>) {
+export function HankoStamp({
+  myVote,
+  pressId,
+  translate,
+  morph = morphSeal,
+}: Readonly<HankoStampProps>) {
   /**
    * The card and the seal have to say the same thing. Stamping the raw value would
    * leave the seal reading "coffee" on a card that reads "Café", which reads as two
@@ -95,9 +191,10 @@ export function HankoStamp({ myVote, pressId, translate }: Readonly<HankoStampPr
     <InkStamp
       label={
         myVote === null
-          ? translate("vote.prompt")
+          ? translate("vote.waiting")
           : translate("vote.stamp", { value: stamped ?? myVote })
       }
+      morph={morph}
       pressId={pressId}
       value={stamped}
     />

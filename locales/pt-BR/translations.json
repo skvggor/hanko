@@ -70,6 +70,7 @@
   },
   "vote": {
     "prompt": "Sua estimativa",
+    "waiting": "Aguardando sua estimativa",
     "hint": "Escolha uma vez. Toque de novo para desfazer.",
     "coffee": "Café",
     "undo": "Desfazer",
