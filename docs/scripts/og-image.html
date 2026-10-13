@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hanko social card</title>
+    <!--
+      This is a drawing surface, not a page: capture.mjs renders it at 1200x630, the size
+      Open Graph recommends and Twitter's large card expects. The colours mirror @theme in
+      src/presentation/styles/theme.css so a shared link previews in the colours the app
+      uses. The font is injected by the capture script because a document loaded from disk
+      cannot reach files outside its own directory in Chromium.
+    -->
+    <style>
+      :root {
+        --color-paper: #f0ece3;
+        --color-paper-raised: #fdfbf7;
+        --color-ink: #16150f;
+        --color-ink-dim: #55524a;
+        --color-line: #d8d2c5;
+        --color-primary: #b8371e;
+        --color-primary-bright: #d94a2c;
+        --color-on-primary: #fff9f4;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 72px;
+        background: var(--color-paper);
+        color: var(--color-ink);
+        font-family: "Space Grotesk Variable", "Helvetica Neue", sans-serif;
+      }
+
+      .lockup {
+        display: flex;
+        align-items: center;
+        gap: 40px;
+      }
+
+      .seal {
+        width: 148px;
+        height: 148px;
+        flex: none;
+      }
+
+      .wordmark {
+        font-size: 7.5rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        line-height: 1;
+      }
+
+      .tagline {
+        margin-top: 0.75rem;
+        font-size: 2.125rem;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+        color: var(--color-ink-dim);
+      }
+
+      .cards {
+        display: flex;
+        gap: 1.5rem;
+      }
+
+      .card {
+        display: flex;
+        width: 8.25rem;
+        height: 8.25rem;
+        align-items: center;
+        justify-content: center;
+        border: 3px solid var(--color-line);
+        border-radius: 1.5rem;
+        background: var(--color-paper-raised);
+        color: var(--color-ink-dim);
+        font-size: 3.5rem;
+        font-weight: 700;
+      }
+
+      .card--stamped {
+        border-color: var(--color-primary);
+        background: var(--color-primary);
+        color: var(--color-on-primary);
+        transform: rotate(-3deg) translateY(-0.625rem);
+        box-shadow: 0.75rem 0.75rem 0 rgba(22, 21, 15, 0.12);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="lockup">
+      <svg class="seal" viewBox="0 0 120 120" aria-hidden="true">
+        <g transform="translate(9.93 11.57)" fill="none" stroke="#d94a2c">
+          <circle cx="49.7379" cy="36.5215" r="33.2139" stroke-width="6.6152" />
+          <circle cx="34.5371" cy="61.6676" r="33.2139" stroke-width="2.6465" />
+          <circle cx="64.9394" cy="61.6657" r="33.2129" stroke-width="3.9687" />
+          <path
+            fill="#d94a2c"
+            stroke="none"
+            d="M 49.2577,32.0088 38.5618,41.3912 33.3076,53.9636 32.1818,65.4101 39.5,69.163 47.0059,69.9136 58.8277,68.7878 65.7707,65.5977 68.0225,63.5336 66.5213,52.65 62.0177,41.9541 56.2007,35.3865 z"
+          />
+        </g>
+      </svg>
+      <div>
+        <div class="wordmark">Hanko</div>
+        <div class="tagline">Room-based planning poker. No accounts.</div>
+      </div>
+    </div>
+    <div class="cards">
+      <div class="card">0</div>
+      <div class="card">1</div>
+      <div class="card">2</div>
+      <div class="card card--stamped">3</div>
+      <div class="card">5</div>
+      <div class="card">8</div>
+    </div>
+  </body>
+</html>

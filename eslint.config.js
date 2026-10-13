@@ -5,7 +5,7 @@ import sonarjs from "eslint-plugin-sonarjs";
 import tseslint from "typescript-eslint";
 
 const sources = ["src/**/*.{ts,tsx}", "aliases.ts", "*.config.{ts,js}"];
-const scripts = "scripts/**/*.mjs";
+const scripts = ["scripts/**/*.mjs", "docs/scripts/**/*.mjs"];
 const tests = "src/**/*.{test.ts,test.tsx}";
 
 /**
@@ -105,10 +105,11 @@ export default tseslint.config(
     /**
      * The scripts are Node rather than the browser, and one of them is what makes the
      * quality gate mean anything, so leaving them outside both gates is how a broken gate
-     * goes unnoticed. They need their own block because the typed rules have to be told
-     * which project holds them.
+     * goes unnoticed. The capture scripts under docs/ are Node for the same reasons and
+     * are held to the same set. They need their own block because the typed rules have to
+     * be told which project holds them.
      */
-    files: [scripts],
+    files: scripts,
     languageOptions: {
       globals: { ...globals.node },
       parserOptions: {

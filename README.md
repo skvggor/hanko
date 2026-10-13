@@ -6,11 +6,14 @@ privately, and the room owner reveals.
 There are no accounts and no sign-up. **The room id is the only secret guarding a room.**
 That single decision shapes almost everything else about how this is built.
 
-The visual language is the Japanese seal stamp (*hanko*): ink on paper, and a stamp that
-lands on the vote grid at reveal time.
+![The Hanko start page: the logo, the name, and one button to start a room](docs/images/hero.png)
+
+**Using Hanko?** The [user manual](docs/MANUAL.md) walks through every step with
+screenshots, from opening a room to reading the consensus.
 
 ## Contents
 
+- [User manual](docs/MANUAL.md)
 - [How it works](#how-it-works)
 - [Running it](#running-it)
 - [Architecture](#architecture)
@@ -36,8 +39,8 @@ lands on the vote grid at reveal time.
 5. The room owner reveals. Everyone sees the distribution, the average and a consensus
    verdict at the same moment.
 
-Decks are Fibonacci, T-shirt sizes and Linear 1–10, plus `?` for "needs discussion" and
-`coffee`.
+Decks are Fibonacci (with `?` for "needs discussion" and `coffee`), T-shirt sizes and
+Linear 1–10.
 
 ## Running it
 
@@ -154,6 +157,7 @@ src/
   presentation/   React, plus the stylesheet
   config/         build constants
 locales/          en-US and pt-BR translation files
+docs/             the user manual, its screenshots and the capture script
 public/_headers   CSP and the other response headers
 ```
 
@@ -170,6 +174,7 @@ There are no barrel `index.ts` files; import the concrete module.
 | `npm test`             | The test suite                                      |
 | `npm run test:coverage`| The suite, enforcing the 80% gate                   |
 | `npm run sonar`       | The SonarQube gate, on a throwaway instance          |
+| `npm run docs:capture`| The manual's screenshots, the README hero and the social card |
 | `npm run deploy`       | Coverage, then build, then `wrangler deploy`        |
 
 `npm run build` only typechecks the client config. Use `npm run typecheck` to cover both.
@@ -182,6 +187,21 @@ The sonar gate brings up its own instance in Docker and takes it down again, so 
 needs the daemon running. Set `SONAR_KEEP_ALIVE=1` to leave the instance up at
 `http://localhost:9000`, signing in as `admin`/`admin`; it is then yours to remove with
 `docker rm -f hanko-sonar`.
+
+### Regenerating the documentation pictures
+
+The figures in `docs/MANUAL.md`, the hero at the top of this file and the social card
+are produced against the real application:
+
+```bash
+npm run docs:capture                   # everything
+node docs/scripts/capture.mjs manual   # only the manual's shots and the hero
+node docs/scripts/capture.mjs og       # only public/og-image.png
+```
+
+The script starts the dev server itself (pass `--url` to use one that is already
+running), walks the flow with two participants in one room, and compresses
+the PNGs with [compattor](https://github.com/skvggor/compattor) when it is installed.
 
 ## Testing
 

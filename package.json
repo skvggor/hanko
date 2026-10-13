@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "sonar": "node scripts/sonar-scan.mjs",
+    "docs:capture": "node docs/scripts/capture.mjs all",
     "deploy": "npm run test:coverage && npm run build && wrangler deploy",
     "prepare": "lefthook install"
   },
