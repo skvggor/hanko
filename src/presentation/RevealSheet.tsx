@@ -133,9 +133,10 @@ export function RevealSheet({ entries, scale, translate }: Readonly<RevealSheetP
         className="m-0 flex list-none flex-wrap gap-tight p-0"
       >
         {entries.slice(0, revealedCount).map((entry, index) => {
-          const isDiscussion = entry.vote === "?";
           const isCoffee = entry.vote === "coffee";
-          const isIdle = entry.points === null && !isDiscussion && !isCoffee;
+          // A size has no points either, so "no vote" can only mean the absence of
+          // one: judging by points turned every T-shirt card into a dash.
+          const isIdle = entry.vote === null;
 
           return (
             <li

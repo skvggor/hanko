@@ -6,6 +6,7 @@ import {
   tiltFor,
 } from "@presentation/RevealSheet";
 import type { RevealedVote } from "@domain/protocol";
+import { pointsFor } from "@domain/deck";
 import { createTranslator } from "@application/i18n";
 
 const translate = createTranslator("en-US");
@@ -30,7 +31,9 @@ function entry(
     name,
     role,
     vote,
-    points: vote === null ? null : Number.parseFloat(vote),
+    // The fixture draws its points from the same function the room does, so a size
+    // vote carries the same null here that it carries in production.
+    points: vote === null ? null : pointsFor(vote),
   };
 }
 
@@ -258,6 +261,21 @@ describe("RevealSheet", () => {
     act(() => { vi.advanceTimersByTime(300); });
 
     expect(sealValues().join("|")).toContain("–");
+  });
+
+  it("shows the size a T-shirt vote landed on", () => {
+    render(
+      <RevealSheet
+        entries={[entry("p1", "Ana", "M")]}
+        scale={["XS", "S", "M", "L", "XL", "XXL"]}
+        translate={translate}
+      />,
+    );
+
+    act(() => { vi.advanceTimersByTime(300); });
+
+    expect(sealValues().join("|")).toContain("M");
+    expect(sealValues().join("|")).not.toContain("–");
   });
 
   it("shows the question mark for a discussion vote", () => {
