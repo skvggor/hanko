@@ -34,9 +34,9 @@ type it again.
 
 ![The room with the share chip copied](images/03-room-share.png)
 
-The chip at the top of the room holds the invitation: press it to copy the link and
-send it to the team. Anyone who opens it joins the same room, so share it only with
-the people who should be there.
+The chip at the top of the room holds the invitation. It shows the room id, and
+pressing it copies the whole link to send to the team. Anyone who opens it joins the
+same room, so share it only with the people who should be there.
 
 The room header shows the round number and how many people are present.
 
@@ -116,12 +116,18 @@ The owner's panel holds the controls for the room:
 
 ![The participants list with the owner actions](images/09-people.png)
 
-Everyone can press the pencil to change their own name. On other people's rows the
-owner additionally can:
+The list leads with the owner, whose name is written in gold, and your own row comes
+right below them. A "You" marker points at the row that is yours.
 
-- **Make owner**: hand the room over. Only one owner at a time, and they get the
-  reveal and management controls.
-- **Make watcher / Make voter**: move someone between voting and watching.
+Every action is an icon: rest the pointer on it, or reach it with the keyboard, and
+its name appears.
+
+- **Pencil**: change your own name.
+- **Crown (Make owner)**: hand the room over. Only one owner at a time, and they get
+  the reveal and management controls.
+- **Eye (Make watcher / Make voter)**: move someone between voting and watching. The
+  owner can turn their own row into a watcher as well, which is how someone runs the
+  room without voting in it.
 - **Remove**: kick someone out. A removed person cannot rejoin with the same link,
   not even by reloading.
 

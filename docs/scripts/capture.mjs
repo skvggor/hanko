@@ -123,15 +123,19 @@ async function waitForServer(origin) {
 
 async function captureShot(page, name) {
   await page.evaluate(() => globalThis.document.fonts.ready);
+  // The pointer stays where the last click left it, and a card still hovered under
+  // the cursor photographs as a hover the reader never triggered.
+  await page.mouse.move(0, 0);
   const target = path.join(IMAGES_DIRECTORY, `${name}.png`);
   await page.screenshot({ path: target, scale: "css" });
   console.log(`captured ${path.relative(REPOSITORY_ROOT, target)}`);
 }
 
-async function captureElementShot(element, name) {
+async function captureElementShot(page, element, name) {
   // Centring keeps the pinned header and footer from landing on top of the figure,
   // which is what a plain scroll into view leaves behind.
   await element.evaluate((node) => node.scrollIntoView({ block: "center" }));
+  await page.mouse.move(0, 0);
   const target = path.join(IMAGES_DIRECTORY, `${name}.png`);
   await element.screenshot({ path: target, scale: "css" });
   console.log(`captured ${path.relative(REPOSITORY_ROOT, target)}`);
@@ -222,15 +226,15 @@ async function captureManual(origin, browser) {
     const votePanel = ownerPage
       .getByText("Your estimate", { exact: true })
       .locator("xpath=ancestor::section[1]");
-    await captureElementShot(votePanel, "04-voting");
+    await captureElementShot(ownerPage, votePanel, "04-voting");
 
     await vote(ownerPage, "3");
-    await captureElementShot(votePanel, "05-stamped-vote");
+    await captureElementShot(ownerPage, votePanel, "05-stamped-vote");
 
     await vote(voterPage, "5");
 
     const reveal = ownerPage.getByRole("button", { name: "Reveal", exact: true });
-    await captureElementShot(reveal.locator("xpath=ancestor::section[1]"), "06-owner-controls");
+    await captureElementShot(ownerPage, reveal.locator("xpath=ancestor::section[1]"), "06-owner-controls");
 
     await reveal.click();
     const revealList = ownerPage.getByRole("list", { name: "Revealed votes" });
@@ -238,10 +242,11 @@ async function captureManual(origin, browser) {
     // The seals land one at a time on a timer, so the figure waits for the last one
     // rather than photographing the cascade half way through.
     await ownerPage.locator('[data-complete="true"]').waitFor();
-    await captureElementShot(revealList, "07-reveal");
+    await captureElementShot(ownerPage, revealList, "07-reveal");
 
-    await captureElementShot(ownerPage.locator('[data-complete="true"]'), "08-results");
+    await captureElementShot(ownerPage, ownerPage.locator('[data-complete="true"]'), "08-results");
     await captureElementShot(
+      ownerPage,
       ownerPage.getByRole("region", { name: "People in the room" }),
       "09-people",
     );
@@ -249,7 +254,7 @@ async function captureManual(origin, browser) {
     await sendChatMessage(voterPage, "Should we size the login work first?");
     await openChat(ownerPage);
     await sendChatMessage(ownerPage, "I would say 3.");
-    await captureElementShot(ownerPage.getByRole("region", { name: "Chat" }), "10-chat");
+    await captureElementShot(ownerPage, ownerPage.getByRole("region", { name: "Chat" }), "10-chat");
 
     await ownerPage.getByRole("button", { name: "Delete room", exact: true }).click();
     await ownerPage.getByRole("dialog").waitFor();
