@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import type { ParticipantRole } from "@domain/room";
 import type { Translator } from "@application/i18n";
 import { Button } from "@presentation/ui";
@@ -23,13 +23,14 @@ export function NameGate({
   const trimmed = name.trim();
   const canSubmit = trimmed.length > 0;
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    onJoin(trimmed, role);
-  }
-
   return (
-    <form className="mx-auto flex w-full max-w-105 flex-col gap-snug px-gutter pt-snug pb-room" onSubmit={submit}>
+    <form
+      className="mx-auto flex w-full max-w-105 flex-col gap-snug px-gutter pt-snug pb-room"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onJoin(trimmed, role);
+      }}
+    >
       <h2 className="font-display m-0 text-[1.625rem] leading-tight font-bold tracking-[-0.02em] text-ink">
         {translate("join.heading")}
       </h2>

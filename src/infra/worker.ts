@@ -1,6 +1,4 @@
-import { Room } from "@infra/server";
-
-export { Room };
+export { Room } from "@infra/server";
 
 interface Env {
   ROOMS: DurableObjectNamespace;

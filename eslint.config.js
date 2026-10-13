@@ -19,10 +19,12 @@ const tests = "src/**/*.{test.ts,test.tsx}";
  * the only things it adds here are the underscore prefixed test variables the repository
  * keeps on purpose.
  *
- * `deprecation` names `FormEvent` as deprecated, and @types/react 19.3.0 does not say so.
- * The rule takes no options, so it cannot be scoped away from React, and this repository
- * does not carry inline disables. The genuine half of it was real: the Phosphor icons in
- * this tree were on their deprecated aliases and have been renamed to `Icon` exports.
+ * `deprecation` would flag types the React typings mark with a `@deprecated` tag that
+ * names no replacement, `FormEvent` among them until the forms stopped naming it and
+ * let the handler's parameter be inferred instead. The rule takes no options, so it
+ * cannot be scoped away from those tags, and this repository does not carry inline
+ * disables. The genuine half of it was real: the Phosphor icons in this tree were on
+ * their deprecated aliases and have been renamed to `Icon` exports.
  *
  * `prefer-specific-assertions`, `parameterized-tests` and `no-alphabetical-sort` each ask
  * for a house style this repository does not use: assertions are spelled out, test names

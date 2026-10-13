@@ -48,11 +48,11 @@ export function ConfirmDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-room"
       data-open="true"
     >
-      <div
+      <dialog
         aria-labelledby="confirm-delete-title"
         aria-modal="true"
-        className="w-full max-w-88 rounded-3xl border border-line bg-paper-raised p-room text-center shadow-[0_18px_0_-6px_var(--color-ink)]"
-        role="dialog"
+        className="static w-full max-w-88 rounded-3xl border border-line bg-paper-raised p-room text-center shadow-[0_18px_0_-6px_var(--color-ink)]"
+        open
       >
         <h2
           className="font-display m-0 text-[1.1875rem] leading-tight font-bold text-ink"
@@ -69,7 +69,7 @@ export function ConfirmDialog({
             {acceptLabel}
           </Button>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

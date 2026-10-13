@@ -156,19 +156,14 @@ export function Meter({
 
   return (
     <div
-      aria-label={label}
-      aria-valuemax={100}
-      aria-valuemin={0}
-      aria-valuenow={filled}
       className={`relative h-2.5 w-full overflow-hidden rounded-chip bg-ink/10 ${pending ? "meter-live" : ""}`}
       data-pending={pending}
-      role="progressbar"
     >
-      <div
-        className={`h-full rounded-chip transition-[width] duration-500 ease-out ${
-          tone === "primary" ? "bg-primary" : "bg-secondary"
-        }`}
-        style={{ width: `${filled}%` }}
+      <progress
+        aria-label={label}
+        className={`meter ${tone === "primary" ? "meter--primary" : ""}`}
+        max={100}
+        value={filled}
       />
       {pending && (
         <span aria-hidden="true" className="meter-sweep absolute inset-y-0 w-1/3" />

@@ -49,7 +49,7 @@ function routeScreen({
 }
 
 export function Root() {
-  const [locale, setLocaleState] = useState<Locale>(() =>
+  const [locale, setLocale] = useState<Locale>(() =>
     pickLocale(readStoredLocale(), globalThis.navigator?.language, DEFAULT_LOCALE),
   );
   const [pathname, setPathname] = useState(() => globalThis.location?.pathname ?? "/");
@@ -57,8 +57,8 @@ export function Root() {
   const [notice, setNotice] = useState<string | null>(null);
   const translate = useMemo(() => createTranslator(locale), [locale]);
 
-  const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
+  const changeLocale = useCallback((next: Locale) => {
+    setLocale(next);
     writeStoredLocale(next);
   }, []);
 
@@ -110,7 +110,7 @@ export function Root() {
       errorCode={null}
       locale={locale}
       onLeaveRoom={route.kind === "room" ? () => handleNavigate("/") : null}
-      onLocaleChange={setLocale}
+      onLocaleChange={changeLocale}
       onNavigateHome={() => handleNavigate("/")}
       hasFloatingDock={route.kind === "room"}
       sessionName={route.kind === "room" ? sessionName : null}

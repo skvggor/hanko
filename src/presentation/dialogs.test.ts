@@ -54,7 +54,7 @@ describe("no native dialogs", () => {
       "utf8",
     );
 
-    expect(dialog).toContain("role=\"dialog\"");
+    expect(dialog).toContain("<dialog");
     expect(dialog).toContain("aria-modal");
     expect(dialog).toContain("Escape");
   });

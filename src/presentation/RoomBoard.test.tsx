@@ -346,9 +346,9 @@ describe("RoomBoard", () => {
 describe("RoomBoard live voting meter", () => {
   it("pulses while someone still owes a vote", () => {
     const { container } = renderWithContainer();
-    const meter = container.querySelector("[role='progressbar']");
+    const meter = container.querySelector('[data-pending="true"]');
 
-    expect(meter?.getAttribute("data-pending")).toBe("true");
+    expect(meter).toBeTruthy();
     expect(container.querySelector(".meter-sweep")).not.toBeNull();
   });
 
@@ -360,9 +360,9 @@ describe("RoomBoard live voting meter", () => {
         { id: "p3", name: "Carla", role: "spectator", isOwner: false, isConnected: true, hasVoted: false },
       ],
     });
-    const meter = container.querySelector("[role='progressbar']");
+    const meter = container.querySelector('[data-pending="false"]');
 
-    expect(meter?.getAttribute("data-pending")).toBe("false");
+    expect(meter).toBeTruthy();
     expect(container.querySelector(".meter-sweep")).toBeNull();
   });
 
@@ -376,9 +376,7 @@ describe("RoomBoard live voting meter", () => {
       ],
     });
 
-    expect(
-      container.querySelector("[role='progressbar']")?.getAttribute("aria-valuenow"),
-    ).toBe("50");
+    expect(container.querySelector("progress")?.getAttribute("value")).toBe("50");
   });
 
   it("never counts a watcher as someone still to vote", () => {
@@ -389,14 +387,12 @@ describe("RoomBoard live voting meter", () => {
       ],
     });
 
-    expect(
-      container.querySelector("[role='progressbar']")?.getAttribute("aria-valuenow"),
-    ).toBe("100");
+    expect(container.querySelector("progress")?.getAttribute("value")).toBe("100");
   });
 
   it("hides the meter once the votes are revealed", () => {
     const { container } = renderWithContainer({ isRevealed: true });
-    expect(container.querySelector("[role='progressbar']")).toBeNull();
+    expect(container.querySelector("progress")).toBeNull();
   });
 });
 

@@ -1,9 +1,5 @@
-import { createRoom, CreateRoomError } from "@application/createRoom";
-import { pendingAtLeast } from "@application/minimumPending";
-import { roomPath } from "@application/routing";
 import type { Translator } from "@application/i18n";
-import { Button } from "@presentation/ui";
-import { useState } from "react";
+import { StartRoomAction } from "@presentation/StartRoomAction";
 
 export interface MissingRoomProps {
   translate: Translator;
@@ -17,29 +13,6 @@ export interface MissingRoomProps {
  * like the room was deleted and the reader goes looking for a way to recover it.
  */
 export function MissingRoom({ translate, onNavigate }: Readonly<MissingRoomProps>) {
-  const [pending, setPending] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  async function openRoom() {
-    const startedAt = Date.now();
-
-    setPending(true);
-    setFailed(false);
-
-    try {
-      const roomId = await createRoom();
-      await pendingAtLeast(startedAt);
-      onNavigate(roomPath(roomId));
-    } catch (error) {
-      if (error instanceof CreateRoomError) {
-        setFailed(true);
-        setPending(false);
-        return;
-      }
-      throw error;
-    }
-  }
-
   return (
     <section className="flex w-full flex-col items-center gap-room text-center">
       <h2 className="font-display m-0 text-[1.375rem] leading-tight font-bold tracking-[-0.02em] text-ink">
@@ -49,25 +22,11 @@ export function MissingRoom({ translate, onNavigate }: Readonly<MissingRoomProps
         {translate("room.missingLink")}
       </p>
 
-      <Button
-        busy={pending}
-        className="mt-snug"
-        variant="primary"
-        onClick={() => {
-          void openRoom();
-        }}
-      >
-        {pending ? translate("landing.creating") : translate("landing.create")}
-      </Button>
-
-      {failed && (
-        <p
-          className="m-0 rounded-2xl bg-primary/10 px-snug py-tight text-[0.8125rem] font-semibold text-primary"
-          role="alert"
-        >
-          {translate("landing.failed")}
-        </p>
-      )}
+      <StartRoomAction
+        buttonClassName="mt-snug"
+        onNavigate={onNavigate}
+        translate={translate}
+      />
     </section>
   );
 }

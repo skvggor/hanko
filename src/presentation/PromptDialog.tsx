@@ -67,11 +67,11 @@ export function PromptDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-gutter"
       data-open="true"
     >
-      <div
+      <dialog
         aria-labelledby="prompt-dialog-title"
         aria-modal="true"
-        className="flex w-full max-w-88 flex-col gap-snug rounded-3xl border border-line bg-paper-raised p-room shadow-[0_18px_0_-6px_var(--color-ink)]"
-        role="dialog"
+        className="static flex w-full max-w-88 flex-col gap-snug rounded-3xl border border-line bg-paper-raised p-room shadow-[0_18px_0_-6px_var(--color-ink)]"
+        open
       >
         <h2
           className="font-display m-0 text-[1.1875rem] leading-tight font-bold text-ink"
@@ -118,7 +118,7 @@ export function PromptDialog({
             {acceptLabel}
           </Button>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

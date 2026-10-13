@@ -27,7 +27,7 @@ export function ShareSnippet({
 
   const host = slashIndex === -1 ? withoutScheme : withoutScheme.slice(0, slashIndex);
   const segments = slashIndex === -1 ? [] : withoutScheme.slice(slashIndex + 1).split("/");
-  const roomId = segments[segments.length - 1] ?? "";
+  const roomId = segments.at(-1) ?? "";
 
   return (
     <div className="flex min-w-0 flex-col items-start gap-hair">

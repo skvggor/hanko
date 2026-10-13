@@ -24,9 +24,10 @@ const KEEP_ALIVE = process.env.SONAR_KEEP_ALIVE === "1";
 /**
  * How many code smells the whole repository is allowed to carry. This is the line that
  * decides whether the gate blocks a change, so it is a single named number rather than
- * something buried in a condition list.
+ * something buried in a condition list. It sits at zero: the ratchet only turns one way,
+ * and raising it to let a change through is the one edit that defeats the gate.
  */
-const SMELL_BUDGET = 13;
+const SMELL_BUDGET = 0;
 
 /**
  * The built-in gate carries no condition on code smells at all, so a run goes green with
@@ -49,7 +50,7 @@ const GATE_CONDITIONS = [
   { metric: "bugs", op: "GT", error: "0" },
   { metric: "vulnerabilities", op: "GT", error: "0" },
   { metric: "coverage", op: "LT", error: "80" },
-  { metric: "duplicated_lines_density", op: "GT", error: "3" },
+  { metric: "duplicated_lines_density", op: "GT", error: "0" },
   { metric: "code_smells", op: "GT", error: String(SMELL_BUDGET) },
 ];
 
@@ -83,10 +84,10 @@ async function call(path) {
  * is expressed over new code, so every one of them would sit here looking like a gate and
  * evaluating nothing. They are deleted and replaced with the whole-repository equivalents.
  *
- * The smell budget is a ratchet rather than a target. Zero is the goal, but the codebase
- * carries smells that are argued rather than accidental, so the budget sits where the
- * repository actually is and moving it is a deliberate edit that shows up in the diff
- * next to the reason.
+ * Every finding the analysis can make has a condition of its own and every threshold is
+ * zero, so nothing goes past a push: a bug, a vulnerability, a smell or a duplicated
+ * block each fail the gate on their own. Moving a threshold is a deliberate edit that
+ * shows up in the diff next to the reason.
  */
 async function installGate() {
   await post("/api/qualitygates/create", { name: GATE_NAME });
@@ -197,6 +198,20 @@ async function waitUntilReady() {
  * here instead, and it is worth nothing by the time the script returns, which is why it
  * can be handed to the scanner on the command line without ceremony.
  */
+/**
+ * The scanner is meant to leave with a failing exit code when the gate reproves, and it
+ * does today. That is not something to stake a push on across versions of a tool fetched
+ * by npx, so the verdict is read back from the instance as well. A gate that cannot
+ * express its verdict in the exit code is a gate that quietly stops being one.
+ */
+async function assertGatePassed() {
+  const status = await call(`/api/qualitygates/project_status?projectKey=hanko`);
+
+  if (status.projectStatus?.status !== "OK") {
+    throw new Error(`the quality gate said ${status.projectStatus?.status ?? "nothing"}`);
+  }
+}
+
 async function generateToken() {
   const response = await fetch(`${HOST_URL}/api/user_tokens/generate`, {
     method: "POST",
@@ -290,9 +305,8 @@ async function report() {
   }
 
   console.log(
-    "\nThe gate was SonarQube's built-in default, whose conditions are not readable\n" +
-      "through the API. A gate that passes while issues are open means those issues are\n" +
-      "not among the conditions it counts, not that they do not exist.",
+    "\nThe verdict is the exit code. The gate counts over the whole repository and every\n" +
+      "threshold is zero, so anything listed above is something the push just refused.",
   );
 }
 
@@ -342,6 +356,7 @@ async function main() {
       `-Dsonar.host.url=${HOST_URL}`,
       `-Dsonar.token=${token}`,
     ]);
+    await assertGatePassed();
   } catch (error) {
     failure = error;
   }

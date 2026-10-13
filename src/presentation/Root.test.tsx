@@ -342,9 +342,8 @@ describe("Root after a room is deleted", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "simulate deletion" }));
 
-    expect((await screen.findByText("This room was deleted")).getAttribute("role")).toBe(
-      "status",
-    );
+    const notice = await screen.findByRole("status");
+    expect(notice.textContent).toBe("This room was deleted");
   });
 
   it("offers a way to start a fresh room from where it lands", async () => {

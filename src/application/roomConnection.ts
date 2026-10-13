@@ -23,12 +23,12 @@ export function createDefaultSocketFactory(): SocketFactory {
 
 export class RoomConnection {
   #socket: WebSocket | null = null;
-  #stateListeners = new Set<StateListener>();
-  #errorListeners = new Set<ErrorListener>();
-  #deletedListeners = new Set<DeletedListener>();
-  #chatListeners = new Set<ChatListener>();
-  #removedListeners = new Set<RemovedListener>();
-  #connectionListeners = new Set<ConnectionListener>();
+  readonly #stateListeners = new Set<StateListener>();
+  readonly #errorListeners = new Set<ErrorListener>();
+  readonly #deletedListeners = new Set<DeletedListener>();
+  readonly #chatListeners = new Set<ChatListener>();
+  readonly #removedListeners = new Set<RemovedListener>();
+  readonly #connectionListeners = new Set<ConnectionListener>();
 
   #participantId: string | null = null;
   #token: string | null = null;

@@ -63,7 +63,7 @@ export function RevealSheet({ entries, scale, translate }: Readonly<RevealSheetP
         <div className="rise-in flex flex-wrap items-end justify-between gap-x-stack gap-y-tight">
           <div className="flex items-end gap-snug">
             <span className="font-display text-[3.25rem] leading-[0.85] font-bold text-primary">
-              {tally.average === null ? "–" : tally.average}
+              {tally.average ?? "–"}
             </span>
             <span className="pb-1 text-[0.6875rem] font-semibold tracking-[0.16em] text-ink-dim uppercase">
               {translate("result.average")}

@@ -1,10 +1,6 @@
-import { useState } from "react";
-import { CreateRoomError, createRoom } from "@application/createRoom";
-import { pendingAtLeast } from "@application/minimumPending";
-import { roomPath } from "@application/routing";
 import type { Translator } from "@application/i18n";
+import { StartRoomAction } from "@presentation/StartRoomAction";
 import { BrandMark } from "@presentation/Signature";
-import { Button } from "@presentation/ui";
 
 export interface LandingProps {
   translate: Translator;
@@ -13,57 +9,20 @@ export interface LandingProps {
 }
 
 export function Landing({ translate, onNavigate, notice = null }: Readonly<LandingProps>) {
-  const [pending, setPending] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  async function openRoom() {
-    const startedAt = Date.now();
-
-    setPending(true);
-    setFailed(false);
-
-    try {
-      const roomId = await createRoom();
-      await pendingAtLeast(startedAt);
-      onNavigate(roomPath(roomId));
-    } catch (error) {
-      if (error instanceof CreateRoomError) {
-        setFailed(true);
-        setPending(false);
-        return;
-      }
-      throw error;
-    }
-  }
-
   return (
     <section className="mx-auto flex w-full max-w-115 flex-col items-center gap-stack px-gutter pt-room text-center">
       <BrandMark size="hero" translate={translate} />
 
-      <Button
-        busy={pending}
-        className="min-h-13 px-gutter text-[0.9375rem]"
-        variant="primary"
-        onClick={() => {
-          void openRoom();
-        }}
-      >
-        {pending ? translate("landing.creating") : translate("landing.create")}
-      </Button>
+      <StartRoomAction
+        buttonClassName="min-h-13 px-gutter text-[0.9375rem]"
+        onNavigate={onNavigate}
+        translate={translate}
+      />
 
       {notice !== null && (
-        <p
-          className="w-full rounded-2xl border border-line bg-paper-raised px-snug py-tight text-[0.8125rem] font-semibold text-ink-dim"
-          role="status"
-        >
+        <output className="w-full rounded-2xl border border-line bg-paper-raised px-snug py-tight text-[0.8125rem] font-semibold text-ink-dim">
           {translate(`errors.${notice}`)}
-        </p>
-      )}
-
-      {failed && (
-        <p className="m-0 rounded-2xl bg-primary/10 px-snug py-tight text-[0.8125rem] font-semibold text-primary" role="alert">
-          {translate("landing.failed")}
-        </p>
+        </output>
       )}
 
       <ol className="mt-1 flex list-none flex-col gap-tight border-t border-line pt-room text-left text-[0.8125rem] text-ink-dim">

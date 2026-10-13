@@ -245,37 +245,34 @@ describe("Meter", () => {
     expect(screen.getByRole("progressbar", { name: "Half the room has voted" })).toBeTruthy();
   });
 
-  it("reports the rounded percentage through aria-valuenow", () => {
+  it("is a native progress element", () => {
     render(<Meter value={0.5} label="voted" />);
-    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("50");
+    expect(screen.getByRole("progressbar").tagName).toBe("PROGRESS");
+  });
+
+  it("reports the rounded percentage as its value", () => {
+    render(<Meter value={0.5} label="voted" />);
+    expect(screen.getByRole("progressbar").getAttribute("value")).toBe("50");
   });
 
   it("spans the full scale", () => {
     render(<Meter value={0.5} label="voted" />);
-    const bar = screen.getByRole("progressbar");
-    expect(bar.getAttribute("aria-valuemin")).toBe("0");
-    expect(bar.getAttribute("aria-valuemax")).toBe("100");
-  });
-
-  it("sizes the fill to the value", () => {
-    render(<Meter value={0.25} label="voted" />);
-    const fill = screen.getByRole("progressbar").firstElementChild;
-    expect(fill?.getAttribute("style")).toContain("width: 25%");
+    expect(screen.getByRole("progressbar").getAttribute("max")).toBe("100");
   });
 
   it("rounds a value that does not land on a whole percent", () => {
     render(<Meter value={1 / 3} label="voted" />);
-    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("33");
+    expect(screen.getByRole("progressbar").getAttribute("value")).toBe("33");
   });
 
   it("clamps a value above one, which would otherwise overflow the track", () => {
     render(<Meter value={1.5} label="voted" />);
-    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("100");
+    expect(screen.getByRole("progressbar").getAttribute("value")).toBe("100");
   });
 
   it("clamps a negative value to an empty track", () => {
     render(<Meter value={-0.5} label="voted" />);
-    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("0");
+    expect(screen.getByRole("progressbar").getAttribute("value")).toBe("0");
   });
 
   it("is settled by default, so it does not pulse", () => {
@@ -302,15 +299,13 @@ describe("Meter", () => {
 
   it("fills with the secondary tone by default", () => {
     render(<Meter value={0.5} label="voted" />);
-    expect(screen.getByRole("progressbar").firstElementChild?.className).toContain(
-      "bg-secondary",
-    );
+    const bar = screen.getByRole("progressbar");
+    expect(bar.className).toContain("meter");
+    expect(bar.className).not.toContain("meter--primary");
   });
 
   it("fills with the primary tone on request", () => {
     render(<Meter value={0.5} label="voted" tone="primary" />);
-    expect(screen.getByRole("progressbar").firstElementChild?.className).toContain(
-      "bg-primary",
-    );
+    expect(screen.getByRole("progressbar").className).toContain("meter--primary");
   });
 });

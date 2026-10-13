@@ -292,7 +292,7 @@ export class Room {
   ): Promise<AuthorizedActor | null> {
     const identity = this.#identity(socket);
 
-    if (identity === null || identity.token === null) {
+    if (identity?.token == null) {
       this.#fail(socket, ERROR_CODES.unauthorized);
       return null;
     }
@@ -483,7 +483,7 @@ export class Room {
     const identity = this.#identity(socket);
 
 
-    if (identity === null || identity.token === null) {
+    if (identity?.token == null) {
       return;
     }
 

@@ -222,8 +222,8 @@ are refused by `presentation/dialogs.test.ts`, which also requires the app to ca
 own replacement.
 
 Accessibility is a requirement, not polish. Every icon gets `aria-hidden`, every icon only
-button an `aria-label`, errors `role="alert"`, chat `role="log"`, the meter
-`role="progressbar"` with `aria-valuenow`, toggles `aria-pressed`, screen reader only text
+button an `aria-label`, errors `role="alert"`, chat `role="log"`, the meter a native
+`<progress>`, toggles `aria-pressed`, screen reader only text
 the `visually-hidden` utility. Motion is gated on `prefers-reduced-motion`, which `Shell`
 reflects onto `data-reduced-motion`. Fonts are self hosted with hand written `@font-face`
 blocks declaring only the `latin` and `latin-ext` subsets.
@@ -277,9 +277,11 @@ dashboard to forget about. The cost is that a gate on a database with no history
 "new code" period, so every condition applies to the whole repository. A fresh
 implementation therefore has to meet the bar of the entire codebase.
 
-The gate counts code smells against a budget declared in `scripts/sonar-scan.mjs`. It is a
-ratchet, not a target: lower it when the number comes down, and a lowering is a deliberate
-edit that shows up in the diff next to the reason. Raising it to make a run pass defeats the
+Every finding blocks the push: bugs, vulnerabilities, code smells and duplicated lines
+each carry a condition of their own, and the thresholds in `scripts/sonar-scan.mjs` sit at
+zero. A push with anything left to fix cannot happen, which is the promise the gate
+exists to keep. A threshold only ever moves down, and a move is a deliberate edit that
+shows up in the diff next to the reason. Raising one to make a run pass defeats the
 gate, and the run passing is not the point of it.
 
 Test names are behavioural sentences in the present tense: `"refuses a full room"`,
