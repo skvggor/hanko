@@ -6,8 +6,9 @@ import {
   Chip,
   Label,
   Meter,
-  OwnerBadge,
+  OwnerName,
   Panel,
+  Tooltip,
 } from "@presentation/ui";
 
 describe("Button", () => {
@@ -215,27 +216,66 @@ describe("Chip", () => {
     render(<Chip>3</Chip>);
     expect(screen.getByText("3").hasAttribute("title")).toBe(false);
   });
+
+  it("keeps its label on one line and never squashes", () => {
+    render(<Chip>Waiting for the owner to reveal</Chip>);
+    const chip = screen.getByText("Waiting for the owner to reveal");
+
+    expect(chip.className).toContain("whitespace-nowrap");
+    expect(chip.className).toContain("shrink-0");
+  });
 });
 
-describe("OwnerBadge", () => {
-  it("shows the label it is given", () => {
-    render(<OwnerBadge label="Owner" />);
+describe("OwnerName", () => {
+  it("shows the name it is given", () => {
+    render(<OwnerName name="Ana" roleLabel="Owner" stamp={vi.fn()} />);
+    expect(screen.getByText("Ana")).toBeTruthy();
+  });
+
+  it("says the role in words", () => {
+    render(<OwnerName name="Ana" roleLabel="Owner" stamp={vi.fn()} />);
     expect(screen.getByText("Owner")).toBeTruthy();
   });
 
   it("exposes the owner role to tests and to CSS", () => {
-    const { container } = render(<OwnerBadge label="Owner" />);
-    expect(container.querySelector('[data-role="owner"]')).toBeTruthy();
+    render(<OwnerName name="Ana" roleLabel="Owner" stamp={vi.fn()} />);
+    expect(document.querySelector('[data-role="owner"]')).toBeTruthy();
   });
 
-  it("hides the disc from assistive tech, since the label already says it", () => {
-    const { container } = render(<OwnerBadge label="Owner" />);
-    expect(container.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+  it("wears the gold of the owner", () => {
+    render(<OwnerName name="Ana" roleLabel="Owner" stamp={vi.fn()} />);
+    expect(document.querySelector('[data-role="owner"]')?.className).toContain(
+      "accent-deep",
+    );
   });
 
-  it("paints two discs so ownership reads as a shape", () => {
-    const { container } = render(<OwnerBadge label="Owner" />);
-    expect(container.querySelectorAll("svg circle")).toHaveLength(2);
+  it("glints in the light without saying so to assistive tech", () => {
+    render(<OwnerName name="Ana" roleLabel="Owner" stamp={vi.fn()} />);
+    const glint = document.querySelector(".gold-glint");
+
+    expect(glint).toBeTruthy();
+    expect(glint?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("keeps the glint inside the name", () => {
+    render(<OwnerName name="Ana" roleLabel="Owner" stamp={vi.fn()} />);
+    const box = document.querySelector(".gold-glint")?.parentElement;
+
+    expect(box?.className).toContain("truncate");
+    expect(box?.className).toContain("block");
+  });
+
+  it("settles the bloom away when nothing moves it", () => {
+    render(<OwnerName name="Ana" roleLabel="Owner" stamp={vi.fn()} />);
+    const bloom = document.querySelector('[data-role="owner"] span[aria-hidden="true"]');
+
+    expect(bloom?.className).toContain("opacity-0");
+  });
+
+  it("stamps the name when it appears", () => {
+    const stamp = vi.fn();
+    render(<OwnerName name="Ana" roleLabel="Owner" stamp={stamp} />);
+    expect(stamp).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -307,5 +347,49 @@ describe("Meter", () => {
   it("fills with the primary tone on request", () => {
     render(<Meter value={0.5} label="voted" tone="primary" />);
     expect(screen.getByRole("progressbar").className).toContain("meter--primary");
+  });
+});
+
+describe("Tooltip", () => {
+  function renderTip() {
+    render(
+      <>
+        <Tooltip label="Remove">
+          <button type="button">go</button>
+        </Tooltip>
+        <button type="button">after</button>
+      </>,
+    );
+  }
+
+  it("says nothing until it is asked", () => {
+    renderTip();
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("reveals the label when the pointer rests on it", async () => {
+    renderTip();
+    await userEvent.hover(screen.getByRole("button", { name: "go" }));
+    expect(screen.getByRole("tooltip").textContent).toBe("Remove");
+  });
+
+  it("takes the label away when the pointer leaves", async () => {
+    renderTip();
+    await userEvent.hover(screen.getByRole("button", { name: "go" }));
+    await userEvent.unhover(screen.getByRole("button", { name: "go" }));
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("reveals the label when the keyboard reaches it", async () => {
+    renderTip();
+    await userEvent.tab();
+    expect(screen.getByRole("tooltip").textContent).toBe("Remove");
+  });
+
+  it("takes the label away when the focus moves on", async () => {
+    renderTip();
+    await userEvent.tab();
+    await userEvent.tab();
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 });

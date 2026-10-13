@@ -16,7 +16,7 @@ function renderSnippet(overrides: Partial<Parameters<typeof ShareSnippet>[0]> = 
       copyLabel="Copy link"
       label="share"
       onCopy={onCopy}
-      url="https://hanko.skvggor.workers.dev/room/room-1"
+      roomId="room-1"
       {...overrides}
     />,
   );
@@ -24,26 +24,9 @@ function renderSnippet(overrides: Partial<Parameters<typeof ShareSnippet>[0]> = 
 }
 
 describe("ShareSnippet", () => {
-  it("drops the scheme so the host reads as the subject", () => {
+  it("shows the room id in the chip", () => {
     renderSnippet();
-    expect(screen.getByText("hanko.skvggor.workers.dev")).toBeTruthy();
-  });
-
-  it("never doubles the slash", () => {
-    renderSnippet();
-    expect(screen.getByText("/room/")).toBeTruthy();
-    expect(screen.getByText("room-1")).toBeTruthy();
-    expect(screen.queryByText("//")).toBeNull();
-  });
-
-  it("renders the whole link with a single separator", () => {
-    renderSnippet();
-    expect(chip().textContent).toContain("hanko.skvggor.workers.dev/room/room-1");
-  });
-
-  it("does not repeat the scheme anywhere", () => {
-    renderSnippet();
-    expect(screen.queryByText(/https:\/\//)).toBeNull();
+    expect(chip().textContent).toContain("room-1");
   });
 
   it("labels the snippet", () => {
@@ -57,6 +40,12 @@ describe("ShareSnippet", () => {
     await userEvent.click(chip());
 
     expect(onCopy).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the address around the id", () => {
+    renderSnippet();
+    expect(chip().textContent).not.toContain("hanko.skvggor.workers.dev");
+    expect(chip().textContent).not.toContain("/room/");
   });
 
   it("is one chip, not a field plus a button", () => {
@@ -84,15 +73,6 @@ describe("ShareSnippet", () => {
     renderSnippet({ copied: true });
     expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
   });
-
-  it("handles a url with no path", () => {
-    expect(() => renderSnippet({ url: "https://hanko.skvggor.workers.dev" })).not.toThrow();
-    expect(screen.getByText("hanko.skvggor.workers.dev")).toBeTruthy();
-  });
-
-  it("survives an empty url", () => {
-    expect(() => renderSnippet({ url: "" })).not.toThrow();
-  });
 });
 
 /*
@@ -113,12 +93,21 @@ describe("ShareSnippet copy feedback", () => {
 
   /* `hover:bg-ink` in a shared list ties with `hover:bg-accent`, and the pointer is
      still resting on the chip it just clicked. */
+  it("wears the paper rather than a slab of colour", () => {
+    renderSnippet();
+    const classes = chip().className;
+
+    expect(classes).toContain("bg-paper");
+    expect(classes).not.toContain("bg-secondary");
+    expect(classes).not.toContain("bg-accent");
+  });
+
   it("keeps the copied palette from colliding with the resting one", () => {
     renderSnippet({ copied: true });
     const classes = chip("Copied").className;
 
     expect(classes).toContain("bg-accent");
-    expect(classes).not.toContain("bg-secondary");
+    expect(classes).not.toContain("bg-paper");
     expect(classes).not.toContain("hover:bg-ink");
   });
 

@@ -144,3 +144,54 @@ export const morphSeal: SealMorpher = (morph) => {
 
   return () => media.revert();
 };
+
+export interface NameStamp {
+  bloom: HTMLElement | null;
+  name: HTMLElement;
+}
+
+export type NameStamper = (stamp: NameStamp) => (() => void) | void;
+
+/**
+ * The owner's name lands the way a seal lands: pressed onto the paper with a little
+ * give, while a wash of gold blooms behind it and settles away. Reduced motion gets
+ * the same picture with none of the travel, told instantly like the morph is.
+ */
+export const stampName: NameStamper = ({ bloom, name }) => {
+  // Shell guards the same query the same way; it is absent under jsdom.
+  if (typeof globalThis.matchMedia !== "function") return;
+
+  const media = gsap.matchMedia();
+
+  media.add("(prefers-reduced-motion: no-preference)", () => {
+    const timeline = gsap
+      .timeline()
+      .fromTo(
+        name,
+        { autoAlpha: 0, rotate: -5, scale: 1.14 },
+        {
+          autoAlpha: 1,
+          rotate: 0,
+          scale: 1,
+          duration: 0.52,
+          ease: "back.out(2.2)",
+        },
+        0,
+      );
+
+    if (bloom !== null) {
+      timeline.fromTo(
+        bloom,
+        { autoAlpha: 0.6, scale: 1.45 },
+        { autoAlpha: 0, scale: 1, duration: 0.7, ease: "power2.out" },
+        0,
+      );
+    }
+
+    return () => {
+      timeline.kill();
+    };
+  });
+
+  return () => media.revert();
+};

@@ -56,7 +56,7 @@ function renderWithContainer(
     <RoomBoard
       copied={false}
       myParticipantId="p1"
-      shareUrl="https://hanko.skvggor.workers.dev/room/room-1"
+      roomId="room-1"
       state={state(overrides)}
       translate={translate}
       {...handlers}
@@ -86,7 +86,7 @@ function renderBoard(overrides: Partial<PublicRoomState> = {}, props: Partial<Ro
     <RoomBoard
       copied={false}
       myParticipantId="p1"
-      shareUrl="https://hanko.skvggor.workers.dev/room/room-1"
+      roomId="room-1"
       state={state(overrides)}
       translate={translate}
       {...handlers}
@@ -235,7 +235,10 @@ describe("RoomBoard", () => {
 
   it("calls onSetRole to make somebody watch", async () => {
     const handlers = renderBoard();
-    await userEvent.click(screen.getAllByRole("button", { name: "Make watcher" })[0]!);
+    const row = screen.getByText("Bruno", { exact: true }).parentElement;
+
+    await userEvent.click(within(row!).getByRole("button", { name: "Make watcher" }));
+
     expect(handlers.onSetRole).toHaveBeenCalledWith("p2", "spectator");
   });
 
@@ -275,12 +278,12 @@ describe("RoomBoard", () => {
     );
   });
 
-  it("shows the room link as one clean snippet", () => {
+  it("shows the room id in the chip", () => {
     renderWithContainer();
+    const chip = screen.getByRole("button", { name: "Copy link" });
 
-    expect(screen.getByRole("button", { name: "Copy link" }).textContent).toContain(
-      "hanko.skvggor.workers.dev/room/room-1",
-    );
+    expect(chip.textContent).toContain("room-1");
+    expect(chip.textContent).not.toContain("hanko.skvggor.workers.dev");
   });
 
   it("confirms a copied link on the chip", () => {
@@ -312,9 +315,129 @@ describe("RoomBoard", () => {
     expect(wrapper?.[1]).not.toMatch(/max-w-|flex-1/);
   });
 
-  it("does not show owner actions on my own row", () => {
+  it("keeps the remove action off my own row", () => {
     renderBoard();
     expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(2);
+  });
+
+  it("lets the owner watch instead of voting", () => {
+    renderBoard({
+      participants: [
+        { id: "p1", name: "Ana", role: "voter", isOwner: true, isConnected: true, hasVoted: false },
+      ],
+    });
+
+    expect(screen.getByRole("button", { name: "Make watcher" })).toBeTruthy();
+  });
+
+  it("sits the actions beside the name", () => {
+    renderBoard();
+    const rename = screen.getByRole("button", { name: "Change name" });
+
+    expect(
+      rename.compareDocumentPosition(screen.getByText("Ana", { exact: true })),
+    ).toBe(Node.DOCUMENT_POSITION_PRECEDING);
+  });
+
+  it("says which row is you", () => {
+    renderBoard();
+    expect(screen.getAllByText("You")).toHaveLength(1);
+  });
+
+  it("lines the chips up with the name instead of centring the boxes", () => {
+    renderBoard();
+    const row = screen.getByText("Bruno", { exact: true }).parentElement;
+
+    expect(row?.className).toContain("items-baseline");
+    expect(row?.querySelector(".self-center")).toBeTruthy();
+  });
+
+  it("puts the owner at the top of the list", () => {
+    renderBoard({
+      participants: [
+        { id: "p2", name: "Bruno", role: "voter", isOwner: false, isConnected: true, hasVoted: true },
+        { id: "p1", name: "Ana", role: "voter", isOwner: true, isConnected: true, hasVoted: false },
+      ],
+    });
+    const ana = screen.getByText("Ana", { exact: true });
+
+    expect(
+      ana.compareDocumentPosition(screen.getByText("Bruno", { exact: true })),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("puts you right below the owner", () => {
+    renderBoard(
+      {
+        participants: [
+          { id: "p2", name: "Bruno", role: "voter", isOwner: false, isConnected: true, hasVoted: true },
+          { id: "p3", name: "Carla", role: "voter", isOwner: false, isConnected: true, hasVoted: false },
+          { id: "p1", name: "Ana", role: "voter", isOwner: true, isConnected: true, hasVoted: false },
+        ],
+      },
+      { myParticipantId: "p3" },
+    );
+    const carla = screen.getByText("Carla", { exact: true });
+
+    expect(
+      carla.compareDocumentPosition(screen.getByText("Bruno", { exact: true })),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("gilds the name of the owner", () => {
+    renderBoard();
+    const owner = document.querySelector('[data-role="owner"]');
+
+    expect(owner?.className).toContain("accent-deep");
+  });
+
+  it("gives the crown that hands the room over the same gold", () => {
+    renderBoard({
+      participants: [
+        { id: "p1", name: "Ana", role: "voter", isOwner: true, isConnected: true, hasVoted: false },
+        { id: "p2", name: "Bruno", role: "voter", isOwner: false, isConnected: true, hasVoted: true },
+      ],
+    });
+    const crown = screen.getByRole("button", { name: "Make owner" });
+    const holder = crown.querySelector(".gold-glint")?.parentElement;
+
+    expect(holder?.className).toContain("accent-deep");
+    expect(holder?.className).toContain("overflow-hidden");
+  });
+
+  it("carries the action names on the buttons instead of inside them", () => {
+    renderBoard();
+    const rename = screen.getByRole("button", { name: "Change name" });
+
+    expect(rename.textContent?.trim()).toBe("");
+  });
+
+  it("names what an icon does when the pointer rests on it", async () => {
+    renderBoard();
+    await userEvent.hover(screen.getByRole("button", { name: "Change name" }));
+
+    expect(screen.getByRole("tooltip").textContent).toBe("Change name");
+  });
+
+  it("truncates a long name instead of wrapping the actions to a second line", () => {
+    const longName = "Ana Maria de Oliveira e Silva dos Santos";
+    renderBoard({
+      participants: [
+        {
+          id: "p1",
+          name: longName,
+          role: "voter",
+          isOwner: true,
+          isConnected: true,
+          hasVoted: false,
+        },
+      ],
+    });
+
+    expect(screen.getByText(longName, { exact: true }).className).toContain("truncate");
+    expect(
+      screen.getByRole("button", { name: "Change name" }).closest(".shrink-0"),
+    ).toBeTruthy();
   });
 
   it("renders in portuguese", () => {
@@ -333,7 +456,7 @@ describe("RoomBoard", () => {
         onSetRole={vi.fn()}
         onSetRoomName={vi.fn()}
         onTransferOwnership={vi.fn()}
-        shareUrl="https://hanko.app/room/room-1"
+        roomId="room-1"
         state={state()}
         translate={createTranslator("pt-BR")}
       />,
@@ -507,7 +630,7 @@ describe("RoomBoard participant rows", () => {
         onSetRole={vi.fn()}
         onSetRoomName={vi.fn()}
         onTransferOwnership={vi.fn()}
-        shareUrl="https://example.test/room/abc12345"
+        roomId="abc12345"
         state={state({ participants })}
         translate={translate}
       />,
@@ -517,7 +640,7 @@ describe("RoomBoard participant rows", () => {
   function rowOf(container: Element, name: string): Element {
     const row = [...container.querySelectorAll("div")].find((element) =>
       element.className.includes("border-b border-line") &&
-      element.textContent?.startsWith(name),
+      element.textContent?.includes(name),
     );
     if (!row) throw new Error(`no row for ${name}`);
     return row;
@@ -580,7 +703,7 @@ describe("RoomBoard rename", () => {
         onSetRole={vi.fn()}
         onSetRoomName={vi.fn()}
         onTransferOwnership={vi.fn()}
-        shareUrl="https://example.test/room/abcd2345"
+        roomId="abcd2345"
         state={state({
           participants: [
             {
@@ -632,7 +755,7 @@ describe("RoomBoard rename", () => {
         onSetRole={vi.fn()}
         onSetRoomName={vi.fn()}
         onTransferOwnership={vi.fn()}
-        shareUrl="https://example.test/room/abcd2345"
+        roomId="abcd2345"
         state={state({
           participants: [
             {
@@ -674,7 +797,7 @@ describe("RoomBoard rename", () => {
         onSetRole={vi.fn()}
         onSetRoomName={vi.fn()}
         onTransferOwnership={vi.fn()}
-        shareUrl="https://example.test/room/abcd2345"
+        roomId="abcd2345"
         state={state({
           participants: [
             {

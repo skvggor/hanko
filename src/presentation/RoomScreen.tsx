@@ -269,7 +269,7 @@ export function RoomScreen({
           onSetRoomName={handleSetRoomName}
           onTransferOwnership={handleTransferOwnership}
           deleteButtonRef={deleteTrigger}
-          shareUrl={shareUrl}
+          roomId={roomId}
           state={state}
           translate={translate}
         />

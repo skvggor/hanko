@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { morphSeal, type SealMorph } from "@presentation/sealMotion";
+import { morphSeal, stampName, type NameStamp, type SealMorph } from "@presentation/sealMotion";
 
 interface RecordedTween {
   method: "fromTo" | "to" | "set";
@@ -184,5 +184,72 @@ describe("morphSeal", () => {
     morphSeal(aPress({ motion: "release" }));
 
     expect(colourTweens(harness.read().tweens)[0]?.to.backgroundColor).toBe("transparent");
+  });
+});
+
+function aStamp(overrides: Partial<NameStamp> = {}): NameStamp {
+  return {
+    bloom: document.createElement("span"),
+    name: document.createElement("span"),
+    ...overrides,
+  };
+}
+
+describe("stampName", () => {
+  beforeEach(() => {
+    harness.reset();
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("presses the name onto the row", () => {
+    const stamp = aStamp();
+
+    stampName(stamp);
+
+    const tween = harness.read().tweens.find((entry) => entry.target === stamp.name);
+    expect(tween?.method).toBe("fromTo");
+    expect(tween?.to.autoAlpha).toBe(1);
+  });
+
+  it("bleeds the gold out behind the name and settles it away", () => {
+    const stamp = aStamp();
+
+    stampName(stamp);
+
+    const tween = harness.read().tweens.find((entry) => entry.target === stamp.bloom);
+    expect(tween?.to.autoAlpha).toBe(0);
+  });
+
+  it("still stamps a name that has no bloom to bleed", () => {
+    expect(() => stampName(aStamp({ bloom: null }))).not.toThrow();
+    expect(harness.read().tweens).toHaveLength(1);
+  });
+
+  it("says nothing at all to someone who asks for less motion", () => {
+    harness.prefersReduced();
+
+    stampName(aStamp());
+
+    expect(harness.read().tweens).toHaveLength(0);
+  });
+
+  it("settles without travelling when there is no motion query to read", () => {
+    vi.stubGlobal("matchMedia", undefined);
+
+    expect(() => stampName(aStamp())).not.toThrow();
+    expect(harness.read().tweens).toHaveLength(0);
+    expect(harness.read().reverted).toBe(0);
+  });
+
+  it("lets the stamp be abandoned before it lands", () => {
+    const abandon = stampName(aStamp());
+
+    abandon?.();
+
+    expect(harness.read().reverted).toBe(1);
   });
 });

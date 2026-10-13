@@ -1,5 +1,6 @@
-import type { ReactNode, Ref } from "react";
+import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { CircleNotchIcon } from "@phosphor-icons/react";
+import { stampName, type NameStamper } from "@presentation/sealMotion";
 
 export function Button({
   busy = false,
@@ -109,7 +110,7 @@ export function Chip({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-chip px-tight py-0.5 text-[0.625rem] font-semibold tracking-[0.06em] uppercase ${tones[tone]}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-chip px-tight py-0.5 text-[0.625rem] font-semibold tracking-[0.06em] whitespace-nowrap uppercase ${tones[tone]}`}
       title={title}
     >
       {children}
@@ -121,17 +122,68 @@ export function Chip({
  * The owner marker: a filled disc with a notch, echoing the wordmark so ownership
  * reads as a shape before anyone reads the word.
  */
-export function OwnerBadge({ label }: Readonly<{ label: string }>) {
+export interface OwnerNameProps {
+  name: string;
+  roleLabel: string;
+  stamp?: NameStamper;
+}
+
+/**
+ * A pale streak that crosses gold every so often, the light catching the foil. The
+ * gradient belongs to the streak rather than to what it crosses, so the mark beneath
+ * stays one colour and stays readable.
+ */
+export function GoldGlint() {
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-chip bg-ink py-0.5 pr-tight pl-1.5 text-[0.625rem] font-semibold tracking-[0.06em] text-paper uppercase"
+      aria-hidden="true"
+      className="gold-glint absolute inset-y-0 left-0 w-1/3"
+    />
+  );
+}
+
+/**
+ * Ownership is said by the name itself: the owner's name is written in gold and lands
+ * on the row the way a seal lands, with the role kept beside it in words so colour is
+ * never the only thing saying who owns the room.
+ */
+export function OwnerName({
+  name,
+  roleLabel,
+  stamp = stampName,
+}: Readonly<OwnerNameProps>) {
+  const nameRef = useRef<HTMLSpanElement>(null);
+  const bloomRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const nameElement = nameRef.current;
+    if (nameElement === null) return;
+
+    return stamp({ bloom: bloomRef.current, name: nameElement });
+  }, [stamp]);
+
+  return (
+    <span
+      className="relative inline-flex min-w-0 items-baseline gap-tight text-accent-deep"
       data-role="owner"
     >
-      <svg aria-hidden="true" className="h-2.5 w-2.5" viewBox="0 0 10 10">
-        <circle cx="5" cy="5" fill="var(--color-accent)" r="5" />
-        <circle cx="5" cy="5" fill="var(--color-primary)" r="2.2" />
-      </svg>
-      {label}
+      <span className="relative min-w-0">
+        <span
+          aria-hidden="true"
+          className="absolute -inset-1 rounded-chip bg-accent/40 opacity-0"
+          ref={bloomRef}
+        />
+        <span
+          className="relative block min-w-0 truncate text-[0.9375rem] font-semibold"
+          ref={nameRef}
+        >
+          {name}
+          <GoldGlint />
+        </span>
+      </span>
+      <span className="shrink-0 text-[0.625rem] font-semibold tracking-[0.16em] text-ink-faint uppercase">
+        {roleLabel}
+      </span>
     </span>
   );
 }
@@ -169,5 +221,39 @@ export function Meter({
         <span aria-hidden="true" className="meter-sweep absolute inset-y-0 w-1/3" />
       )}
     </div>
+  );
+}
+
+export interface TooltipProps {
+  label: string;
+  children: ReactNode;
+}
+
+/**
+ * A tooltip the app draws itself, for the same reason the dialogs are ours: the
+ * browser's own is a delay and a font the design has no say over. It opens on hover
+ * and on keyboard focus alike, because an icon nobody can name is only half drawn.
+ */
+export function Tooltip({ label, children }: Readonly<TooltipProps>) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <span
+      className="relative inline-flex"
+      onBlur={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      {children}
+      {open && (
+        <span
+          className="absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 rounded-chip bg-ink px-snug py-1 text-[0.625rem] font-semibold tracking-[0.06em] whitespace-nowrap text-paper"
+          role="tooltip"
+        >
+          {label}
+        </span>
+      )}
+    </span>
   );
 }

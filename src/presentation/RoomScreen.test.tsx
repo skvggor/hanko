@@ -443,14 +443,14 @@ describe("RoomScreen", () => {
 
 
 
-  it("renders the room link without the scheme", async () => {
+  it("shows the room id in the share chip", async () => {
     renderRoom();
     await joinAs("Ana");
     await waitFor(() => expect(harness.joinCalls).toHaveLength(1));
 
     pushState(roomState);
 
-    expect(await screen.findByText("hanko.skvggor.workers.dev")).toBeTruthy();
+    expect(await screen.findByText("abcd2345")).toBeTruthy();
   });
 
   describe("chat beside the estimate panel", () => {
@@ -833,7 +833,8 @@ describe("RoomScreen owner controls", () => {
     await enterRoom();
     pushState(ownerState);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Make watcher" }));
+    const row = (await screen.findByText("Bruno", { exact: true })).parentElement;
+    await userEvent.click(within(row!).getByRole("button", { name: "Make watcher" }));
 
     expect(harness.sent).toContainEqual({
       type: "set-role",

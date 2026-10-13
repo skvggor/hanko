@@ -53,6 +53,9 @@
 
   --color-secondary: #1f4e8c;
   --color-accent: #f0b323;
+  /* The bright accent is too light to write with: this is the same gold deep enough
+     to hold five to one against the paper, so a name can wear it and still be read. */
+  --color-accent-deep: #85640f;
 
   --font-display: "Space Grotesk Variable", "Helvetica Neue", sans-serif;
   --font-sans: "Space Grotesk Variable", "Helvetica Neue", sans-serif;
@@ -488,6 +491,22 @@ footer {
     box-shadow: 0 0 0 3px rgb(31 78 140 / 12%);
   }
 
+  /*
+   * Gold catches the light every so often: a pale streak crosses the name and leaves
+   * it resting between passes. The gradient belongs to the streak rather than to the
+   * letters, which stay one colour and stay readable.
+   */
+  .gold-glint {
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 249 244 / 55%),
+      transparent
+    );
+    animation: gold-glint 3200ms ease-in-out infinite;
+  }
+
   .meter-sweep {
     background: linear-gradient(
       90deg,
@@ -515,6 +534,18 @@ footer {
   }
   100% {
     transform: translateX(420%);
+  }
+}
+
+@keyframes gold-glint {
+  0% {
+    transform: translateX(-100%);
+  }
+  40% {
+    transform: translateX(320%);
+  }
+  100% {
+    transform: translateX(320%);
   }
 }
 

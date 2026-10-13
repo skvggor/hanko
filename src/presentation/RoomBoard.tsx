@@ -8,7 +8,7 @@ import {
 import { DECK_IDS } from "@domain/deck";
 import type { Translator } from "@application/i18n";
 import { readVotedState } from "@application/votedState";
-import { Button, Chip, Label, Meter, OwnerBadge, Panel } from "@presentation/ui";
+import { Button, Chip, GoldGlint, Label, Meter, OwnerName, Panel, Tooltip } from "@presentation/ui";
 import { ShareSnippet } from "@presentation/ShareSnippet";
 import { PromptDialog } from "@presentation/PromptDialog";
 import { validateName } from "@domain/name";
@@ -27,7 +27,7 @@ import {
 export interface RoomBoardProps {
   state: PublicRoomState;
   myParticipantId: string | null;
-  shareUrl: string;
+  roomId: string;
   translate: Translator;
   copied: boolean;
   onCopyLink: () => void;
@@ -58,11 +58,13 @@ function miniButtonClasses(pressed: boolean, tone: "neutral" | "primary"): strin
 }
 
 function MiniButton({
+  ariaLabel,
   children,
   onClick,
   pressed = false,
   tone = "neutral",
 }: Readonly<{
+  ariaLabel?: string | undefined;
   children: React.ReactNode;
   onClick: () => void;
   pressed?: boolean;
@@ -70,6 +72,7 @@ function MiniButton({
 }>) {
   return (
     <button
+      aria-label={ariaLabel}
       aria-pressed={pressed}
       className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full px-snug py-1 font-sans text-[0.625rem] font-semibold tracking-[0.06em] uppercase transition-colors ${miniButtonClasses(pressed, tone)}`}
       type="button"
@@ -83,7 +86,7 @@ function MiniButton({
 export function RoomBoard({
   state,
   myParticipantId,
-  shareUrl,
+  roomId,
   translate,
   copied,
   onCopyLink,
@@ -109,6 +112,18 @@ export function RoomBoard({
 
   const voters = state.participants.filter((entry) => entry.role === "voter").length;
   const watchers = state.participants.length - voters;
+  // The owner leads the list because the room is theirs to run, and whoever is reading
+  // follows them so their own row is never lost among the rest. Both settle in front of
+  // the join order, which holds the rest steady.
+  const orderedParticipants = [...state.participants].sort((left, right) => {
+    if (left.isOwner !== right.isOwner) return left.isOwner ? -1 : 1;
+
+    const leftIsMine = left.id === myParticipantId;
+    const rightIsMine = right.id === myParticipantId;
+    if (leftIsMine !== rightIsMine) return leftIsMine ? -1 : 1;
+
+    return 0;
+  });
 
   return (
     <div className="flex flex-col gap-snug px-gutter">
@@ -130,7 +145,7 @@ export function RoomBoard({
             copiedLabel={translate("room.copied")}
             label={translate("room.invite")}
             onCopy={onCopyLink}
-            url={shareUrl}
+            roomId={roomId}
           />
         </div>
       </Panel>
@@ -165,23 +180,34 @@ export function RoomBoard({
         </Panel>
       )}
 
-      <Panel aria-label={translate("a11y.participantList")} className="overflow-hidden">
-        {state.participants.map((participant) => {
+      <Panel aria-label={translate("a11y.participantList")}>
+        {orderedParticipants.map((participant) => {
           const isMe = participant.id === myParticipantId;
           const isVoter = participant.role === "voter";
+          const renameLabel = translate("controls.rename");
+          const transferLabel = translate("controls.transferOwnership");
+          const roleLabel = isVoter
+            ? translate("controls.changeRole")
+            : translate("controls.changeToVoter");
+          const removeLabel = translate("controls.removeParticipant");
 
           return (
             <div
-              className={`flex min-h-12 flex-wrap items-center gap-x-snug gap-y-1 border-b border-line px-room py-snug last:border-b-0 ${participant.isConnected ? "" : "opacity-50"}`}
+              className={`relative flex min-h-12 items-baseline gap-x-snug gap-y-1 border-b border-line px-room py-snug last:border-b-0 hover:z-10 focus-within:z-10 ${participant.isConnected ? "" : "opacity-50"}`}
               key={participant.id}
             >
-              <span className="text-[0.9375rem] font-semibold text-ink">
-                {participant.name}
-              </span>
-
-              {participant.isOwner && (
-                <OwnerBadge label={translate("controls.ownerControls")} />
+              {participant.isOwner ? (
+                <OwnerName
+                  name={participant.name}
+                  roleLabel={translate("controls.ownerControls")}
+                />
+              ) : (
+                <span className="min-w-0 truncate text-[0.9375rem] font-semibold text-ink">
+                  {participant.name}
+                </span>
               )}
+
+              {isMe && <Chip tone="primary">{translate("room.youBadge")}</Chip>}
 
               {!isVoter && (
                 <Chip>
@@ -198,21 +224,22 @@ export function RoomBoard({
                 </Chip>
               )}
 
-              <span className="ml-auto flex flex-wrap items-center gap-1.5">
+              <span className="ml-auto flex shrink-0 items-center gap-1.5 self-center">
                 {isMe && (
-                  <MiniButton onClick={() => setRenaming(participant.name)}>
-                    <PencilSimpleIcon aria-hidden="true" size={12} weight="bold" />
-                    {translate("controls.rename")}
-                  </MiniButton>
+                  <Tooltip label={renameLabel}>
+                    <MiniButton
+                      ariaLabel={renameLabel}
+                      onClick={() => setRenaming(participant.name)}
+                    >
+                      <PencilSimpleIcon aria-hidden="true" size={16} weight="bold" />
+                    </MiniButton>
+                  </Tooltip>
                 )}
 
-                {amOwner && !isMe && (
-                  <>
-                    <MiniButton onClick={() => onTransferOwnership(participant.id)}>
-                      <CrownIcon aria-hidden="true" size={12} weight="fill" />
-                      {translate("controls.transferOwnership")}
-                    </MiniButton>
+                {amOwner && (
+                  <Tooltip label={roleLabel}>
                     <MiniButton
+                      ariaLabel={roleLabel}
                       onClick={() =>
                         onSetRole(
                           participant.id,
@@ -220,14 +247,36 @@ export function RoomBoard({
                         )
                       }
                     >
-                      {isVoter
-                        ? translate("controls.changeRole")
-                        : translate("controls.changeToVoter")}
+                      {isVoter ? (
+                        <EyeSlashIcon aria-hidden="true" size={16} weight="bold" />
+                      ) : (
+                        <EyeIcon aria-hidden="true" size={16} weight="bold" />
+                      )}
                     </MiniButton>
-                    <MiniButton onClick={() => onRemoveParticipant(participant.id)}>
-                      <UserMinusIcon aria-hidden="true" size={12} weight="bold" />
-                      {translate("controls.removeParticipant")}
-                    </MiniButton>
+                  </Tooltip>
+                )}
+
+                {amOwner && !isMe && (
+                  <>
+                    <Tooltip label={transferLabel}>
+                      <MiniButton
+                        ariaLabel={transferLabel}
+                        onClick={() => onTransferOwnership(participant.id)}
+                      >
+                        <span className="relative flex overflow-hidden text-accent-deep">
+                          <CrownIcon aria-hidden="true" size={16} weight="fill" />
+                          <GoldGlint />
+                        </span>
+                      </MiniButton>
+                    </Tooltip>
+                    <Tooltip label={removeLabel}>
+                      <MiniButton
+                        ariaLabel={removeLabel}
+                        onClick={() => onRemoveParticipant(participant.id)}
+                      >
+                        <UserMinusIcon aria-hidden="true" size={16} weight="bold" />
+                      </MiniButton>
+                    </Tooltip>
                   </>
                 )}
               </span>
