@@ -167,8 +167,11 @@ export function RoomScreen({
     [connection],
   );
   const handleRename = useCallback(
-    (name: string) => connection.rename(name),
-    [connection],
+    (name: string) => {
+      writeStoredName(roomId, name);
+      connection.rename(name);
+    },
+    [connection, roomId],
   );
   const handleVote = useCallback(
     (value: string) => {

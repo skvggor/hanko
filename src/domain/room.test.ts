@@ -259,6 +259,29 @@ describe("setParticipantName", () => {
     const room = setParticipantName(roomWith(draft("ana")), "ana", "Ana Maria");
     expect(room.participants[0]?.name).toBe("Ana Maria");
   });
+
+  it("gives already sent messages the new name", () => {
+    let room = roomWith(draft("ana"), draft("bruno"));
+    room = appendMessage(room, {
+      id: "m1",
+      authorId: "ana",
+      authorName: "ana",
+      text: "hello",
+      sentAt: 1,
+    });
+    room = appendMessage(room, {
+      id: "m2",
+      authorId: "bruno",
+      authorName: "bruno",
+      text: "hi",
+      sentAt: 2,
+    });
+
+    const renamed = setParticipantName(room, "ana", "Ana Maria");
+
+    expect(renamed.messages[0]?.authorName).toBe("Ana Maria");
+    expect(renamed.messages[1]?.authorName).toBe("bruno");
+  });
 });
 
 describe("leaveRoom", () => {

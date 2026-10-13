@@ -904,6 +904,20 @@ describe("RoomScreen owner controls", () => {
     expect(harness.sent).toContainEqual({ type: "set-name", name: "Ana Maria" });
   });
 
+  it("keeps the renamed name for the way back in", async () => {
+    const setItem = vi.fn();
+    vi.stubGlobal("localStorage", { getItem: vi.fn(() => null), setItem });
+
+    await enterRoom();
+    pushState(ownerState);
+
+    await renameTo("Ana Maria");
+
+    await waitFor(() => {
+      expect(setItem).toHaveBeenCalledWith("hanko:name:abcd2345", "Ana Maria");
+    });
+  });
+
   it("sends nothing when the rename modal is dismissed", async () => {
     await enterRoom();
     pushState(ownerState);

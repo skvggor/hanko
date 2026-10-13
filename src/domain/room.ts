@@ -297,6 +297,9 @@ export function setParticipantName(
     participants: room.participants.map((participant) =>
       participant.id === participantId ? { ...participant, name } : participant,
     ),
+    messages: room.messages.map((message) =>
+      message.authorId === participantId ? { ...message, authorName: name } : message,
+    ),
   };
 }
 
