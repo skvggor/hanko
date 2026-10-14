@@ -833,7 +833,9 @@ describe("RoomScreen owner controls", () => {
     await enterRoom();
     pushState(ownerState);
 
-    const row = (await screen.findByText("Bruno", { exact: true })).parentElement;
+    const row = (await screen.findByText("Bruno", { exact: true })).closest<HTMLElement>(
+      "[data-participant-row]",
+    );
     await userEvent.click(within(row!).getByRole("button", { name: "Make watcher" }));
 
     expect(harness.sent).toContainEqual({

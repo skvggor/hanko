@@ -29,6 +29,7 @@
     "reconnecting": "Reconnecting...",
     "offline": "Connection lost",
     "waitingForVote": "Waiting for the owner to reveal",
+    "waitingForVoteShort": "Waiting",
     "yourVote": "Your vote: {{value}}",
     "noVote": "No vote",
     "discussionNeeded": "Needs discussion",

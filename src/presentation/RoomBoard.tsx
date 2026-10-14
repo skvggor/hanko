@@ -57,6 +57,10 @@ function miniButtonClasses(pressed: boolean, tone: "neutral" | "primary"): strin
   return tone === "primary" ? "bg-primary text-on-primary" : "bg-ink text-paper";
 }
 
+/**
+ * The phone needs a thumb sized target, so the button grows below the small
+ * breakpoint and keeps the compact size the settled desktop layout already has.
+ */
 function MiniButton({
   ariaLabel,
   children,
@@ -74,7 +78,7 @@ function MiniButton({
     <button
       aria-label={ariaLabel}
       aria-pressed={pressed}
-      className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full px-snug py-1 font-sans text-[0.625rem] font-semibold tracking-[0.06em] uppercase transition-colors ${miniButtonClasses(pressed, tone)}`}
+      className={`inline-flex min-h-11 min-w-11 cursor-pointer items-center gap-1 rounded-full px-snug py-1 font-sans text-[0.625rem] font-semibold tracking-[0.06em] uppercase transition-colors sm:min-h-8 sm:min-w-8 ${miniButtonClasses(pressed, tone)}`}
       type="button"
       onClick={onClick}
     >
@@ -184,6 +188,8 @@ export function RoomBoard({
         {orderedParticipants.map((participant) => {
           const isMe = participant.id === myParticipantId;
           const isVoter = participant.role === "voter";
+          const showVoteState = isVoter && !state.isRevealed;
+          const hasControls = isMe || amOwner;
           const renameLabel = translate("controls.rename");
           const transferLabel = translate("controls.transferOwnership");
           const roleLabel = isVoter
@@ -191,97 +197,115 @@ export function RoomBoard({
             : translate("controls.changeToVoter");
           const removeLabel = translate("controls.removeParticipant");
 
+          /**
+           * A phone gets two lines per person: the name, its badges and the vote state
+           * on one baseline first, then the controls below them. Every piece of text
+           * rides the name's baseline at every width, so the small caps of a chip read
+           * as part of the same line as the name instead of floating over it, and the
+           * row centres the two groups so the vertical balance holds either way.
+           */
           return (
             <div
-              className={`relative flex min-h-12 items-baseline gap-x-snug gap-y-1 border-b border-line px-room py-snug last:border-b-0 hover:z-10 focus-within:z-10 ${participant.isConnected ? "" : "opacity-50"}`}
+              className={`relative flex min-h-12 flex-wrap items-center gap-x-snug gap-y-tight border-b border-line px-room py-snug last:border-b-0 hover:z-10 focus-within:z-10 sm:flex-nowrap ${participant.isConnected ? "" : "opacity-50"}`}
+              data-participant-row={participant.id}
               key={participant.id}
             >
-              {participant.isOwner ? (
-                <OwnerName
-                  name={participant.name}
-                  roleLabel={translate("controls.ownerControls")}
-                />
-              ) : (
-                <span className="min-w-0 truncate text-[0.9375rem] font-semibold text-ink">
-                  {participant.name}
+              <div
+                className="flex min-w-0 items-baseline gap-x-snug"
+                data-line="identity"
+              >
+                {participant.isOwner ? (
+                  <OwnerName
+                    name={participant.name}
+                    roleLabel={translate("controls.ownerControls")}
+                  />
+                ) : (
+                  <span className="min-w-0 truncate text-[0.9375rem] font-semibold text-ink">
+                    {participant.name}
+                  </span>
+                )}
+
+                {isMe && <Chip tone="primary">{translate("room.youBadge")}</Chip>}
+
+                {!isVoter && (
+                  <Chip>
+                    <EyeSlashIcon aria-hidden="true" size={10} weight="bold" />
+                    {translate("room.spectatorBadge")}
+                  </Chip>
+                )}
+
+                {showVoteState && (
+                  <Chip tone={participant.hasVoted ? "secondary" : "neutral"}>
+                    {participant.hasVoted
+                      ? translate("progress.allVotedShort")
+                      : translate("room.waitingForVoteShort")}
+                  </Chip>
+                )}
+              </div>
+
+              {hasControls && (
+                <span
+                  className="ml-auto flex w-full shrink-0 items-center justify-end gap-1.5 sm:w-auto"
+                  data-line="controls"
+                >
+                  {isMe && (
+                    <Tooltip label={renameLabel}>
+                      <MiniButton
+                        ariaLabel={renameLabel}
+                        onClick={() => setRenaming(participant.name)}
+                      >
+                        <PencilSimpleIcon aria-hidden="true" size={16} weight="bold" />
+                      </MiniButton>
+                    </Tooltip>
+                  )}
+
+                  {amOwner && (
+                    <Tooltip label={roleLabel}>
+                      <MiniButton
+                        ariaLabel={roleLabel}
+                        onClick={() =>
+                          onSetRole(
+                            participant.id,
+                            isVoter ? "spectator" : "voter",
+                          )
+                        }
+                      >
+                        {isVoter ? (
+                          <EyeSlashIcon aria-hidden="true" size={16} weight="bold" />
+                        ) : (
+                          <EyeIcon aria-hidden="true" size={16} weight="bold" />
+                        )}
+                      </MiniButton>
+                    </Tooltip>
+                  )}
+
+                  {amOwner && !isMe && (
+                    <>
+                      <Tooltip label={transferLabel}>
+                        <MiniButton
+                          ariaLabel={transferLabel}
+                          onClick={() => onTransferOwnership(participant.id)}
+                        >
+                          <span className="relative flex overflow-hidden text-accent-deep">
+                            <CrownIcon aria-hidden="true" size={16} weight="fill" />
+                            <GoldGlint />
+                          </span>
+                        </MiniButton>
+                      </Tooltip>
+                      <Tooltip label={removeLabel}>
+                        <MiniButton
+                          ariaLabel={removeLabel}
+                          onClick={() => onRemoveParticipant(participant.id)}
+                        >
+                          <UserMinusIcon aria-hidden="true" size={16} weight="bold" />
+                        </MiniButton>
+                      </Tooltip>
+                    </>
+                  )}
                 </span>
               )}
 
-              {isMe && <Chip tone="primary">{translate("room.youBadge")}</Chip>}
-
-              {!isVoter && (
-                <Chip>
-                  <EyeSlashIcon aria-hidden="true" size={10} weight="bold" />
-                  {translate("room.spectatorBadge")}
-                </Chip>
-              )}
-
-              {isVoter && !state.isRevealed && (
-                <Chip tone={participant.hasVoted ? "secondary" : "neutral"}>
-                  {participant.hasVoted
-                    ? translate("progress.allVotedShort")
-                    : translate("room.waitingForVote")}
-                </Chip>
-              )}
-
-              <span className="ml-auto flex shrink-0 items-center gap-1.5 self-center">
-                {isMe && (
-                  <Tooltip label={renameLabel}>
-                    <MiniButton
-                      ariaLabel={renameLabel}
-                      onClick={() => setRenaming(participant.name)}
-                    >
-                      <PencilSimpleIcon aria-hidden="true" size={16} weight="bold" />
-                    </MiniButton>
-                  </Tooltip>
-                )}
-
-                {amOwner && (
-                  <Tooltip label={roleLabel}>
-                    <MiniButton
-                      ariaLabel={roleLabel}
-                      onClick={() =>
-                        onSetRole(
-                          participant.id,
-                          isVoter ? "spectator" : "voter",
-                        )
-                      }
-                    >
-                      {isVoter ? (
-                        <EyeSlashIcon aria-hidden="true" size={16} weight="bold" />
-                      ) : (
-                        <EyeIcon aria-hidden="true" size={16} weight="bold" />
-                      )}
-                    </MiniButton>
-                  </Tooltip>
-                )}
-
-                {amOwner && !isMe && (
-                  <>
-                    <Tooltip label={transferLabel}>
-                      <MiniButton
-                        ariaLabel={transferLabel}
-                        onClick={() => onTransferOwnership(participant.id)}
-                      >
-                        <span className="relative flex overflow-hidden text-accent-deep">
-                          <CrownIcon aria-hidden="true" size={16} weight="fill" />
-                          <GoldGlint />
-                        </span>
-                      </MiniButton>
-                    </Tooltip>
-                    <Tooltip label={removeLabel}>
-                      <MiniButton
-                        ariaLabel={removeLabel}
-                        onClick={() => onRemoveParticipant(participant.id)}
-                      >
-                        <UserMinusIcon aria-hidden="true" size={16} weight="bold" />
-                      </MiniButton>
-                    </Tooltip>
-                  </>
-                )}
-              </span>
-
-              {isVoter && !state.isRevealed && (
+              {showVoteState && (
                 <span className="visually-hidden">
                   {participant.hasVoted
                     ? translate("a11y.votedMarker", { name: participant.name })

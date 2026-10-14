@@ -29,6 +29,7 @@
     "reconnecting": "Reconectando...",
     "offline": "Conexão perdida",
     "waitingForVote": "Aguardando o dono revelar",
+    "waitingForVoteShort": "Aguardando",
     "yourVote": "Seu voto: {{value}}",
     "noVote": "Sem voto",
     "discussionNeeded": "Precisa de discussão",

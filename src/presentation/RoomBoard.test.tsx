@@ -235,7 +235,9 @@ describe("RoomBoard", () => {
 
   it("calls onSetRole to make somebody watch", async () => {
     const handlers = renderBoard();
-    const row = screen.getByText("Bruno", { exact: true }).parentElement;
+    const row = screen
+      .getByText("Bruno", { exact: true })
+      .closest<HTMLElement>("[data-participant-row]");
 
     await userEvent.click(within(row!).getByRole("button", { name: "Make watcher" }));
 
@@ -330,7 +332,7 @@ describe("RoomBoard", () => {
     expect(screen.getByRole("button", { name: "Make watcher" })).toBeTruthy();
   });
 
-  it("sits the actions beside the name", () => {
+  it("keeps the controls after the name in the row", () => {
     renderBoard();
     const rename = screen.getByRole("button", { name: "Change name" });
 
@@ -344,12 +346,14 @@ describe("RoomBoard", () => {
     expect(screen.getAllByText("You")).toHaveLength(1);
   });
 
-  it("lines the chips up with the name instead of centring the boxes", () => {
+  it("centres every box across the row", () => {
     renderBoard();
-    const row = screen.getByText("Bruno", { exact: true }).parentElement;
+    const row = screen
+      .getByText("Bruno", { exact: true })
+      .closest<HTMLElement>("[data-participant-row]");
 
-    expect(row?.className).toContain("items-baseline");
-    expect(row?.querySelector(".self-center")).toBeTruthy();
+    expect(row?.className).toContain("items-center");
+    expect(row?.className).not.toContain("items-baseline");
   });
 
   it("puts the owner at the top of the list", () => {
@@ -419,7 +423,7 @@ describe("RoomBoard", () => {
     expect(screen.getByRole("tooltip").textContent).toBe("Change name");
   });
 
-  it("truncates a long name instead of wrapping the actions to a second line", () => {
+  it("truncates a long name instead of shoving the controls off the row", () => {
     const longName = "Ana Maria de Oliveira e Silva dos Santos";
     renderBoard({
       participants: [
@@ -464,6 +468,7 @@ describe("RoomBoard", () => {
 
     expect(screen.getByText("Rodada 2")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Revelar" })).toBeTruthy();
+    expect(screen.getByText("Aguardando", { exact: true })).toBeTruthy();
   });
 });
 describe("RoomBoard live voting meter", () => {
@@ -613,7 +618,10 @@ describe("RoomBoard voted markers", () => {
 });
 
 describe("RoomBoard participant rows", () => {
-  function renderBoard(participants: PublicRoomState["participants"]) {
+  function renderBoard(
+    participants: PublicRoomState["participants"],
+    props: Partial<RoomBoardProps> = {},
+  ) {
     return render(
       <RoomBoard
         copied={false}
@@ -633,6 +641,7 @@ describe("RoomBoard participant rows", () => {
         roomId="abc12345"
         state={state({ participants })}
         translate={translate}
+        {...props}
       />,
     );
   }
@@ -676,6 +685,99 @@ describe("RoomBoard participant rows", () => {
     // depend on which side of that wrap a participant lands, or the list looks ragged.
     expect(classes).toContain("py-snug");
     expect(classes).not.toMatch(/py-(tight|1|2|3|4)\b/);
+  });
+
+  it("keeps the name, the badges and the state on one baseline", () => {
+    renderBoard([member("p2", "Bruno")], { myParticipantId: "p2" });
+    const line = screen.getByText("Bruno", { exact: true }).parentElement;
+
+    expect(line?.className).toContain("items-baseline");
+    expect(within(line!).getByText("You", { exact: true })).toBeTruthy();
+    expect(within(line!).getByText("Waiting", { exact: true })).toBeTruthy();
+    expect(line?.querySelector('[data-line="controls"]')).toBeNull();
+  });
+
+  it("puts the controls on a line of their own below the name", () => {
+    const { container } = renderBoard([member("p2", "Bruno")]);
+    const controls = rowOf(container, "Bruno").querySelector<HTMLElement>(
+      '[data-line="controls"]',
+    );
+
+    expect(controls).toBeTruthy();
+    expect(controls?.className).toContain("w-full");
+    expect(controls?.className).toContain("justify-end");
+    expect(controls?.className).toContain("sm:w-auto");
+    expect(within(controls!).getByRole("button", { name: "Remove" })).toBeTruthy();
+    expect(within(controls!).queryByText("Waiting", { exact: true })).toBeNull();
+  });
+
+  it("says the vote state in words the chip can hold", () => {
+    renderBoard([member("p2", "Bruno")]);
+
+    expect(screen.getByText("Waiting", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("Waiting for the owner to reveal")).toBeNull();
+  });
+
+  it("gives the controls a thumb sized target on phones", () => {
+    renderBoard([member("p2", "Bruno")]);
+
+    expect(screen.getByRole("button", { name: "Remove" }).className).toContain("min-h-11");
+  });
+
+  it("leaves the desktop controls at their current size", () => {
+    renderBoard([member("p2", "Bruno")]);
+
+    expect(screen.getByRole("button", { name: "Remove" }).className).toContain("sm:min-h-8");
+  });
+
+  it("keeps the state on the name's line even when the row has no controls", () => {
+    const { container } = renderBoard(
+      [
+        { id: "p1", name: "Ana", role: "voter", isOwner: true, isConnected: true, hasVoted: true },
+        member("p2", "Bruno"),
+        member("p3", "Carla"),
+      ],
+      { myParticipantId: "p3" },
+    );
+    const row = rowOf(container, "Bruno");
+    const line = screen.getByText("Bruno", { exact: true }).parentElement;
+
+    expect(within(line!).getByText("Waiting", { exact: true })).toBeTruthy();
+    expect(row.querySelector('[data-line="controls"]')).toBeNull();
+  });
+
+  it("opens the controls line even when there is no state to show", () => {
+    const { container } = renderBoard([
+      { id: "p1", name: "Ana", role: "spectator", isOwner: true, isConnected: true, hasVoted: false },
+    ]);
+    const secondLine = rowOf(container, "Ana").querySelector<HTMLElement>(
+      '[data-line="controls"]',
+    );
+
+    expect(secondLine).toBeTruthy();
+    expect(within(secondLine!).getAllByRole("button")).toHaveLength(2);
+  });
+
+  it("leaves the second line out when there is nothing to put on it", () => {
+    const { container } = renderBoard(
+      [
+        { id: "p1", name: "Ana", role: "voter", isOwner: true, isConnected: true, hasVoted: true },
+        {
+          id: "p2",
+          name: "Bruno",
+          role: "spectator",
+          isOwner: false,
+          isConnected: true,
+          hasVoted: false,
+        },
+        member("p3", "Carla"),
+      ],
+      { myParticipantId: "p3" },
+    );
+    const row = rowOf(container, "Bruno");
+
+    expect(row.querySelectorAll("[data-line]")).toHaveLength(1);
+    expect(row.querySelector('[data-line="controls"]')).toBeNull();
   });
 });
 
