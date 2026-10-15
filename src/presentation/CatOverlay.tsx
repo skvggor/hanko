@@ -147,6 +147,8 @@ export function CatOverlay({
       myParticipantId === null ||
       controlledId !== null ||
       asleep ||
+      ownCatState?.isPaused === true ||
+      ownCatState?.activity === "sleeping" ||
       initialControlParticipantRef.current === myParticipantId ||
       !catByParticipant.has(myParticipantId)
     ) {
@@ -168,7 +170,16 @@ export function CatOverlay({
     });
 
     return () => window.clearTimeout(controlTimer);
-  }, [asleep, bounds.height, bounds.width, catByParticipant, controlledId, myParticipantId]);
+  }, [
+    asleep,
+    bounds.height,
+    bounds.width,
+    catByParticipant,
+    controlledId,
+    myParticipantId,
+    ownCatState?.activity,
+    ownCatState?.isPaused,
+  ]);
 
   const liveText = useMemo(
     () => messages.map((message) => `${message.authorName}: ${message.text}`).join(". "),

@@ -418,6 +418,59 @@ describe("RoomConnection", () => {
     );
   });
 
+  it("delivers cat movement on its own frame", async () => {
+    const { RoomConnection } = await import("@application/roomConnection");
+    const socket = createFakeSocket();
+    const listener = vi.fn();
+    const connection = new RoomConnection("room-1", () => socket as unknown as WebSocket);
+
+    connection.onCatState(listener);
+    await connection.join("Ana", "voter", null);
+    socket.onmessage?.({
+      data: JSON.stringify({
+        type: "cat-state",
+        cat: {
+          participantId: "p2",
+          breed: "tabby",
+          x: 0.2,
+          y: 0.4,
+          direction: "right",
+          activity: "walking",
+          isPaused: false,
+        },
+      }),
+    });
+
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ participantId: "p2" }));
+  });
+
+  it("coalesces frequent cat updates into the latest frame", async () => {
+    vi.useFakeTimers();
+    try {
+      const { RoomConnection } = await import("@application/roomConnection");
+      const socket = createFakeSocket();
+      const connection = new RoomConnection("room-1", () => socket as unknown as WebSocket);
+      await connection.join("Ana", "voter", null);
+
+      connection.updateCat(0.1, 0.2, "right", "walking", false);
+      connection.updateCat(0.3, 0.4, "left", "jumping", false);
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(socket.sent.slice(1).map((entry) => JSON.parse(entry))).toEqual([
+        {
+          type: "cat-update",
+          x: 0.3,
+          y: 0.4,
+          direction: "left",
+          activity: "jumping",
+          isPaused: false,
+        },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("deletes the room command", async () => {
     const { RoomConnection } = await import("@application/roomConnection");
     const socket = createFakeSocket();
