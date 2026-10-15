@@ -7,6 +7,7 @@ import {
 import type { ChatMessage } from "@domain/chat";
 import type { DeckId } from "@domain/deck";
 import type { ParticipantRole } from "@domain/room";
+import type { CatActivity, CatState } from "@domain/cat";
 
 export type SocketFactory = (url: string) => WebSocket;
 
@@ -14,6 +15,7 @@ type StateListener = (state: PublicRoomState) => void;
 type ErrorListener = (code: string) => void;
 type DeletedListener = () => void;
 type ChatListener = (message: ChatMessage) => void;
+type CatStateListener = (cat: CatState) => void;
 type RemovedListener = () => void;
 type ConnectionListener = (connected: boolean) => void;
 
@@ -21,12 +23,19 @@ export function createDefaultSocketFactory(): SocketFactory {
   return (url) => new WebSocket(url);
 }
 
+/**
+ * Cat movement is a stream rather than a discrete command, so it is throttled on
+ * the client instead of relying on the server budget alone.
+ */
+const CAT_UPDATE_INTERVAL_MS = 100;
+
 export class RoomConnection {
   #socket: WebSocket | null = null;
   readonly #stateListeners = new Set<StateListener>();
   readonly #errorListeners = new Set<ErrorListener>();
   readonly #deletedListeners = new Set<DeletedListener>();
   readonly #chatListeners = new Set<ChatListener>();
+  readonly #catStateListeners = new Set<CatStateListener>();
   readonly #removedListeners = new Set<RemovedListener>();
   readonly #connectionListeners = new Set<ConnectionListener>();
 
@@ -34,6 +43,15 @@ export class RoomConnection {
   #token: string | null = null;
   #open = false;
   #removed = false;
+  #pendingCatUpdate: {
+    x: number;
+    y: number;
+    direction: "left" | "right";
+    activity: CatActivity;
+    isPaused: boolean;
+  } | null = null;
+  #catUpdateTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+  #lastCatUpdateAt = 0;
 
   constructor(
     private readonly roomId: string,
@@ -83,6 +101,17 @@ export class RoomConnection {
     this.#chatListeners.add(listener);
     return () => {
       this.#chatListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Movement arrives on its own frame so a cat crossing the screen never forces a
+   * fresh PublicRoomState, and each peer only patches the one cat that moved.
+   */
+  onCatState(listener: CatStateListener): () => void {
+    this.#catStateListeners.add(listener);
+    return () => {
+      this.#catStateListeners.delete(listener);
     };
   }
 
@@ -161,6 +190,9 @@ export class RoomConnection {
         break;
       case "chat":
         for (const listener of this.#chatListeners) listener(message.message);
+        break;
+      case "cat-state":
+        for (const listener of this.#catStateListeners) listener(message.cat);
         break;
       case "joined":
         this.#participantId = message.participantId;
@@ -259,7 +291,46 @@ export class RoomConnection {
     this.#send({ type: "ping" });
   }
 
+  /**
+   * Cat movement fires far more often than any other command, so the client sends
+   * at most one update every CAT_UPDATE_INTERVAL_MS and coalesces the rest into the
+   * latest state. Without this a held arrow key produces a burst that trips the
+   * server's rate limit before the room can respond to anything else.
+   */
+  updateCat(
+    x: number,
+    y: number,
+    direction: "left" | "right",
+    activity: CatActivity,
+    isPaused: boolean,
+  ): void {
+    this.#pendingCatUpdate = { x, y, direction, activity, isPaused };
+    if (this.#catUpdateTimer !== null) return;
+
+    const elapsed = Date.now() - this.#lastCatUpdateAt;
+    const delay = Math.max(0, CAT_UPDATE_INTERVAL_MS - elapsed);
+
+    this.#catUpdateTimer = globalThis.setTimeout(() => {
+      this.#catUpdateTimer = null;
+      this.#flushCatUpdate();
+    }, delay);
+  }
+
+  #flushCatUpdate(): void {
+    const update = this.#pendingCatUpdate;
+    if (update === null) return;
+
+    this.#pendingCatUpdate = null;
+    this.#lastCatUpdateAt = Date.now();
+    this.#send({ type: "cat-update", ...update });
+  }
+
   close(): void {
+    if (this.#catUpdateTimer !== null) {
+      globalThis.clearTimeout(this.#catUpdateTimer);
+      this.#catUpdateTimer = null;
+    }
+    this.#pendingCatUpdate = null;
     this.#socket?.close();
     this.#open = false;
   }

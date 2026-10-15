@@ -3,14 +3,17 @@ import { MESSAGE_LIMIT, type ChatMessage } from "@domain/chat";
 import type { PublicRoomState } from "@domain/protocol";
 import type { DeckId } from "@domain/deck";
 import type { ParticipantRole } from "@domain/room";
+import type { CatActivity, CatState } from "@domain/cat";
 import { RoomConnection } from "@application/roomConnection";
 import type { Translator } from "@application/i18n";
 import { roomPath } from "@application/routing";
+import { CatOverlay } from "@presentation/CatOverlay";
 import { ChatPanel } from "@presentation/ChatPanel";
 import { ConfirmDialog } from "@presentation/ConfirmDialog";
 import { Hanko } from "@presentation/Hanko";
 import { NameGate } from "@presentation/NameGate";
 import { RoomBoard } from "@presentation/RoomBoard";
+import { useIsMobile } from "@presentation/useIsMobile";
 
 const TOKEN_PREFIX = "hanko:token:";
 const NAME_PREFIX = "hanko:name:";
@@ -67,6 +70,7 @@ export function RoomScreen({
 }: Readonly<RoomScreenProps>) {
   const [state, setState] = useState<PublicRoomState | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [cats, setCats] = useState<CatState[]>([]);
   const [draftName, setDraftName] = useState<string | null>(null);
   const [draftRole, setDraftRole] = useState<ParticipantRole>("voter");
   const [errorCode, setErrorCode] = useState<string | null>(null);
@@ -92,9 +96,19 @@ export function RoomScreen({
       setPendingVote(undefined);
       setState(next);
       setMessages(next.messages);
+      setCats(next.cats ?? []);
     });
     const unsubscribeChat = connection.onChatMessage((message) => {
       setMessages((previous) => [...previous, message].slice(-MESSAGE_LIMIT));
+    });
+    const unsubscribeCatState = connection.onCatState((cat) => {
+      setCats((previous) => {
+        const index = previous.findIndex((entry) => entry.participantId === cat.participantId);
+        if (index === -1) return [...previous, cat];
+        const next = [...previous];
+        next[index] = cat;
+        return next;
+      });
     });
     const unsubscribeError = connection.onError((code) => {
       setPendingVote(undefined);
@@ -112,6 +126,7 @@ export function RoomScreen({
     return () => {
       unsubscribeState();
       unsubscribeChat();
+      unsubscribeCatState();
       unsubscribeError();
       unsubscribeDeleted();
       unsubscribeRemoved();
@@ -193,6 +208,23 @@ export function RoomScreen({
     () => connection.clearMessages(),
     [connection],
   );
+  const handleUpdateCat = useCallback(
+    (update: {
+      x: number;
+      y: number;
+      direction: "left" | "right";
+      activity: CatActivity;
+      isPaused: boolean;
+    }) =>
+      connection.updateCat(
+        update.x,
+        update.y,
+        update.direction,
+        update.activity,
+        update.isPaused,
+      ),
+    [connection],
+  );
 
   const handleCopyLink = useCallback(() => {
     void globalThis.navigator.clipboard?.writeText(shareUrl);
@@ -205,6 +237,9 @@ export function RoomScreen({
 
   useEffect(() => () => onSessionNameChange?.(null), [onSessionNameChange]);
 
+  const isOwner =
+    state !== null && state.ownerId === connection.participantId;
+
   const connectedParticipantIds = useMemo(
     () =>
       new Set(
@@ -215,8 +250,7 @@ export function RoomScreen({
     [state],
   );
 
-  const isOwner =
-    state !== null && state.ownerId === connection.participantId;
+  const isMobile = useIsMobile();
 
   /**
    * The gate stays on screen until the room answers, so it has to say that it is waiting
@@ -282,15 +316,29 @@ export function RoomScreen({
           translate={translate}
         />
 
-        <ChatPanel
-          connectedParticipantIds={connectedParticipantIds}
-          isOwner={isOwner}
-          messages={messages}
-          myParticipantId={connection.participantId}
-          onClear={handleClearMessages}
-          onSend={handleSendMessage}
-          translate={translate}
-        />
+        {isMobile ? (
+          <ChatPanel
+            connectedParticipantIds={connectedParticipantIds}
+            isOwner={isOwner}
+            messages={messages}
+            myParticipantId={connection.participantId}
+            onClear={handleClearMessages}
+            onSend={handleSendMessage}
+            translate={translate}
+          />
+        ) : (
+          <CatOverlay
+            cats={cats}
+            isOwner={isOwner}
+            messages={messages}
+            myParticipantId={connection.participantId}
+            onClear={handleClearMessages}
+            onSend={handleSendMessage}
+            onUpdateCat={handleUpdateCat}
+            participants={state.participants}
+            translate={translate}
+          />
+        )}
       </>
     );
   }

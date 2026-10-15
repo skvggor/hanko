@@ -37,6 +37,7 @@ import {
   startNextRound,
   transferOwnership,
 } from "@domain/room";
+import { CAT_BREEDS, type CatState } from "@domain/cat";
 
 interface SocketIdentity {
   participantId: string | null;
@@ -52,6 +53,18 @@ const CHAT_WINDOW_MS = 5_000;
 /** Everything else a joined participant can ask for. */
 const COMMAND_LIMIT_PER_WINDOW = 60;
 const COMMAND_WINDOW_MS = 10_000;
+
+/**
+ * Movement is a stream, not a request. This is only an abuse ceiling to stop one
+ * socket flooding the room with broadcasts; a normal client is throttled to about
+ * ten updates a second and never approaches it. Frames over the ceiling are
+ * dropped silently rather than answered with "Slow down".
+ */
+const CAT_LIMIT_PER_WINDOW = 6_000;
+const CAT_WINDOW_MS = 10_000;
+
+/** Cat positions are cosmetic, so a short durable-write debounce is invisible. */
+const CAT_PERSIST_INTERVAL_MS = 2_000;
 
 /** Joining mints a participant and writes the room, so it gets its own budget. */
 const JOIN_LIMIT_PER_WINDOW = 10;
@@ -81,6 +94,7 @@ interface AuthorizedActor {
 export class Room {
   #room: RoomSnapshot | null = null;
   #roomId: string | null = null;
+  readonly #cats = new Map<string, CatState>();
   readonly #chatBudget = new InMemoryRateLimiter(CHAT_LIMIT_PER_WINDOW, CHAT_WINDOW_MS);
   readonly #socketKeys = new WeakMap<WebSocket, string>();
   readonly #joinBudget = new InMemoryRateLimiter(JOIN_LIMIT_PER_WINDOW, JOIN_WINDOW_MS);
@@ -88,6 +102,9 @@ export class Room {
     COMMAND_LIMIT_PER_WINDOW,
     COMMAND_WINDOW_MS,
   );
+  readonly #catBudget = new InMemoryRateLimiter(CAT_LIMIT_PER_WINDOW, CAT_WINDOW_MS);
+  #catsPersistTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+  #lastCatsPersistAt = 0;
 
   constructor(private readonly storage: DurableObjectState) {}
 
@@ -134,7 +151,7 @@ export class Room {
     const room = await this.#load(roomId);
     const requestedToken = new URL(request.url).searchParams.get("token");
 
-    return Response.json(toPublicState(room, requestedToken));
+    return Response.json(toPublicState(room, requestedToken, this.#catStates(room)));
   }
 
   async webSocketMessage(
@@ -226,7 +243,7 @@ export class Room {
         type: "joined",
         participantId: known.id,
         token: known.token,
-        state: toPublicState(back, known.token),
+        state: toPublicState(back, known.token, this.#catStates(back)),
       });
       this.#broadcast();
       return;
@@ -253,6 +270,15 @@ export class Room {
     };
 
     room = joinRoom(room, draft);
+    this.#cats.set(participantId, {
+      participantId,
+      breed: this.#nextBreed(),
+      x: this.#cats.size === 0 ? 0.12 : ((this.#cats.size % 5) + 1) / 6,
+      y: this.#cats.size === 0 ? 0.72 : (Math.floor(this.#cats.size / 5) + 1) / 6,
+      direction: "right",
+      activity: "idle",
+      isPaused: false,
+    });
     await this.#save(room);
     this.#attach(socket, { participantId, token });
 
@@ -260,7 +286,7 @@ export class Room {
       type: "joined",
       participantId,
       token,
-      state: toPublicState(room, token),
+      state: toPublicState(room, token, this.#catStates(room)),
     });
     this.#broadcast();
   }
@@ -337,6 +363,8 @@ export class Room {
         return this.#applyRoomName(socket, message, room);
       case "chat":
         return this.#applyChat(socket, message, room, actor);
+      case "cat-update":
+        return this.#applyCatUpdate(socket, message, room, actor);
       case "reveal":
       case "next-round":
       case "reset-round":
@@ -346,6 +374,7 @@ export class Room {
       case "remove-participant": {
         const removed = message.participantId;
 
+        this.#cats.delete(removed);
         await this.#save(removeParticipant(room, removed));
         this.#broadcast();
         this.#disconnectParticipantSockets(removed);
@@ -361,6 +390,33 @@ export class Room {
       default:
         return { room, finished: true };
     }
+  }
+
+  #applyCatUpdate(
+    socket: WebSocket,
+    message: Extract<ClientMessage, { type: "cat-update" }>,
+    room: RoomSnapshot,
+    actor: Participant,
+  ): CommandOutcome {
+    const current = this.#cats.get(actor.id);
+    if (current === undefined) return { room, finished: true };
+
+    const cat: CatState = {
+      ...current,
+      x: Math.min(1, Math.max(0, message.x)),
+      y: Math.min(1, Math.max(0, message.y)),
+      direction: message.direction,
+      activity: message.activity,
+      isPaused: message.isPaused,
+    };
+
+    this.#cats.set(actor.id, cat);
+    // Movement is ephemeral: peers get a single small frame rather than a full
+    // room push, and the durable write is deferred instead of paid per tick.
+    this.#broadcastCatState(cat, socket);
+    this.#scheduleCatsPersist();
+
+    return { room, finished: true };
   }
 
   #advanceRoom(message: ClientMessage, room: RoomSnapshot): RoomSnapshot {
@@ -499,6 +555,8 @@ export class Room {
     }
 
     room = disconnectParticipant(room, participant.id);
+    // The cat stays in the map across a disconnect so a refresh comes back to the
+    // same breed and pose; #catStates only publishes cats whose owner is connected.
     await this.#save(room);
     this.#broadcast();
 
@@ -567,11 +625,16 @@ export class Room {
    */
   #spend(socket: WebSocket, message: ClientMessage): boolean {
     const key = this.#participantKey(socket);
-    const budget =
-      message.type === "chat" ? this.#chatBudget : this.#commandBudget;
+    let budget = this.#commandBudget;
+    if (message.type === "chat") budget = this.#chatBudget;
+    if (message.type === "cat-update") budget = this.#catBudget;
     const now = Date.now();
 
     if (budget.allow(key, now)) return true;
+
+    // Movement frames are dropped without an error so a flood can never freeze a
+    // cat behind "Slow down"; real commands still get the rate-limit answer.
+    if (message.type === "cat-update") return false;
 
     this.#fail(socket, ERROR_CODES.rateLimited);
     return false;
@@ -600,6 +663,18 @@ export class Room {
     return this.#identity(socket)?.token ?? this.#socketKey(socket);
   }
 
+  #nextBreed(): CatState["breed"] {
+    const used = new Set([...this.#cats.values()].map((cat) => cat.breed));
+    return CAT_BREEDS.find((breed) => !used.has(breed)) ?? CAT_BREEDS[this.#cats.size % CAT_BREEDS.length] ?? "tabby";
+  }
+
+  #catStates(room: RoomSnapshot): CatState[] {
+    const connected = new Set(
+      room.participants.filter((participant) => participant.isConnected).map((participant) => participant.id),
+    );
+    return [...this.#cats.values()].filter((cat) => connected.has(cat.participantId));
+  }
+
   #broadcast(override?: ServerMessage): void {
     const room = this.#room;
     if (override === undefined && room === null) return;
@@ -613,27 +688,64 @@ export class Room {
       const token = this.#identity(socket)?.token ?? null;
       this.#send(socket, {
         type: "state",
-        state: toPublicState(room as RoomSnapshot, token),
+        state: toPublicState(room as RoomSnapshot, token, this.#catStates(room as RoomSnapshot)),
       });
     }
+  }
+
+  /**
+   * Movement reaches the other sockets as one small frame instead of a full room
+   * push, which is what makes frequent updates affordable. The sender is skipped
+   * because it already has the position it just reported.
+   */
+  #broadcastCatState(cat: CatState, exceptSocket: WebSocket): void {
+    for (const socket of this.storage.getWebSockets()) {
+      if (socket === exceptSocket) continue;
+      this.#send(socket, { type: "cat-state", cat });
+    }
+  }
+
+  /**
+   * Cat positions are cosmetic, so writing them to storage is debounced rather
+   * than paid on every movement tick. Joins and departures save immediately, so
+   * the deferred write only ever trails the last couple of seconds of motion.
+   */
+  #scheduleCatsPersist(): void {
+    if (this.#catsPersistTimer !== null) return;
+
+    const elapsed = Date.now() - this.#lastCatsPersistAt;
+    const delay = Math.max(0, CAT_PERSIST_INTERVAL_MS - elapsed);
+
+    this.#catsPersistTimer = globalThis.setTimeout(() => {
+      this.#catsPersistTimer = null;
+      this.#lastCatsPersistAt = Date.now();
+      void this.storage.storage.put("cats", [...this.#cats.values()]);
+    }, delay);
   }
 
   async #load(roomId: string): Promise<RoomSnapshot> {
     if (this.#room !== null) return this.#room;
 
     const stored = await this.storage.storage.get<{ room: Partial<RoomSnapshot> }>("room");
+    const storedCats = await this.storage.storage.get<CatState[]>("cats");
+    for (const cat of storedCats ?? []) this.#cats.set(cat.participantId, cat);
     this.#room = restoreRoom(stored?.room, roomId);
     return this.#room;
   }
 
   #save(room: RoomSnapshot): Promise<void> {
     this.#room = room;
-    return this.storage.storage.put("room", { room });
+    return Promise.all([
+      this.storage.storage.put("room", { room }),
+      this.storage.storage.put("cats", [...this.#cats.values()]),
+    ]).then(() => undefined);
   }
 
   async #wipe(): Promise<void> {
     this.#room = null;
+    this.#cats.clear();
     await this.storage.storage.delete("room");
+    await this.storage.storage.delete("cats");
   }
 
   async alarm(): Promise<void> {

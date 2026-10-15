@@ -1,6 +1,7 @@
 import { isChatMessage, type ChatMessage } from "@domain/chat";
 import { isDeckId, type DeckId } from "@domain/deck";
 import { isValidName } from "@domain/name";
+import { isCatActivity, isCatState, type CatState } from "@domain/cat";
 import {
   type ParticipantRole,
   type RoomSnapshot,
@@ -40,11 +41,13 @@ export interface PublicRoomState {
   myVote: string | null;
   messages: ChatMessage[];
   name: string | null;
+  cats?: CatState[];
 }
 
 export function toPublicState(
   room: RoomSnapshot,
   viewerToken: string | null = null,
+  cats: CatState[] = [],
 ): PublicRoomState {
   const reveals = room.isRevealed ? buildRevealEntries(room) : null;
   const viewer = viewerToken === null ? undefined : findByToken(room, viewerToken);
@@ -72,6 +75,7 @@ export function toPublicState(
     myVote: viewer?.vote ?? null,
     messages: room.messages,
     name: room.name,
+    cats,
   };
 }
 
@@ -85,7 +89,9 @@ export function isViewPayload(value: unknown): value is PublicRoomState {
     typeof candidate.isRevealed === "boolean" &&
     Array.isArray(candidate.participants) &&
     Array.isArray(candidate.messages) &&
-    candidate.messages.every(isChatMessage)
+    candidate.messages.every(isChatMessage) &&
+    (candidate.cats === undefined ||
+      (Array.isArray(candidate.cats) && candidate.cats.every(isCatState)))
   );
 }
 
@@ -103,6 +109,14 @@ export type ClientMessage =
   | { type: "set-room-name"; name: string | null }
   | { type: "chat"; text: string }
   | { type: "clear-chat" }
+  | {
+      type: "cat-update";
+      x: number;
+      y: number;
+      direction: "left" | "right";
+      activity: "idle" | "walking" | "jumping" | "sleeping" | "angry";
+      isPaused: boolean;
+    }
   | { type: "delete-room" }
   | { type: "ping" };
 
@@ -110,6 +124,7 @@ export type ServerMessage =
   | { type: "state"; state: PublicRoomState }
   | { type: "chat"; message: ChatMessage }
   | { type: "joined"; participantId: string; token: string; state: PublicRoomState }
+  | { type: "cat-state"; cat: CatState }
   | { type: "error"; code: string }
   | { type: "room-deleted" }
   | { type: "removed" }
@@ -148,6 +163,24 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     }
     case "set-name":
       return typeof (candidate as { name?: unknown }).name === "string";
+    case "cat-update": {
+      const update = candidate as {
+        x?: unknown;
+        y?: unknown;
+        direction?: unknown;
+        activity?: unknown;
+        isPaused?: unknown;
+      };
+      return (
+        typeof update.x === "number" &&
+        Number.isFinite(update.x) &&
+        typeof update.y === "number" &&
+        Number.isFinite(update.y) &&
+        (update.direction === "left" || update.direction === "right") &&
+        isCatActivity(update.activity) &&
+        typeof update.isPaused === "boolean"
+      );
+    }
     case "set-deck":
       return isDeckId((candidate as { deckId?: unknown }).deckId);
     case "set-role": {
@@ -177,8 +210,9 @@ export function isServerMessage(value: unknown): value is ServerMessage {
   const candidate = value as {
     type?: unknown;
     state?: unknown;
-    code?: unknown;
     message?: unknown;
+    cat?: unknown;
+    code?: unknown;
   };
 
   switch (candidate.type) {
@@ -186,6 +220,8 @@ export function isServerMessage(value: unknown): value is ServerMessage {
       return isViewPayload(candidate.state);
     case "chat":
       return isChatMessage(candidate.message);
+    case "cat-state":
+      return isCatState(candidate.cat);
     case "joined":
       return (
         isViewPayload(candidate.state) &&

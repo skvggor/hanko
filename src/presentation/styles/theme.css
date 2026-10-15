@@ -71,6 +71,71 @@
   --spacing-dock: 6rem;
 
   --radius-chip: 999px;
+
+  --cat-size: 4rem;
+}
+
+@property --cat-progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --cat-direction {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@keyframes cat-patrol {
+  0% {
+    --cat-progress: 0;
+    --cat-direction: 1;
+  }
+
+  49.999% {
+    --cat-progress: 1;
+    --cat-direction: 1;
+  }
+
+  50% {
+    --cat-progress: 1;
+    --cat-direction: -1;
+  }
+
+  100% {
+    --cat-progress: 0;
+    --cat-direction: -1;
+  }
+}
+
+@keyframes cat-jump {
+  0%,
+  100% {
+    transform: scaleX(var(--cat-direction)) translateY(0);
+  }
+
+  50% {
+    transform: scaleX(var(--cat-direction)) translateY(-1rem);
+  }
+}
+
+@keyframes bubble-pop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(0.5rem) scale(0.9);
+  }
+
+  4%,
+  96% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-0.25rem) scale(0.95);
+  }
 }
 
 @layer base {
@@ -519,6 +584,307 @@ footer {
 
   .button-spinner {
     animation: button-spinner 900ms linear infinite;
+  }
+
+  .cat-overlay {
+    position: fixed;
+    inset: 0;
+    /* Above the pinned chrome (header, footer, docks) so cats always float on
+       top, but below the modal dialogs so confirmations stay readable. */
+    z-index: 45;
+    pointer-events: none;
+    container-type: inline-size;
+  }
+
+  .cat {
+    position: absolute;
+    left: 0;
+    top: var(--cat-top, 0);
+    width: var(--cat-size);
+    height: var(--cat-size);
+    animation: cat-patrol var(--cat-duration, 10s) linear infinite;
+    transform: translateX(calc((100cqw - 100%) * var(--cat-progress)));
+  }
+
+  .cat[data-paused="true"],
+  .cat[data-activity="sleeping"],
+  .cat[data-activity="idle"] {
+    animation-play-state: paused;
+  }
+
+  .cat__button {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .cat__figure {
+    width: 100%;
+    height: 100%;
+  }
+
+  .cat-sprite {
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    transform: scaleX(var(--cat-direction));
+    transform-origin: center;
+  }
+
+  /* A sleeping cat settles onto the ground: the body drops onto its paws so it
+     reads as lying down rather than standing in place. */
+  .cat-sprite--sleeping {
+    transform: scaleX(var(--cat-direction)) scaleY(0.68);
+    transform-origin: center bottom;
+  }
+
+  .cat[data-activity="jumping"] .cat-sprite {
+    animation: cat-jump 400ms ease;
+  }
+
+  .cat[data-activity="sleeping"] .cat-sprite {
+    opacity: 0.6;
+  }
+
+  .cat__sleep-z {
+    position: absolute;
+    top: -0.5rem;
+    right: -0.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 0.9;
+    transform: rotate(-12deg);
+    pointer-events: none;
+  }
+
+  .cat__sleep-z__letter {
+    font-weight: 700;
+    color: var(--color-ink-dim);
+    animation: cat-sleep-z 2.4s ease-out infinite;
+    opacity: 0;
+  }
+
+  .cat__sleep-z__letter:nth-child(1) {
+    font-size: 0.875rem;
+    animation-delay: 0ms;
+  }
+
+  .cat__sleep-z__letter:nth-child(2) {
+    font-size: 0.625rem;
+    animation-delay: 350ms;
+  }
+
+  .cat__sleep-z__letter:nth-child(3) {
+    font-size: 0.4375rem;
+    animation-delay: 700ms;
+  }
+
+  /* Each Z drifts up and fades in turn, so the sleep reads as a soft cascade. */
+  @keyframes cat-sleep-z {
+    0% {
+      opacity: 0;
+      transform: translateY(0.25rem) scale(0.5);
+    }
+    30% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-0.75rem) scale(1);
+    }
+  }
+
+  .cat__badge {
+    position: absolute;
+    top: -0.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: var(--radius-chip);
+    background: var(--color-ink);
+    padding: 0 var(--spacing-tight);
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--color-paper-raised);
+  }
+
+  .cat__badge--controlled {
+    background: var(--color-secondary);
+  }
+
+  .cat[data-controlled="true"] {
+    z-index: 50;
+    animation-play-state: paused;
+  }
+
+  .cat[data-synced="true"] {
+    animation: none;
+    transform: none;
+  }
+
+  .cat[data-controlled="true"] .cat-sprite {
+    filter: drop-shadow(0 0 0.25rem var(--color-secondary));
+  }
+
+  .cat[data-controlled="true"] .cat__button {
+    border-radius: 50%;
+    box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-secondary) 45%, transparent);
+  }
+
+  .cat-controls {
+    position: absolute;
+    bottom: -1.75rem;
+    left: 50%;
+    display: flex;
+    gap: var(--spacing-snug);
+    opacity: 0;
+    pointer-events: auto;
+    transform: translateX(-50%);
+    transition: opacity 120ms ease;
+  }
+
+  .cat:hover .cat-controls,
+  .cat:focus-within .cat-controls,
+  .cat[data-controlled="true"] .cat-controls {
+    opacity: 1;
+  }
+
+  .cat-controls__button {
+    display: flex;
+    width: 1.5rem;
+    height: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-chip);
+    background: var(--color-paper-raised);
+    color: var(--color-ink);
+    cursor: pointer;
+    transition:
+      background 120ms ease,
+      color 120ms ease;
+  }
+
+  .cat-controls__button:hover {
+    background: var(--color-ink);
+    color: var(--color-paper-raised);
+  }
+
+  .speech-bubble {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    width: max-content;
+    min-width: 8rem;
+    max-width: min(18rem, 90vw);
+    margin-bottom: 0.5rem;
+    transform: translateX(-50%);
+    border: 1px solid var(--color-ink);
+    border-radius: 1rem;
+    background: var(--color-paper-raised);
+    padding: var(--spacing-tight) var(--spacing-snug);
+    box-shadow: 0.1875rem 0.1875rem 0 var(--color-ink);
+    animation: bubble-pop 5s ease-out forwards;
+    text-align: left;
+  }
+
+  .speech-bubble__text {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--color-ink);
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    white-space: normal;
+  }
+
+  .speech-bubble__author {
+    display: block;
+    margin-bottom: var(--spacing-tight);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    color: var(--color-ink-dim);
+  }
+
+  .cat-composer {
+    position: fixed;
+    left: 1rem;
+    bottom: calc(var(--chrome-height) + 1rem);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-tight);
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-chip);
+    background: var(--color-paper-raised);
+    padding: var(--spacing-snug);
+    box-shadow: 0.1875rem 0.1875rem 0 var(--color-ink);
+    pointer-events: auto;
+  }
+
+  .cat-composer__input {
+    width: 12rem;
+    min-width: 0;
+    border: none;
+    border-radius: var(--radius-chip);
+    background: transparent;
+    padding: 0 var(--spacing-tight);
+    font-size: 0.8125rem;
+    color: var(--color-ink);
+  }
+
+  .cat-composer__input:focus-visible {
+    outline: 2px solid var(--color-secondary);
+    outline-offset: 2px;
+  }
+
+  .cat-composer__input::placeholder {
+    color: var(--color-ink-dim);
+    opacity: 1;
+  }
+
+  .cat-composer__send,
+  .cat-composer__clear {
+    display: flex;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: var(--radius-chip);
+    background: var(--color-primary);
+    color: var(--color-paper-raised);
+    transition:
+      background 140ms ease,
+      opacity 140ms ease;
+  }
+
+  .cat-composer__send:disabled,
+  .cat-composer__clear:disabled {
+    cursor: default;
+    opacity: 0.35;
+  }
+
+  .cat-composer__clear {
+    background: var(--color-paper-sunk);
+    color: var(--color-ink-dim);
+    border-color: var(--color-line);
+  }
+
+  .cat-composer__clear:hover {
+    background: var(--color-line);
+    color: var(--color-ink);
   }
 }
 

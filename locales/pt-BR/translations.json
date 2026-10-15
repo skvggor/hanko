@@ -156,6 +156,24 @@
     "empty": "Nenhuma mensagem ainda",
     "openUnread": "Abrir bate-papo, {{count}} não lidas"
   },
+  "cat": {
+    "pause": "Pausar gato de {{name}}",
+    "resume": "Retomar gato de {{name}}",
+    "pauseAction": "Pausar",
+    "resumeAction": "Retomar",
+    "removeAction": "Remover",
+    "controls": "Controles do gato",
+    "release": "Soltar",
+    "paused": "Pausado",
+    "status": {
+      "idle": "parado",
+      "walking": "andando",
+      "jumping": "pulando",
+      "sleeping": "dormindo",
+      "controlled": "controlado"
+    },
+    "statusPaused": "movimento pausado"
+  },
   "session": {
     "label": "Nome da sessão",
     "placeholder": "Planning da Sprint 42",

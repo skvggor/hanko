@@ -102,6 +102,16 @@ describe("isClientMessage", () => {
     expect(isClientMessage({ type: "remove-participant", participantId: "ana" })).toBe(true);
     expect(isClientMessage({ type: "delete-room" })).toBe(true);
     expect(isClientMessage({ type: "ping" })).toBe(true);
+    expect(
+      isClientMessage({
+        type: "cat-update",
+        x: 0.4,
+        y: 0.6,
+        direction: "left",
+        activity: "walking",
+        isPaused: false,
+      }),
+    ).toBe(true);
   });
 
   it("rejects malformed payloads", () => {
@@ -116,6 +126,16 @@ describe("isClientMessage", () => {
     expect(isClientMessage({ type: "transfer-ownership" })).toBe(false);
     expect(isClientMessage({ type: "remove-participant" })).toBe(false);
     expect(isClientMessage({ type: "set-role", participantId: 1 })).toBe(false);
+    expect(
+      isClientMessage({
+        type: "cat-update",
+        x: 0.4,
+        y: 0.6,
+        direction: "left",
+        activity: "unknown",
+        isPaused: false,
+      }),
+    ).toBe(false);
   });
 });
 
@@ -126,6 +146,20 @@ describe("isServerMessage", () => {
     expect(isServerMessage({ type: "error", code: ERROR_CODES.notOwner })).toBe(true);
     expect(isServerMessage({ type: "room-deleted" })).toBe(true);
     expect(isServerMessage({ type: "pong" })).toBe(true);
+    expect(
+      isServerMessage({
+        type: "cat-state",
+        cat: {
+          participantId: "a",
+          breed: "tabby",
+          x: 0.4,
+          y: 0.6,
+          direction: "left",
+          activity: "walking",
+          isPaused: false,
+        },
+      }),
+    ).toBe(true);
   });
 
   it("rejects unknown frames", () => {

@@ -156,6 +156,24 @@
     "empty": "No messages yet",
     "openUnread": "Open chat, {{count}} unread"
   },
+  "cat": {
+    "pause": "Pause {{name}}'s cat",
+    "resume": "Resume {{name}}'s cat",
+    "pauseAction": "Pause",
+    "resumeAction": "Resume",
+    "removeAction": "Remove",
+    "controls": "Cat controls",
+    "release": "Release",
+    "paused": "Paused",
+    "status": {
+      "idle": "idle",
+      "walking": "walking",
+      "jumping": "jumping",
+      "sleeping": "sleeping",
+      "controlled": "controlled"
+    },
+    "statusPaused": "movement paused"
+  },
   "session": {
     "label": "Session name",
     "placeholder": "Sprint 42 planning",

@@ -4,6 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RoomScreen } from "@presentation/RoomScreen";
 
+beforeEach(() => {
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+});
+
 const harness = vi.hoisted(() => ({
   sockets: [] as Array<Record<string, unknown>>,
   joinCalls: [] as unknown[],
@@ -52,6 +60,12 @@ vi.mock("@application/roomConnection", () => ({
 
     onChatMessage(listener: (message: unknown) => void) {
       this.chatListener = listener;
+      return () => {};
+    }
+    catStateListener: ((cat: unknown) => void) | null = null;
+
+    onCatState(listener: (cat: unknown) => void) {
+      this.catStateListener = listener;
       return () => {};
     }
     removedListener: (() => void) | null = null;
@@ -103,6 +117,15 @@ vi.mock("@application/roomConnection", () => ({
     }
     clearMessages() {
       this.#record({ type: "clear-chat" });
+    }
+    updateCat(
+      x: number,
+      y: number,
+      direction: string,
+      activity: string,
+      isPaused: boolean,
+    ) {
+      this.#record({ type: "cat-update", x, y, direction, activity, isPaused });
     }
     ping() {}
     close() {}
@@ -453,9 +476,8 @@ describe("RoomScreen", () => {
     expect(await screen.findByText("abcd2345")).toBeTruthy();
   });
 
-  describe("chat beside the estimate panel", () => {
-    async function openChat() {
-      await userEvent.click(screen.getByRole("button", { name: "Open chat" }));
+  describe("chat as cat bubbles", () => {
+    function composerInput() {
       return screen.getByRole("textbox", { name: "Say something" });
     }
 
@@ -464,7 +486,7 @@ describe("RoomScreen", () => {
       await joinAs("Ana");
       pushState(roomState);
 
-      const input = await openChat();
+      const input = composerInput();
       const before = screen.getByText("Your estimate").closest("div");
 
       await userEvent.type(input, "hello");
@@ -472,12 +494,23 @@ describe("RoomScreen", () => {
       expect(screen.getByText("Your estimate").closest("div")).toBe(before);
     });
 
+    it("forwards chat messages to the connection", async () => {
+      renderRoom();
+      await joinAs("Ana");
+      pushState(roomState);
+
+      const input = composerInput();
+      await userEvent.type(input, "oi{Enter}");
+
+      expect(harness.sent).toContainEqual({ type: "chat", text: "oi" });
+    });
+
     it("does not restart the stamp animation when a message is sent", async () => {
       const { container } = renderRoom();
       await joinAs("Ana");
       pushState({ ...roomState, myVote: "8" });
 
-      const input = await openChat();
+      const input = composerInput();
       const sealBefore = container.querySelector("[data-seal]");
 
       await userEvent.type(input, "oi{Enter}");
@@ -492,7 +525,7 @@ describe("RoomScreen", () => {
       await joinAs("Ana");
       pushState({ ...roomState, myVote: "8" });
 
-      const input = await openChat();
+      const input = composerInput();
       const seal = () => container.querySelector("[data-phase]");
       const before = seal();
       expect(before?.getAttribute("data-phase")).not.toBeNull();
@@ -515,7 +548,7 @@ describe("RoomScreen", () => {
       await joinAs("Ana");
       pushState({ ...roomState, myVote: "8" });
 
-      const input = await openChat();
+      const input = composerInput();
       const seal = container.querySelector("[data-phase]");
       const phase = seal?.getAttribute("data-phase");
 
@@ -545,8 +578,7 @@ describe("RoomScreen", () => {
         connectedCount: 2,
       });
 
-      const hanko = () =>
-        screen.getByText("Your estimate").closest("div")?.parentElement?.parentElement;
+      const hanko = () => screen.getByText("Your estimate").closest("section");
 
       const before = hanko()?.outerHTML;
       const phaseBefore = container
@@ -611,16 +643,21 @@ describe("RoomScreen", () => {
       expect(screen.getByText("Your estimate").closest("div")).toBe(panel);
     });
 
-    it("still shows the message that arrived on the chat frame", async () => {
+    it("shows the message as a speech bubble when it arrives on the chat frame", async () => {
       renderRoom();
       await joinAs("Ana");
-      pushState(roomState);
+      pushState({
+        ...roomState,
+        participants: [
+          { id: "p1", name: "Ana", role: "voter", isOwner: true, isConnected: true, hasVoted: false },
+          { id: "p2", name: "Bia", role: "voter", isOwner: false, isConnected: true, hasVoted: false },
+        ],
+        connectedCount: 2,
+      });
 
-      await userEvent.click(screen.getByRole("button", { name: "Open chat" }));
       pushChat({ id: "m1", authorId: "p2", authorName: "Bia", text: "oi", sentAt: 1 });
 
       expect(screen.getByText("oi")).toBeTruthy();
-      expect(screen.getByText("Bia")).toBeTruthy();
     });
 
     it("lets a later full state win over the locally appended chat", async () => {
@@ -628,19 +665,30 @@ describe("RoomScreen", () => {
       // message must replace the local append rather than duplicate it.
       renderRoom();
       await joinAs("Ana");
-      pushState(roomState);
+      pushState({
+        ...roomState,
+        participants: [
+          { id: "p1", name: "Ana", role: "voter", isOwner: true, isConnected: true, hasVoted: false },
+          { id: "p2", name: "Bia", role: "voter", isOwner: false, isConnected: true, hasVoted: false },
+        ],
+        connectedCount: 2,
+      });
 
-      await userEvent.click(screen.getByRole("button", { name: "Open chat" }));
       pushChat({ id: "m1", authorId: "p2", authorName: "Bia", text: "oi", sentAt: 1 });
       pushState({
         ...roomState,
+        participants: [
+          { id: "p1", name: "Ana", role: "voter", isOwner: true, isConnected: true, hasVoted: false },
+          { id: "p2", name: "Bia", role: "voter", isOwner: false, isConnected: true, hasVoted: false },
+        ],
+        connectedCount: 2,
         messages: [{ id: "m1", authorId: "p2", authorName: "Bia", text: "oi", sentAt: 1 }],
       });
 
       expect(screen.getAllByText("oi")).toHaveLength(1);
     });
 
-    it("replaces no dom node outside the chat when another person speaks", async () => {
+    it("replaces no dom node outside the cat overlay when another person speaks", async () => {
       // Tags every node, then pushes the broadcast the server sends. Any node that
       // is not the same object afterwards was remounted, which is what replays a
       // css animation and reads as a blink.
@@ -673,22 +721,22 @@ describe("RoomScreen", () => {
         ],
       });
 
-      const chat = container.querySelector(".chat-panel, .chat-launcher");
+      const overlay = container.querySelector(".cat-overlay, .cat-composer");
       const replaced = [...container.querySelectorAll("*")].filter(
-        (node) => !seen.has(node) && !chat?.contains(node),
+        (node) => !seen.has(node) && !overlay?.contains(node),
       );
 
       expect(replaced.map((node) => node.className || node.tagName)).toEqual([]);
     });
 
-it("survives a broadcast while the seal is still drying", async () => {
+    it("survives a broadcast while the seal is still drying", async () => {
       const { container } = renderRoom();
       await joinAs("Ana");
       pushState({ ...roomState, myVote: "8" });
 
       const phase = () =>
         container.querySelector("[data-phase]")?.getAttribute("data-phase");
-      const input = await openChat();
+      const input = composerInput();
       const before = phase();
 
       expect(before).not.toBeNull();
@@ -868,7 +916,10 @@ describe("RoomScreen owner controls", () => {
     await enterRoom();
     pushState(ownerState);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Remove" }));
+    const row = (await screen.findByText("Bruno", { exact: true })).closest<HTMLElement>(
+      "[data-participant-row]",
+    );
+    await userEvent.click(within(row!).getByRole("button", { name: "Remove" }));
 
     expect(harness.sent).toContainEqual({
       type: "remove-participant",
@@ -882,8 +933,11 @@ describe("RoomScreen owner controls", () => {
 
     await screen.findByRole("button", { name: "Make owner" });
 
-    // Only Bruno offers the owner controls, so exactly one "Remove" exists.
-    expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(1);
+    const rows = screen.getAllByRole("button", { name: "Remove" })
+      .map((button) => button.closest<HTMLElement>("[data-participant-row]"))
+      .filter((row): row is HTMLElement => row !== null);
+
+    expect(rows).toHaveLength(1);
   });
 
   // The rename goes through the app's own modal now, so these drive the field instead of

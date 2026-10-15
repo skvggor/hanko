@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Room } from "@infra/server";
 import type { castVote} from "@domain/room";
 import { createRoom, joinRoom } from "@domain/room";
@@ -1341,6 +1341,67 @@ describe("Room over WebSocket", () => {
     const rejoined = lastJoined(returningSocket);
     expect(rejoined.token).toBe(token);
     expect(rejoined.state.participants).toHaveLength(1);
+  });
+
+  it("restores the same cat after the room is reconstructed", async () => {
+    vi.useFakeTimers();
+    try {
+      const socket = await joinAs("Ana");
+      const joined = lastJoined(socket);
+      const originalCat = joined.state.cats?.[0];
+
+      await room.webSocketMessage(socket as never, JSON.stringify({
+        type: "cat-update",
+        x: 0.34,
+        y: 0.61,
+        direction: "left",
+        activity: "walking",
+        isPaused: false,
+      }));
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      const reconstructedRoom = new Room(storage as never);
+      const returningSocket = createFakeSocket();
+      connect(storage, returningSocket);
+      await reconstructedRoom.webSocketMessage(returningSocket as never, JSON.stringify({
+        type: "join",
+        token: joined.token,
+        name: "Ana",
+        role: "voter",
+      }));
+
+      const restoredCat = lastJoined(returningSocket).state.cats?.[0];
+      expect(restoredCat?.breed).toBe(originalCat?.breed);
+      expect(restoredCat?.x).toBeCloseTo(0.34);
+      expect(restoredCat?.y).toBeCloseTo(0.61);
+      expect(restoredCat?.direction).toBe("left");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("broadcasts a cat position as a single delta frame", async () => {
+    const owner = await joinAs("Ana");
+    const other = await joinAs("Bruno");
+    const ownerId = lastJoined(owner).participantId;
+
+    await room.webSocketMessage(owner as never, JSON.stringify({
+      type: "cat-update",
+      x: 0.27,
+      y: 0.44,
+      direction: "right",
+      activity: "walking",
+      isPaused: false,
+    }));
+
+    const frames = parse(other.sent).filter((entry) => entry["type"] === "cat-state");
+    const frame = frames.at(-1) as {
+      cat: { participantId: string; x: number; y: number };
+    };
+
+    expect(frame.cat.participantId).toBe(ownerId);
+    expect(frame.cat.x).toBeCloseTo(0.27);
+    expect(frame.cat.y).toBeCloseTo(0.44);
   });
 
   it("restores the vote of a reconnecting participant", async () => {
