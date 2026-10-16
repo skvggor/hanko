@@ -5,6 +5,7 @@ import type { PublicParticipant } from "@domain/protocol";
 import type { Translator } from "@application/i18n";
 import { Cat } from "@presentation/Cat";
 import { CatComposer } from "@presentation/CatComposer";
+import { ChatTranscript } from "@presentation/ChatTranscript";
 import { useControlledCat } from "@presentation/useControlledCat";
 import { useViewportSize } from "@presentation/useViewportSize";
 
@@ -12,6 +13,7 @@ export interface CatOverlayProps {
   myParticipantId: string | null;
   participants: PublicParticipant[];
   messages: ChatMessage[];
+  connectedParticipantIds: ReadonlySet<string>;
   isOwner: boolean;
   onClear: () => void;
   onSend: (text: string) => void;
@@ -57,6 +59,7 @@ export function CatOverlay({
   myParticipantId,
   participants,
   messages,
+  connectedParticipantIds,
   isOwner,
   onClear,
   onSend,
@@ -165,16 +168,6 @@ export function CatOverlay({
     ownCatState?.isPaused,
     takeControl,
   ]);
-
-  /**
- * Only the message that just arrived goes into the live region. A region holding
- * the whole backlog is read out again from the start every time it changes, so in
- * a busy room the announcements talk over each other and the newest message, the
- * only one anybody wants, is the hardest to hear.
- */
-const latestMessage = messages.at(-1);
-const liveText =
-    latestMessage === undefined ? "" : `${latestMessage.authorName}: ${latestMessage.text}`;
 
 
   useEffect(() => {
@@ -371,6 +364,13 @@ const removeCat = useCallback((participantId: string) => {
         />
       ))}
 
+      <ChatTranscript
+        connectedParticipantIds={connectedParticipantIds}
+        messages={messages}
+        myParticipantId={myParticipantId}
+        translate={translate}
+      />
+
       <CatComposer
         hasMessages={messages.length > 0}
         isOwner={isOwner}
@@ -379,9 +379,6 @@ const removeCat = useCallback((participantId: string) => {
         translate={translate}
       />
 
-      <div aria-live="polite" className="visually-hidden" role="log">
-        {liveText}
-      </div>
     </div>
   );
 }

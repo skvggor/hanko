@@ -366,6 +366,7 @@ export function RoomScreen({
         ) : (
           <CatOverlay
             cats={cats}
+            connectedParticipantIds={connectedParticipantIds}
             isOwner={isOwner}
             messages={messages}
             myParticipantId={connection.participantId}

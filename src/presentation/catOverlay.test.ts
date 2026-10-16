@@ -62,6 +62,36 @@ describe("the cat overlay", () => {
     expect(patrol).not.toContain("--cat-direction");
   });
 
+  /**
+   * The overlay covers the viewport and switches pointer events off so the cats float
+   * over the board without swallowing it. Everything inside it that a person is meant
+   * to touch has to switch them back on, and anything that forgets inherits the
+   * silence: it is painted, it sits in the accessibility tree, and it cannot be
+   * clicked. jsdom does not evaluate pointer-events, so nothing else here would say so.
+   */
+  it("lets the reader reach the conversation through the overlay", () => {
+    expect(rule(".chat-transcript__open")).toContain("pointer-events: auto");
+    expect(rule(".chat-transcript")).toContain("pointer-events: auto");
+  });
+
+  /**
+   * A cat being driven is lifted above the rest of the overlay, and a panel of text
+   * that a cat walks across is a panel somebody cannot read. Both are inside the
+   * overlay's own stacking context, so the fix is a number rather than a portal.
+   */
+  it("keeps the conversation clear of a cat somebody is driving", () => {
+    const controlledCat = Number(
+      /z-index:\s*(\d+)/.exec(rule('.cat[data-controlled="true"]'))?.[1] ?? "0",
+    );
+    const panel = Number(/z-index:\s*(\d+)/.exec(rule(".chat-transcript"))?.[1] ?? "0");
+    const launcher = Number(
+      /z-index:\s*(\d+)/.exec(rule(".chat-transcript__open"))?.[1] ?? "0",
+    );
+
+    expect(panel).toBeGreaterThan(controlledCat);
+    expect(launcher).toBeGreaterThan(controlledCat);
+  });
+
   it("declares a body font for the fields that ask for one", () => {
     const themeBlock = /@theme\s*\{([\s\S]*?)\n\}/.exec(theme)?.[1] ?? "";
 

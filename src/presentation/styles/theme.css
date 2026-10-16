@@ -973,6 +973,131 @@ footer {
     color: var(--color-ink-dim);
   }
 
+  /**
+   * The conversation, read in the ordinary way. It sits directly above the composer
+   * rather than beside it, because the composer is the way you answer and the list is
+   * the way you catch up, and neither should push the other off the screen.
+   */
+  .chat-transcript__open {
+    position: fixed;
+    right: 1rem;
+    bottom: calc(var(--chrome-height) + 1rem);
+    /* Above a controlled cat, which the overlay lifts to 50, so the cat somebody is
+       driving cannot sit on top of the control they reached for. Dialogs are rendered
+       outside this overlay and so still win, which is the order worth keeping. */
+    z-index: 51;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-tight);
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-chip);
+    background: var(--color-paper-raised);
+    padding: var(--spacing-hair) var(--spacing-snug);
+    font-size: 0.71875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--color-ink);
+    text-transform: uppercase;
+    cursor: pointer;
+    /* The overlay switches pointer events off so cats float without swallowing the
+       board; this is a control a person is meant to press, so it switches them back. */
+    pointer-events: auto;
+    transition:
+      background 120ms ease,
+      border-color 120ms ease;
+  }
+
+  .chat-transcript__open:hover {
+    background: color-mix(in oklab, var(--color-accent) 22%, var(--color-paper-raised));
+  }
+
+  .chat-transcript {
+    position: fixed;
+    right: 1rem;
+    bottom: calc(var(--chrome-height) + 1rem);
+    z-index: 52;
+    display: flex;
+    width: min(24rem, calc(100vw - 2rem));
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--color-ink);
+    border-radius: 1.5rem;
+    background: var(--color-paper-raised);
+    box-shadow: 0.1875rem 0.1875rem 0 var(--color-ink);
+    pointer-events: auto;
+  }
+
+  .chat-transcript__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-tight);
+    border-bottom: 1px solid var(--color-line);
+    padding: var(--spacing-tight) var(--spacing-snug);
+  }
+
+  .chat-transcript__heading {
+    margin: 0;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--color-ink-faint);
+    text-transform: uppercase;
+  }
+
+  .chat-transcript__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    padding: var(--spacing-hair);
+    color: var(--color-ink-dim);
+    cursor: pointer;
+  }
+
+  .chat-transcript__list {
+    display: flex;
+    max-height: 18rem;
+    flex-direction: column;
+    gap: var(--spacing-tight);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--spacing-snug) var(--spacing-room);
+  }
+
+  /**
+   * The warning is deliberately the loudest thing in the panel. It is the one piece of
+   * text in the room that is about something other than the round, and the round is
+   * what people are looking at.
+   */
+  .chat-transcript__warning {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-tight);
+    margin: 0;
+    border-bottom: 1px solid var(--color-line);
+    background: color-mix(in oklab, var(--color-primary) 12%, var(--color-paper-raised));
+    padding: var(--spacing-snug) var(--spacing-room);
+    font-size: 0.78125rem;
+    line-height: 1.45;
+    color: var(--color-ink);
+  }
+
+  .chat-transcript__warning-dismiss {
+    align-self: flex-start;
+    border: 1px solid var(--color-ink);
+    border-radius: var(--radius-chip);
+    background: var(--color-paper-raised);
+    padding: var(--spacing-hair) var(--spacing-snug);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--color-ink);
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
   .cat-composer {
     position: fixed;
     left: 1rem;

@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react";
 import { MESSAGE_MAX_LENGTH, type ChatMessage } from "@domain/chat";
 import type { Translator } from "@application/i18n";
+import { ChatMessages } from "@presentation/ChatMessages";
 import { useMessageDraft } from "@presentation/useMessageDraft";
 
 const WIDE_QUERY = "(min-width: 640px)";
@@ -111,28 +112,14 @@ export function ChatPanel({
           </div>
         </header>
 
-        <div className="chat-panel__list" ref={listRef} role="log">
-          {messages.length === 0 ? (
-            <p className="chat-panel__empty">{translate("chat.empty")}</p>
-          ) : (
-            messages.map((message) => {
-              const isMine = message.authorId === myParticipantId;
-              const hasLeft = !connectedParticipantIds.has(message.authorId);
-
-              return (
-                <p
-                  className="chat-line"
-                  data-mine={isMine}
-                  data-left={hasLeft}
-                  key={message.id}
-                >
-                  <span className="chat-line__name">{message.authorName}</span>
-                  <span className="chat-line__text">{message.text}</span>
-                </p>
-              );
-            })
-          )}
-        </div>
+        <ChatMessages
+          className="chat-panel__list"
+          connectedParticipantIds={connectedParticipantIds}
+          listRef={listRef}
+          messages={messages}
+          myParticipantId={myParticipantId}
+          translate={translate}
+        />
 
         <form
           className="chat-composer"

@@ -214,3 +214,49 @@ describe("ChatPanel", () => {
 
   });
 });
+describe("ChatPanel reading the conversation", () => {
+  function renderPanel(messages: ChatMessage[] = []) {
+    return render(
+      <ChatPanel
+        connectedParticipantIds={new Set(["p1", "p2"])}
+        isOwner={false}
+        messages={messages}
+        myParticipantId="p1"
+        onClear={vi.fn()}
+        onSend={vi.fn()}
+        translate={translate}
+      />,
+    );
+  }
+
+  function line(overrides: Partial<ChatMessage> = {}): ChatMessage {
+    return {
+      id: "m1",
+      authorId: "p2",
+      authorName: "Bia",
+      text: "vamos nessa",
+      sentAt: 1,
+      ...overrides,
+    };
+  }
+
+  it("reads back everything that was said, not only the last thing", () => {
+    renderPanel([
+      line({ id: "m1", text: "primeira" }),
+      line({ id: "m2", text: "segunda" }),
+      line({ id: "m3", text: "terceira" }),
+    ]);
+
+    expect(screen.getByText("primeira")).toBeTruthy();
+    expect(screen.getByText("segunda")).toBeTruthy();
+    expect(screen.getByText("terceira")).toBeTruthy();
+  });
+
+  it("brings the newest message into view", () => {
+    renderPanel([line({ id: "m1", text: "primeira" })]);
+
+    const list = screen.getByRole("log");
+
+    expect(list.scrollTop).toBe(list.scrollHeight);
+  });
+});

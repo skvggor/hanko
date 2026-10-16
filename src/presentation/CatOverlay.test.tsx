@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ChatMessage } from "@domain/chat";
 import type { PublicParticipant } from "@domain/protocol";
@@ -35,6 +35,7 @@ describe("CatOverlay", () => {
   it("renders one cat per connected participant", () => {
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -55,6 +56,7 @@ describe("CatOverlay", () => {
 
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p0"
@@ -81,6 +83,7 @@ describe("CatOverlay", () => {
   it("hides disconnected participants", () => {
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -98,6 +101,7 @@ describe("CatOverlay", () => {
     const onSend = vi.fn();
     render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -118,6 +122,7 @@ describe("CatOverlay", () => {
     const onClear = vi.fn();
     render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner
         messages={[message()]}
         myParticipantId="p1"
@@ -136,6 +141,7 @@ describe("CatOverlay", () => {
   it("announces messages in a live region", () => {
     render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[message({ text: "vamos" })]}
         myParticipantId="p1"
@@ -157,6 +163,7 @@ describe("CatOverlay", () => {
 
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -184,6 +191,7 @@ describe("CatOverlay", () => {
   it("makes the controlled cat jump on the space bar", async () => {
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -209,6 +217,7 @@ describe("CatOverlay", () => {
   it("turns the controlled cat to face the way it is moving", async () => {
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -234,6 +243,7 @@ describe("CatOverlay", () => {
   it("drops the cat selection while typing and takes it back after", async () => {
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -264,6 +274,7 @@ describe("CatOverlay", () => {
     const onSend = vi.fn();
     render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -283,6 +294,7 @@ describe("CatOverlay", () => {
   it("does not move a cat that is asleep", async () => {
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -311,6 +323,7 @@ describe("CatOverlay", () => {
   it("releases the controlled cat on Escape", async () => {
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -334,6 +347,7 @@ describe("CatOverlay", () => {
   it("removes a cat from the overlay", async () => {
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -353,6 +367,7 @@ describe("CatOverlay", () => {
     const onUpdateCat = vi.fn();
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         cats={[{
           participantId: "p1",
           breed: "tabby",
@@ -389,6 +404,7 @@ describe("CatOverlay", () => {
   it("does not select a server-backed cat that is already asleep", async () => {
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         cats={[{
           participantId: "p1",
           breed: "tabby",
@@ -419,6 +435,7 @@ describe("CatOverlay", () => {
   it("shows a brief angry reaction when the controlled cat collides", async () => {
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         cats={[
           {
             participantId: "p1",
@@ -465,6 +482,7 @@ describe("CatOverlay", () => {
     const onUpdateCat = vi.fn();
     const { container } = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -491,6 +509,7 @@ describe("CatOverlay keyboard ownership", () => {
   function renderControlled() {
     const view = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -541,6 +560,7 @@ describe("CatOverlay keyboard ownership", () => {
   it("lets the chat composer keep its own space bar", async () => {
     const view = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[message()]}
         myParticipantId="p1"
@@ -615,6 +635,7 @@ describe("CatOverlay reconciliation", () => {
   ) {
     return render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId={myParticipantId}
@@ -641,6 +662,7 @@ describe("CatOverlay reconciliation", () => {
     // back to it.
     view.rerender(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -657,6 +679,7 @@ describe("CatOverlay reconciliation", () => {
 
     view.rerender(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
         myParticipantId="p1"
@@ -673,6 +696,7 @@ describe("CatOverlay reconciliation", () => {
   it("still renders a cat whose state has not arrived yet", () => {
     const view = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         cats={[]}
         isOwner={false}
         messages={[]}
@@ -695,6 +719,7 @@ describe("CatOverlay reconciliation", () => {
   it("announces only the message that just arrived", () => {
     const view = render(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[message({ id: "m1", authorName: "Ana", text: "primeira" })]}
         myParticipantId="p1"
@@ -708,6 +733,7 @@ describe("CatOverlay reconciliation", () => {
 
     view.rerender(
       <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[
           message({ id: "m1", authorName: "Ana", text: "primeira" }),
@@ -726,5 +752,160 @@ describe("CatOverlay reconciliation", () => {
     const log = screen.getByRole("log").textContent ?? "";
     expect(log).toContain("segunda");
     expect(log).not.toContain("primeira");
+  });
+});
+
+describe("CatOverlay and the chat composer", () => {
+  function renderOverlay() {
+    const onSend = vi.fn();
+    const view = render(
+      <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
+        isOwner={false}
+        messages={[message({ id: "m1", authorName: "Ana", text: "vamos nessa" })]}
+        myParticipantId="p1"
+        onClear={vi.fn()}
+        onSend={onSend}
+        participants={[participant()]}
+        translate={translate}
+      />,
+    );
+
+    return { onSend, ...view };
+  }
+
+  it("still offers the composer after your own cat is sent away", async () => {
+    const { container } = renderOverlay();
+
+    const remove = container.querySelector(
+      '[data-testid="cat-p1"] .cat-controls__button:last-of-type',
+    ) as HTMLElement;
+    expect(remove).toBeTruthy();
+    expect(container.querySelectorAll(".cat")).toHaveLength(1);
+
+    await userEvent.click(remove);
+
+    expect(container.querySelectorAll(".cat")).toHaveLength(0);
+    expect(container.querySelector(".cat-composer__input")).toBeTruthy();
+  });
+
+  it("still sends a message after your own cat is sent away", async () => {
+    const { container, onSend } = renderOverlay();
+
+    const remove = container.querySelector(
+      '[data-testid="cat-p1"] .cat-controls__button:last-of-type',
+    ) as HTMLElement;
+    await userEvent.click(remove);
+
+    const input = container.querySelector(".cat-composer__input") as HTMLElement;
+    expect(input).toBeTruthy();
+    await userEvent.type(input, "ainda aqui{Enter}");
+
+    expect(onSend).toHaveBeenCalledWith("ainda aqui");
+  });
+
+  it("still shows what was said after your own cat is sent away", () => {
+    const { container } = renderOverlay();
+
+    const remove = container.querySelector(
+      '[data-testid="cat-p1"] .cat-controls__button:last-of-type',
+    ) as HTMLElement;
+    remove.click();
+
+    expect(screen.getByRole("log").textContent).toContain("vamos nessa");
+  });
+});
+
+describe("CatOverlay reading the conversation", () => {
+  const conversation = [
+    message({ id: "m1", authorId: "p2", authorName: "Bia", text: "primeira" }),
+    message({ id: "m2", authorId: "p2", authorName: "Bia", text: "segunda" }),
+    message({ id: "m3", authorId: "p1", authorName: "Ana", text: "terceira" }),
+  ];
+
+  function renderOverlay(messages: ChatMessage[] = conversation) {
+    const onSend = vi.fn();
+    const view = render(
+      <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
+        isOwner={false}
+        messages={messages}
+        myParticipantId="p1"
+        onClear={vi.fn()}
+        onSend={onSend}
+        participants={[participant(), participant({ id: "p2", name: "Bia" })]}
+        translate={translate}
+      />,
+    );
+
+    return { onSend, ...view };
+  }
+
+  it("offers the conversation rather than assuming it is wanted", () => {
+    renderOverlay();
+
+    expect(screen.getByRole("button", { name: "Read the conversation" })).toBeTruthy();
+  });
+
+  /**
+   * The bubbles carry one message each, so before this the room could only show the
+   * last thing every person said and had no way at all to read anything back.
+   */
+  it("reads back everything once asked for it", async () => {
+    renderOverlay();
+
+    await userEvent.click(screen.getByRole("button", { name: "Read the conversation" }));
+    // Scoped to the list, because a message can legitimately be in two places at once:
+    // the bubble carries the newest of each author and the list carries all of them.
+    const transcript = within(screen.getByRole("log"));
+
+    expect(transcript.getByText("primeira")).toBeTruthy();
+    expect(transcript.getByText("segunda")).toBeTruthy();
+    expect(transcript.getByText("terceira")).toBeTruthy();
+  });
+
+  it("keeps the composer while the conversation is open", async () => {
+    renderOverlay();
+
+    await userEvent.click(screen.getByRole("button", { name: "Read the conversation" }));
+
+    expect(screen.getByPlaceholderText("Say something")).toBeTruthy();
+  });
+
+  it("still sends with the conversation open", async () => {
+    const { onSend } = renderOverlay();
+
+    await userEvent.click(screen.getByRole("button", { name: "Read the conversation" }));
+    await userEvent.type(screen.getByPlaceholderText("Say something"), "agora{Enter}");
+
+    expect(onSend).toHaveBeenCalledWith("agora");
+  });
+
+  it("keeps the composer after the conversation is closed", async () => {
+    renderOverlay();
+
+    await userEvent.click(screen.getByRole("button", { name: "Read the conversation" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close the conversation" }));
+
+    expect(screen.getByPlaceholderText("Say something")).toBeTruthy();
+  });
+
+  it("warns about what the room is the first time it is opened", async () => {
+    globalThis.localStorage?.clear();
+    renderOverlay();
+
+    await userEvent.click(screen.getByRole("button", { name: "Read the conversation" }));
+
+    expect(screen.getByText(/not private and its chat is not encrypted/)).toBeTruthy();
+    globalThis.localStorage?.clear();
+  });
+
+  it("says whose words a line was, so a transcript is readable later", async () => {
+    renderOverlay();
+
+    await userEvent.click(screen.getByRole("button", { name: "Read the conversation" }));
+
+    const first = within(screen.getByRole("log")).getByText("primeira");
+    expect(first.closest(".chat-line")?.textContent).toContain("Bia");
   });
 });

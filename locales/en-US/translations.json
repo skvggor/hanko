@@ -155,7 +155,11 @@
     "send": "Send message",
     "placeholder": "Say something",
     "empty": "No messages yet",
-    "openUnread": "Open chat, {{count}} unread"
+    "openUnread": "Open chat, {{count}} unread",
+    "read": "Read the conversation",
+    "close": "Close the conversation",
+    "warning": "This room is not private and its chat is not encrypted: anyone holding the link can read everything here. Do not put confidential or unlawful information in it.",
+    "warningDismiss": "Understood"
   },
   "cat": {
     "pause": "Pause {{name}}'s cat",
