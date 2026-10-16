@@ -92,6 +92,7 @@
     "offline": "Você parece estar sem conexão",
     "retry": "Tentar de novo",
     "empty_message": "Escreva algo primeiro",
+    "copy_failed": "Não foi possível copiar o link, copie pela barra de endereço",
     "session_name_required": "Dê um nome para a sessão",
     "session_name_invalid": "Esse nome não pode ser usado",
     "rate_limited": "Devagar um pouco",
@@ -159,8 +160,6 @@
   "cat": {
     "pause": "Pausar gato de {{name}}",
     "resume": "Retomar gato de {{name}}",
-    "pauseAction": "Pausar",
-    "resumeAction": "Retomar",
     "removeAction": "Remover",
     "controls": "Controles do gato",
     "release": "Soltar",

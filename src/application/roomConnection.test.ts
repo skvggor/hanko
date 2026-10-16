@@ -192,15 +192,17 @@ describe("RoomConnection", () => {
     const socket = createFakeSocket();
 
     const connection = new RoomConnection("room-1", () => socket as unknown as WebSocket);
-    const changes = vi.fn<(connected: boolean) => void>();
+    const changes = vi.fn<(status: string) => void>();
     connection.onConnectionChange(changes);
 
     await connection.join("Ana", "voter", null);
     socket.onopen?.(new Event("open"));
     socket.onclose?.();
 
-    expect(changes).toHaveBeenNthCalledWith(1, true);
-    expect(changes).toHaveBeenNthCalledWith(2, false);
+    // "reconnecting" rather than "offline", because the room is still being chased
+    // and the person is waiting rather than stranded.
+    expect(changes).toHaveBeenNthCalledWith(1, "connected");
+    expect(changes).toHaveBeenNthCalledWith(2, "reconnecting");
   });
 
   it("marks itself disconnected on a socket error", async () => {
@@ -221,7 +223,7 @@ describe("RoomConnection", () => {
     const socket = createFakeSocket();
 
     const connection = new RoomConnection("room-1", () => socket as unknown as WebSocket);
-    const changes = vi.fn<(connected: boolean) => void>();
+    const changes = vi.fn<(status: string) => void>();
     connection.onConnectionChange(changes)();
 
     await connection.join("Ana", "voter", null);
@@ -565,5 +567,209 @@ describe("RoomConnection", () => {
     connection.close();
 
     expect(connection.isConnected()).toBe(false);
+  });
+});
+
+describe("RoomConnection recovery", () => {
+  beforeEach(() => {
+    useSecureLocation();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /**
+   * A socket per attempt, so a reconnect is observable as a second socket rather
+   * than as a message on the first one.
+   */
+  function socketFactory() {
+    const sockets: FakeWebSocket[] = [];
+    return {
+      sockets,
+      factory: () => {
+        const socket = createFakeSocket();
+        sockets.push(socket);
+        return socket as unknown as WebSocket;
+      },
+    };
+  }
+
+  function joinFrame(token: string): string {
+    return JSON.stringify({
+      type: "joined",
+      participantId: "p1",
+      token,
+      state: baseState,
+    });
+  }
+
+  async function joined(token = "tok-1") {
+    const { RoomConnection } = await import("@application/roomConnection");
+    const { factory, sockets } = socketFactory();
+    const connection = new RoomConnection("room-1", factory);
+
+    await connection.join("Ana", "voter", null);
+    const first = sockets[0];
+    first?.onmessage?.({ data: joinFrame(token) });
+    first?.onopen?.(new Event("open"));
+
+    return { connection, sockets };
+  }
+
+  it("reopens the socket after the connection drops", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined();
+
+    sockets[0]?.onclose?.();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(sockets).toHaveLength(2);
+    connection.close();
+  });
+
+  it("replays the join with the token it was issued", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined("tok-abc");
+
+    sockets[0]?.onclose?.();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    const replay = sockets[1]?.sent.map((entry) => JSON.parse(entry) as { token: string | null });
+    expect(replay?.at(-1)?.token).toBe("tok-abc");
+    connection.close();
+  });
+
+  it("replays the name and the role it joined with", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined();
+
+    sockets[0]?.onclose?.();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    const replay = sockets[1]?.sent.map(
+      (entry) => JSON.parse(entry) as { name: string; role: string },
+    );
+    expect(replay?.at(-1)?.name).toBe("Ana");
+    expect(replay?.at(-1)?.role).toBe("voter");
+    connection.close();
+  });
+
+  it("backs off further with every failed attempt", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined();
+
+    sockets[0]?.onclose?.();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(sockets).toHaveLength(2);
+
+    sockets[1]?.onclose?.();
+    await vi.advanceTimersByTimeAsync(999);
+    expect(sockets).toHaveLength(2);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(sockets).toHaveLength(3);
+    connection.close();
+  });
+
+  it("waits again from the start after a successful reconnect", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined();
+
+    sockets[0]?.onclose?.();
+    await vi.advanceTimersByTimeAsync(500);
+    sockets[1]?.onopen?.(new Event("open"));
+
+    // A socket that came back up is a room that was reachable, so the next drop is
+    // a first drop again rather than the tail of a long failure.
+    sockets[1]?.onclose?.();
+    await vi.advanceTimersByTimeAsync(499);
+    expect(sockets).toHaveLength(2);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(sockets).toHaveLength(3);
+    connection.close();
+  });
+
+  it("gives up after the attempts run out", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined();
+    const statuses: string[] = [];
+    connection.onConnectionChange((status) => statuses.push(status));
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      sockets.at(-1)?.onclose?.();
+      await vi.advanceTimersByTimeAsync(60_000);
+    }
+
+    expect(statuses.at(-1)).toBe("offline");
+    connection.close();
+  });
+
+  it("announces reconnecting while it is still trying", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined();
+    const statuses: string[] = [];
+    connection.onConnectionChange((status) => statuses.push(status));
+
+    sockets[0]?.onclose?.();
+
+    expect(statuses).toContain("reconnecting");
+    connection.close();
+  });
+
+  it("never reconnects once the caller closed it", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined();
+
+    connection.close();
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(sockets).toHaveLength(1);
+  });
+
+  it("never reconnects a participant who was removed", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined();
+
+    sockets[0]?.onmessage?.({
+      data: JSON.stringify({ type: "removed" }),
+    });
+    sockets[0]?.onclose?.();
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(sockets).toHaveLength(1);
+    connection.close();
+  });
+
+  it("never reconnects into a room that was deleted", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined();
+
+    sockets[0]?.onmessage?.({
+      data: JSON.stringify({ type: "room-deleted" }),
+    });
+    sockets[0]?.onclose?.();
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(sockets).toHaveLength(1);
+    connection.close();
+  });
+
+  it("lets the caller try again after giving up", async () => {
+    vi.useFakeTimers();
+    const { connection, sockets } = await joined();
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      sockets.at(-1)?.onclose?.();
+      await vi.advanceTimersByTimeAsync(60_000);
+    }
+    const attemptsBefore = sockets.length;
+
+    connection.retry();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(sockets.length).toBeGreaterThan(attemptsBefore);
+    connection.close();
   });
 });

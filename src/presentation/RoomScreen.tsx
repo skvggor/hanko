@@ -4,7 +4,7 @@ import type { PublicRoomState } from "@domain/protocol";
 import type { DeckId } from "@domain/deck";
 import type { ParticipantRole } from "@domain/room";
 import type { CatActivity, CatState } from "@domain/cat";
-import { RoomConnection } from "@application/roomConnection";
+import { RoomConnection, type ConnectionStatus } from "@application/roomConnection";
 import type { Translator } from "@application/i18n";
 import { roomPath } from "@application/routing";
 import { CatOverlay } from "@presentation/CatOverlay";
@@ -37,6 +37,16 @@ function writeStoredToken(roomId: string, token: string): void {
   } catch {
     // storage unavailable, the session simply will not survive a reload
   }
+}
+
+/**
+ * The clipboard is simply absent outside a secure context, even though the DOM
+ * types promise it is always there. Going through a function keeps the possibility
+ * in the type instead of letting a non-optional property hide a browser that has
+ * not implemented it.
+ */
+function readClipboard(): Clipboard | undefined {
+  return globalThis.navigator.clipboard;
 }
 
 function readStoredName(roomId: string): string | null {
@@ -77,6 +87,7 @@ export function RoomScreen({
   const [wasRemoved, setWasRemoved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connected");
   /** Waiting the round trip left a tap looking like it had done nothing. */
   const [pendingVote, setPendingVote] = useState<string | null | undefined>(undefined);
   const deleteTrigger = useRef<HTMLButtonElement>(null);
@@ -122,6 +133,9 @@ export function RoomScreen({
     const unsubscribeRemoved = connection.onRemoved(() => {
       setWasRemoved(true);
     });
+    const unsubscribeConnection = connection.onConnectionChange((status) => {
+      setConnectionStatus(status);
+    });
 
     return () => {
       unsubscribeState();
@@ -130,6 +144,7 @@ export function RoomScreen({
       unsubscribeError();
       unsubscribeDeleted();
       unsubscribeRemoved();
+      unsubscribeConnection();
       connection.close();
     };
   }, [connection, onRoomDeleted]);
@@ -226,9 +241,31 @@ export function RoomScreen({
     [connection],
   );
 
+  /**
+   * The chip is the room's only secret, so claiming a copy that never happened is
+   * the worst possible failure here: the person walks away believing the link is on
+   * their clipboard when it is not. A clipboard that rejects, or a browser with no
+   * clipboard at all, has to say so instead.
+   */
   const handleCopyLink = useCallback(() => {
-    void globalThis.navigator.clipboard?.writeText(shareUrl);
-    setCopied(true);
+    const clipboard = readClipboard();
+
+    if (clipboard === undefined) {
+      setCopied(false);
+      setErrorCode("copy_failed");
+      return;
+    }
+
+    void clipboard.writeText(shareUrl).then(
+      () => {
+        setCopied(true);
+        setErrorCode(null);
+      },
+      () => {
+        setCopied(false);
+        setErrorCode("copy_failed");
+      },
+    );
   }, [shareUrl]);
 
   useEffect(() => {
@@ -365,6 +402,35 @@ export function RoomScreen({
         >
           {translate(`errors.${errorCode}`)}
         </p>
+      )}
+
+      {/*
+        A dropped socket is not a lost seat, so the room stays on screen and the
+        notice sits above it rather than replacing it. "status" rather than "alert"
+        because nothing has gone wrong that the person can act on by reading this:
+        it is the network talking, and interrupting whatever they were doing for it
+        would be worse than the silence it replaces.
+      */}
+      {connectionStatus !== "connected" && (
+        <output
+          className="mb-snug flex items-center gap-tight rounded-2xl bg-ink/5 px-snug py-tight text-[0.8125rem] font-semibold text-ink-dim"
+        >
+          <span>
+            {translate(
+              connectionStatus === "offline" ? "room.offline" : "room.reconnecting",
+            )}
+          </span>
+
+          {connectionStatus === "offline" && (
+            <button
+              className="ml-auto shrink-0 rounded-chip border border-line px-tight py-hair font-sans text-[0.71875rem] font-bold tracking-[0.06em] uppercase transition-colors hover:border-ink focus-visible:border-ink focus-visible:outline-offset-[3px]"
+              type="button"
+              onClick={() => connection.retry()}
+            >
+              {translate("errors.retry")}
+            </button>
+          )}
+        </output>
       )}
 
       {body}

@@ -18,6 +18,8 @@ const harness = vi.hoisted(() => ({
   sent: [] as unknown[],
   roomDeleted: false,
   errors: [] as string[],
+  retries: 0,
+  connectionListener: null as ((status: string) => void) | null,
 }));
 
 vi.mock("@application/roomConnection", () => ({
@@ -75,8 +77,13 @@ vi.mock("@application/roomConnection", () => ({
       return () => {};
     }
 
-    onConnectionChange() {
+    onConnectionChange(listener: (status: string) => void) {
+      harness.connectionListener = listener;
       return () => {};
+    }
+
+    retry() {
+      harness.retries += 1;
     }
 
     vote(value: string) {
@@ -171,6 +178,12 @@ function pushRemoved() {
 function pushDeleted() {
   act(() => {
     currentConnection()?.deletedListener?.();
+  });
+}
+
+function pushConnection(status: string) {
+  act(() => {
+    harness.connectionListener?.(status);
   });
 }
 
@@ -1057,10 +1070,43 @@ describe("RoomScreen owner controls", () => {
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
   });
 
-  it("still confirms the copy when there is no clipboard to write to", async () => {
+  it("refuses to claim a copy when the clipboard refuses it", async () => {
+    const writeText = vi.fn(async () => {
+      throw new Error("denied");
+    });
+    vi.stubGlobal("navigator", { language: "en-US", clipboard: { writeText } });
+    await enterRoom();
+    pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
+  });
+
+  it("refuses to claim a copy when there is no clipboard to write to", async () => {
     vi.stubGlobal("navigator", { language: "en-US", clipboard: undefined });
     await enterRoom();
     pushState(ownerState);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
+  });
+
+  it("recovers the copy chip after a refusal so it can be tried again", async () => {
+    const writeText = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error("denied"))
+      .mockResolvedValueOnce(undefined);
+    vi.stubGlobal("navigator", { language: "en-US", clipboard: { writeText } });
+    await enterRoom();
+    pushState(ownerState);
+
+    const copyButton = await screen.findByRole("button", { name: "Copy link" });
+    await userEvent.click(copyButton);
+    expect(await screen.findByRole("alert")).toBeTruthy();
 
     await userEvent.click(await screen.findByRole("button", { name: "Copy link" }));
 
@@ -1213,5 +1259,108 @@ describe("RoomScreen deleting the room", () => {
     pushDeleted();
 
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("RoomScreen connection recovery", () => {
+  beforeEach(() => {
+    harness.sockets.length = 0;
+    harness.joinCalls.length = 0;
+    harness.sent.length = 0;
+    harness.retries = 0;
+    harness.connectionListener = null;
+    vi.stubGlobal("location", {
+      protocol: "https:",
+      host: "hanko.skvggor.workers.dev",
+      href: "https://hanko.skvggor.workers.dev/room/abcd2345",
+      origin: "https://hanko.skvggor.workers.dev",
+    });
+  });
+
+  async function enterRoom() {
+    await userEvent.type(screen.getByLabelText("Your name"), "Ana");
+    await userEvent.click(screen.getByRole("button", { name: "Enter" }));
+    pushState(roomState);
+  }
+
+  it("says nothing about the connection while it is healthy", async () => {
+    renderRoom();
+    await enterRoom();
+
+    pushConnection("connected");
+
+    expect(screen.queryByText("Reconnecting...")).toBeNull();
+    expect(screen.queryByText("Connection lost")).toBeNull();
+  });
+
+  it("tells the person the room is being chased", async () => {
+    renderRoom();
+    await enterRoom();
+
+    pushConnection("reconnecting");
+
+    expect(screen.getByText("Reconnecting...")).toBeTruthy();
+  });
+
+  it("announces the loss politely rather than as an error", async () => {
+    renderRoom();
+    await enterRoom();
+
+    pushConnection("offline");
+
+    // role="status" rather than "alert": the network talking is not an emergency,
+    // and an assertive region would interrupt whatever the person was doing.
+    expect(screen.getByRole("status").textContent).toContain("Connection lost");
+  });
+
+  it("clears the message once the room comes back", async () => {
+    renderRoom();
+    await enterRoom();
+
+    pushConnection("reconnecting");
+    expect(screen.getByText("Reconnecting...")).toBeTruthy();
+
+    pushConnection("connected");
+
+    expect(screen.queryByText("Reconnecting...")).toBeNull();
+  });
+
+  it("offers a way back once the chase is over", async () => {
+    renderRoom();
+    await enterRoom();
+
+    pushConnection("offline");
+
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+  });
+
+  it("asks the connection to try again when the person says so", async () => {
+    renderRoom();
+    await enterRoom();
+
+    pushConnection("offline");
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(harness.retries).toBe(1);
+  });
+
+  it("does not offer a retry while the connection is still being chased", async () => {
+    renderRoom();
+    await enterRoom();
+
+    pushConnection("reconnecting");
+
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
+  it("keeps the board readable while the connection is being chased", async () => {
+    renderRoom();
+    await enterRoom();
+
+    pushConnection("reconnecting");
+
+    // The room is not gone, so the vote grid must not be replaced by the notice.
+    expect(screen.getAllByRole("button", { name: /^Vote/ }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("status").textContent).toContain("Reconnecting...");
   });
 });
