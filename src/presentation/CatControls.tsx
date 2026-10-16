@@ -4,6 +4,7 @@ import type { Translator } from "@application/i18n";
 export interface CatControlsProps {
   isPaused: boolean;
   isOwn: boolean;
+  name: string;
   onTogglePause: () => void;
   onRemove: () => void;
   translate: Translator;
@@ -12,6 +13,7 @@ export interface CatControlsProps {
 export function CatControls({
   isPaused,
   isOwn,
+  name,
   onTogglePause,
   onRemove,
   translate,
@@ -21,7 +23,11 @@ export function CatControls({
   return (
     <span aria-label={translate("cat.controls")} className="cat-controls" role="toolbar">
       <button
-        aria-label={isPaused ? translate("cat.resume") : translate("cat.pause")}
+        aria-label={
+          isPaused
+            ? translate("cat.resume", { name })
+            : translate("cat.pause", { name })
+        }
         className="cat-controls__button"
         type="button"
         onClick={onTogglePause}

@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
 import { ArrowUpIcon, TrashIcon } from "@phosphor-icons/react";
 import { MESSAGE_MAX_LENGTH } from "@domain/chat";
 import type { Translator } from "@application/i18n";
+import { useMessageDraft } from "@presentation/useMessageDraft";
 
 export interface CatComposerProps {
   hasMessages: boolean;
@@ -18,14 +18,7 @@ export function CatComposer({
   onSend,
   translate,
 }: Readonly<CatComposerProps>) {
-  const [draft, setDraft] = useState("");
-
-  const submit = useCallback(() => {
-    const text = draft.trim();
-    if (text.length === 0) return;
-    onSend(text);
-    setDraft("");
-  }, [draft, onSend]);
+  const { canSend, draft, setDraft, submit } = useMessageDraft(onSend);
 
   return (
     <form
@@ -52,7 +45,7 @@ export function CatComposer({
       <button
         aria-label={translate("chat.send")}
         className="cat-composer__send"
-        disabled={draft.trim().length === 0}
+        disabled={!canSend}
         type="submit"
       >
         <ArrowUpIcon aria-hidden="true" size={16} weight="bold" />

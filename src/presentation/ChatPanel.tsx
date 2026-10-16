@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react";
 import { MESSAGE_MAX_LENGTH, type ChatMessage } from "@domain/chat";
 import type { Translator } from "@application/i18n";
+import { useMessageDraft } from "@presentation/useMessageDraft";
 
 const WIDE_QUERY = "(min-width: 640px)";
 
@@ -34,9 +35,9 @@ export function ChatPanel({
   translate,
 }: Readonly<ChatPanelProps>) {
   const [open, setOpen] = useState(prefersWideScreen);
-  const [draft, setDraft] = useState("");
   const [readUpTo, setReadUpTo] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const { canSend, draft, setDraft, submit } = useMessageDraft(onSend);
 
   const unread = readUpTo === null ? 0 : Math.max(0, messages.length - readUpTo);
 
@@ -60,13 +61,6 @@ export function ChatPanel({
     const list = listRef.current;
     if (list !== null) list.scrollTop = list.scrollHeight;
   }, [open, messages.length]);
-
-  const submit = useCallback(() => {
-    const text = draft.trim();
-    if (text.length === 0) return;
-    onSend(text);
-    setDraft("");
-  }, [draft, onSend]);
 
   if (!open) {
     return (
@@ -147,7 +141,7 @@ export function ChatPanel({
             submit();
           }}
         >
-          <label className="sr-only" htmlFor="chat-input">
+          <label className="visually-hidden" htmlFor="chat-input">
             {translate("chat.placeholder")}
           </label>
           <input
@@ -162,7 +156,7 @@ export function ChatPanel({
           <button
             aria-label={translate("chat.send")}
             className="chat-send"
-            disabled={draft.trim().length === 0}
+            disabled={!canSend}
             type="submit"
           >
             <ArrowUpIcon aria-hidden="true" size={16} weight="bold" />

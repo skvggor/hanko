@@ -60,6 +60,9 @@
   --font-display: "Space Grotesk Variable", "Helvetica Neue", sans-serif;
   --font-sans: "Space Grotesk Variable", "Helvetica Neue", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* The face a text field asks for. Named apart from the display face so a field
+     never picks up the display treatment by accident. */
+  --font-body: "Space Grotesk Variable", "Helvetica Neue", sans-serif;
 
   --spacing-hair: 0.3125rem;
   --spacing-tight: 0.5rem;
@@ -67,8 +70,6 @@
   --spacing-room: 1.25rem;
   --spacing-gutter: 1.5rem;
   --spacing-stack: 2rem;
-  /* Clearance for the floating chat dock, which sits above the pinned footer. */
-  --spacing-dock: 6rem;
 
   --radius-chip: 999px;
 
@@ -90,22 +91,18 @@
 @keyframes cat-patrol {
   0% {
     --cat-progress: 0;
-    --cat-direction: 1;
   }
 
   49.999% {
     --cat-progress: 1;
-    --cat-direction: 1;
   }
 
   50% {
     --cat-progress: 1;
-    --cat-direction: -1;
   }
 
   100% {
     --cat-progress: 0;
-    --cat-direction: -1;
   }
 }
 
@@ -622,17 +619,157 @@ footer {
     pointer-events: auto;
   }
 
-  .cat__figure {
-    width: 100%;
-    height: 100%;
-  }
-
   .cat-sprite {
     width: 100%;
     height: 100%;
     image-rendering: pixelated;
     transform: scaleX(var(--cat-direction));
     transform-origin: center;
+  }
+
+  /**
+   * The cat is drawn from rectangles and paths, so every part of it is painted from a
+   * custom property set on the sprite itself. None of it depends on which cat is being
+   * drawn, which is why it lives here once instead of being injected into every
+   * sprite: a room of ten cats used to parse ten identical copies of these rules.
+   */
+  .contorno {
+    fill: var(--cor-contorno);
+  }
+
+  .pelagem {
+    fill: var(--cor-principal);
+  }
+
+  .listra {
+    fill: var(--cor-listras);
+  }
+
+  .claro {
+    fill: var(--cor-peito);
+  }
+
+  .olho {
+    fill: var(--cor-olhos);
+  }
+
+  .focinho {
+    fill: var(--cor-focinho);
+  }
+
+  /* Breathing is the idle tell, so it runs whether or not the cat walks. */
+  @keyframes respirar {
+    0%,
+    100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(1px);
+    }
+  }
+
+  /* A sleeping cat barely moves: one slow, tiny breath and nothing more. */
+  @keyframes respirar-sono {
+    0%,
+    100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(0.35px);
+    }
+  }
+
+  @keyframes abanar-rabo {
+    0%,
+    100% {
+      transform: translateX(0px);
+    }
+    50% {
+      transform: translateX(-1px);
+    }
+  }
+
+  @keyframes piscar {
+    0%,
+    90%,
+    100% {
+      opacity: 1;
+    }
+    95% {
+      opacity: 0;
+    }
+  }
+
+  /* Legs only swing while the cat is walking. The swing is slow and eased so a step
+     reads as one calm stride rather than a twitch. */
+  @keyframes andar-front {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-1px);
+    }
+  }
+
+  @keyframes andar-back {
+    0%,
+    100% {
+      transform: translateY(-1px);
+    }
+    50% {
+      transform: translateY(0);
+    }
+  }
+
+  .cabeca {
+    animation: respirar 1.5s infinite steps(1);
+  }
+
+  .rabo-ponta {
+    animation: abanar-rabo 1s infinite steps(1);
+  }
+
+  .olhos-abertos {
+    animation: piscar 4s infinite steps(1);
+  }
+
+  .cat-sprite--walking .perna--front {
+    animation: andar-front 560ms ease-in-out infinite;
+  }
+
+  .cat-sprite--walking .perna--back {
+    animation: andar-back 560ms ease-in-out infinite;
+  }
+
+  /* A sleeping cat swaps open eyes for drawn closed lids and barely stirs. */
+  .olhos-fechados {
+    opacity: 0;
+  }
+
+  .cat-sprite--sleeping .olhos-abertos {
+    opacity: 0;
+    animation: none;
+  }
+
+  .cat-sprite--sleeping .olhos-fechados {
+    opacity: 1;
+  }
+
+  .cat-sprite--sleeping .cabeca {
+    animation: respirar-sono 3s ease-in-out infinite;
+  }
+
+  .cat-sprite--sleeping .rabo-ponta {
+    animation: none;
+  }
+
+  .cat-sprite--sleeping .perna {
+    opacity: 0;
+  }
+
+  .cat-sprite--angry .olho {
+    fill: #b83232;
   }
 
   /* A sleeping cat settles onto the ground: the body drops onto its paws so it
@@ -755,6 +892,27 @@ footer {
   .cat:focus-within .cat-controls,
   .cat[data-controlled="true"] .cat-controls {
     opacity: 1;
+  }
+
+  /**
+   * A cat only answers a click when it is the one you can drive. The others are
+   * scenery, and a moving four-rem target sitting over the vote grid is scenery
+   * that eats the votes.
+   */
+  .cat:not([data-controllable="true"]) .cat__button {
+    pointer-events: none;
+  }
+
+  @media (hover: none) {
+    .cat-controls {
+      opacity: 1;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .cat-controls {
+      opacity: 1;
+    }
   }
 
   .cat-controls__button {

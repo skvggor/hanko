@@ -5,7 +5,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { CAT_INACTIVITY_MS, type CatActivity } from "@domain/cat";
+import { CAT_INACTIVITY_MS, stableHash, type CatActivity } from "@domain/cat";
+
+/**
+ * A pointer reports far more often than a cat needs to be told anything. The sleep
+ * timer is measured in minutes, so noticing a movement once a second keeps a cat
+ * awake for as long as the person is, while a hundred updates a second would
+ * re-render every cat in the room and rebuild that timer just as often.
+ */
+const ACTIVITY_THROTTLE_MS = 1_000;
 
 export interface UseCatOptions {
   participantId: string;
@@ -21,17 +29,6 @@ export interface UseCatResult {
   togglePause: () => void;
 }
 
-function hashCode(value: string): number {
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash << 5) - hash + (value.codePointAt(index) ?? 0);
-    hash = Math.trunc(hash);
-  }
-
-  return Math.abs(hash);
-}
-
 export function useCat({
   participantId,
   isControllable,
@@ -43,6 +40,7 @@ export function useCat({
   const [lastActivity, setLastActivity] = useState(() => Date.now());
   const randomRef = useRef(random);
   const revertTimeoutRef = useRef(0);
+  const lastActivityRef = useRef(lastActivity);
 
   useEffect(() => {
     randomRef.current = random;
@@ -50,7 +48,7 @@ export function useCat({
 
   const durationSeconds = useMemo(() => {
     const base = 22;
-    const variation = hashCode(participantId) % 9;
+    const variation = stableHash(participantId) % 9;
     return base + variation;
   }, [participantId]);
 
@@ -62,10 +60,19 @@ export function useCat({
    */
   useEffect(() => {
     const wake = (): void => {
-      setLastActivity(Date.now());
+      const now = Date.now();
+
+      // The pose answers every event, because a sleeping cat should open its eyes
+      // the instant the person moves. The timestamp is what gets throttled, since
+      // that is the only part of it a fast pointer can make expensive.
       setActivity((current) =>
         current === "sleeping" || current === "jumping" ? "walking" : current,
       );
+
+      if (now - lastActivityRef.current < ACTIVITY_THROTTLE_MS) return;
+
+      lastActivityRef.current = now;
+      setLastActivity(now);
     };
 
     globalThis.addEventListener("mousemove", wake);

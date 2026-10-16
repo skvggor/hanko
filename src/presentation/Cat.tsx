@@ -19,7 +19,12 @@ export interface CatProps {
   onReleaseControl: () => void;
   onRemove: () => void;
   translate: Translator;
-  catState?: CatState;
+  /**
+ * Absent until the room publishes this cat, which is why the prop admits an
+ * explicit undefined: a participant can be connected before their cat is known, and
+ * the cat stands in its lane until it is.
+ */
+catState?: CatState | undefined;
   controlledDirection?: "left" | "right";
   controlledActivity?: CatActivity;
   onPauseChange?: (paused: boolean) => void;
@@ -126,25 +131,25 @@ export function Cat({
   let style: React.CSSProperties;
   if (controlledPosition !== null) {
     style = {
-        top: 0,
-        left: 0,
-        transform: `translate(${controlledPosition.x}px, ${controlledPosition.y}px)`,
-        // Gliding between key presses keeps the stride in step with the legs
-        // instead of teleporting the body while the paws are mid-swing.
-        transition: "transform 260ms ease-out",
-        "--cat-duration": undefined,
-      } as React.CSSProperties;
+      top: 0,
+      left: 0,
+      transform: `translate(${controlledPosition.x}px, ${controlledPosition.y}px)`,
+      // Gliding between key presses keeps the stride in step with the legs
+      // instead of teleporting the body while the paws are mid-swing.
+      transition: "transform 260ms ease-out",
+      "--cat-duration": undefined,
+    };
   } else if (catState === undefined) {
     style = {
-        top: laneTop,
-        "--cat-duration": `${durationSeconds}s`,
-      } as React.CSSProperties;
+      top: laneTop,
+      "--cat-duration": `${durationSeconds}s`,
+    };
   } else {
     style = {
-          left: `${catState.x * 100}%`,
-          top: `${catState.y * 100}%`,
-          "--cat-duration": undefined,
-        } as React.CSSProperties;
+      left: `${catState.x * 100}%`,
+      top: `${catState.y * 100}%`,
+      "--cat-duration": undefined,
+    };
   }
 
   return (
@@ -152,6 +157,7 @@ export function Cat({
       ref={catRef}
       className="cat"
       data-activity={effectiveActivity}
+      data-controllable={isControllable}
       data-controlled={isControlled}
       data-paused={paused}
       data-synced={catState !== undefined}
@@ -197,6 +203,7 @@ export function Cat({
       <CatControls
         isOwn={isControllable}
         isPaused={paused}
+        name={name}
         onRemove={handleRemove}
         onTogglePause={handlePause}
         translate={translate}

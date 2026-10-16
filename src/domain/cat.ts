@@ -54,14 +54,23 @@ export function isCatState(value: unknown): value is CatState {
   );
 }
 
-export function breedForParticipantId(participantId: string): CatBreed {
+/**
+ * A small, stable hash of a string. Lives here because a participant id decides
+ * both the breed a cat is given and how long its stride is, and those two answers
+ * have to come out of the same number.
+ */
+export function stableHash(value: string): number {
   let hash = 0;
 
-  for (let index = 0; index < participantId.length; index += 1) {
-    hash = (hash << 5) - hash + (participantId.codePointAt(index) ?? 0);
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + (value.codePointAt(index) ?? 0);
     hash = Math.trunc(hash);
   }
 
-  const breed = CAT_BREEDS[Math.abs(hash) % CAT_BREEDS.length];
+  return Math.abs(hash);
+}
+
+export function breedForParticipantId(participantId: string): CatBreed {
+  const breed = CAT_BREEDS[stableHash(participantId) % CAT_BREEDS.length];
   return breed ?? CAT_BREEDS[0];
 }

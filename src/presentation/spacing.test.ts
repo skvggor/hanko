@@ -44,7 +44,7 @@ const OFF_SCALE =
 
 const ALLOWED_NUMERIC = new Set(["0", "0.5", "1", "1.5"]);
 
-const NAMED_STEPS = ["tight", "snug", "room", "gutter", "stack", "dock"];
+const NAMED_STEPS = ["tight", "snug", "room", "gutter", "stack"];
 
 describe("spacing scale", () => {
   it("has presentation sources to check", () => {

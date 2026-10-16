@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage } from "@domain/chat";
-import type { CatActivity, CatState } from "@domain/cat";
+import type { CatState } from "@domain/cat";
 import type { PublicParticipant } from "@domain/protocol";
 import type { Translator } from "@application/i18n";
 import { Cat } from "@presentation/Cat";
 import { CatComposer } from "@presentation/CatComposer";
+import { useControlledCat } from "@presentation/useControlledCat";
 import { useViewportSize } from "@presentation/useViewportSize";
 
 export interface CatOverlayProps {
@@ -21,20 +22,34 @@ export interface CatOverlayProps {
 
 const CAT_SIZE_PX = 64;
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
+const FIRST_LANE_TOP_REM = 4.5;
+const LANE_STEP_REM = 5;
 
 /**
- * Whether a keyboard or focus event belongs to a text field. While it does, the
- * cat must not claim the keys, or space would jump instead of typing a space.
+ * The bottom of the last lane a cat may occupy. A room seats far more people than
+ * fit on one screen, and the lane index is the render order, so without a ceiling
+ * the twenty-sixth arrival is placed hundreds of rems down the page: invisible, and
+ * impossible to click into control. Overflowing cats share a lane instead of
+ * leaving the viewport, because a cat nobody can reach is worse than one sharing.
+ */
+const MAX_LANE_INDEX = 7;
+export const MAX_VISIBLE_LANE_TOP_REM = FIRST_LANE_TOP_REM + MAX_LANE_INDEX * LANE_STEP_REM;
+
+/**
+ * Whether a keyboard or focus event belongs to something that is already using the
+ * keys: a text field, or any control with its own activation. The cat only takes
+ * keys that nothing else wants.
  */
 function isTextTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+
+  if (target.isContentEditable || target.closest("[contenteditable]") !== null) return true;
+
   return (
-    target instanceof HTMLElement &&
-    (target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
-      target.isContentEditable)
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT" ||
+    target.getAttribute("role") === "textbox"
   );
 }
 
@@ -50,21 +65,9 @@ export function CatOverlay({
   onUpdateCat,
 }: Readonly<CatOverlayProps>) {
   const bounds = useViewportSize();
-  const [controlledId, setControlledId] = useState<string | null>(null);
-  const [controlledPosition, setControlledPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const [isAngry, setIsAngry] = useState(false);
-  const [controlledDirection, setControlledDirection] = useState<"left" | "right">("right");
-  const [movingPhase, setMovingPhase] = useState<"idle" | "walking">("idle");
-  const [isJumping, setIsJumping] = useState(false);
   const [isAsleep, setIsAsleep] = useState(false);
   const initialControlParticipantRef = useRef<string | null>(null);
-  const controlledMovementRef = useRef(false);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const movingTimeoutRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-  const jumpTimeoutRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(new Set());
 
   /**
@@ -75,38 +78,18 @@ export function CatOverlay({
   const [catSize, setCatSize] = useState(CAT_SIZE_PX);
   const moveStep = Math.max(10, Math.round(catSize / 4));
 
-  /**
-   * The controlled cat's pose is driven locally: it walks only in the moments after
-   * a move, then settles to idle so the legs stop and it just breathes.
-   */
-  function localActivityValue(): CatActivity {
-    if (isJumping) return "jumping";
-    if (isAngry) return "angry";
-    return movingPhase;
-  }
-
-  const localActivity: CatActivity = localActivityValue();
-
-  const markMoving = useCallback(() => {
-    setMovingPhase("walking");
-    if (movingTimeoutRef.current !== null) globalThis.clearTimeout(movingTimeoutRef.current);
-    movingTimeoutRef.current = globalThis.setTimeout(() => setMovingPhase("idle"), 560);
-  }, []);
-
-  const triggerJump = useCallback(() => {
-    setIsJumping(true);
-    controlledMovementRef.current = true;
-    if (jumpTimeoutRef.current !== null) globalThis.clearTimeout(jumpTimeoutRef.current);
-    jumpTimeoutRef.current = globalThis.setTimeout(() => setIsJumping(false), 450);
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (movingTimeoutRef.current !== null) globalThis.clearTimeout(movingTimeoutRef.current);
-      if (jumpTimeoutRef.current !== null) globalThis.clearTimeout(jumpTimeoutRef.current);
-    },
-    [],
-  );
+  const {
+    activity: localActivity,
+    controlledDirection,
+    controlledId,
+    controlledPosition,
+    hasMoved,
+    moveControlled,
+    releaseControl,
+    requestControl,
+    takeControl,
+    triggerJump,
+  } = useControlledCat({ asleep: isAsleep, bounds, catSize, cats });
 
   const visibleParticipants = useMemo(
     () => participants.filter((participant) => participant.isConnected && !hiddenIds.has(participant.id)),
@@ -160,13 +143,14 @@ export function CatOverlay({
 
     initialControlParticipantRef.current = myParticipantId;
     const controlTimer = window.setTimeout(() => {
-      setControlledId(myParticipantId);
-      setControlledPosition({
-        x: ownCat.x * bounds.width,
-        y: ownCat.y * bounds.height,
-      });
-      setControlledDirection(ownCat.direction);
-      controlledMovementRef.current = false;
+      takeControl(
+        myParticipantId,
+        {
+          x: ownCat.x * bounds.width,
+          y: ownCat.y * bounds.height,
+        },
+        ownCat.direction,
+      );
     });
 
     return () => window.clearTimeout(controlTimer);
@@ -179,76 +163,26 @@ export function CatOverlay({
     myParticipantId,
     ownCatState?.activity,
     ownCatState?.isPaused,
+    takeControl,
   ]);
 
-  const liveText = useMemo(
-    () => messages.map((message) => `${message.authorName}: ${message.text}`).join(". "),
-    [messages],
-  );
-
-  const requestControl = useCallback(
-    (participantId: string, position: { x: number; y: number }) => {
-      setControlledId(participantId);
-    setControlledPosition(position);
-    setIsAngry(false);
-    setControlledDirection("right");
-    controlledMovementRef.current = false;
-    },
-    [],
-  );
-
-  const releaseControl = useCallback(() => {
-    setControlledId(null);
-    setIsAngry(false);
-    setMovingPhase("idle");
-    controlledMovementRef.current = false;
-  }, []);
-
-  const moveControlled = useCallback(
-    (deltaX: number, deltaY: number) => {
-      if (asleep) return;
-      controlledMovementRef.current = true;
-      markMoving();
-      if (deltaX !== 0) setControlledDirection(deltaX < 0 ? "left" : "right");
-      setControlledPosition((previous) => {
-        if (previous === null) return previous;
-
-        const next = {
-          x: clamp(previous.x + deltaX, 0, Math.max(0, bounds.width - catSize)),
-          y: clamp(previous.y + deltaY, 0, Math.max(0, bounds.height - catSize)),
-        };
-        const normalizedX = bounds.width === 0 ? 0 : next.x / bounds.width;
-        const normalizedY = bounds.height === 0 ? 0 : next.y / bounds.height;
-        const collision = cats.some((cat) =>
-          cat.participantId !== controlledId &&
-          Math.abs(cat.x - normalizedX) < 0.08 &&
-          Math.abs(cat.y - normalizedY) < 0.08,
-        );
-        if (collision) setIsAngry(true);
-        return next;
-      });
-    },
-    [asleep, bounds.width, bounds.height, catSize, cats, controlledId, markMoving],
-  );
-
   /**
-   * Being bumped is a reaction, not a control lock: the angry face fades after a
-   * moment and the cat keeps obeying the keyboard. Freezing here is what made one
-   * downward move look like the movement had hit a limit.
-   */
-  useEffect(() => {
-    if (!isAngry) return undefined;
+ * Only the message that just arrived goes into the live region. A region holding
+ * the whole backlog is read out again from the start every time it changes, so in
+ * a busy room the announcements talk over each other and the newest message, the
+ * only one anybody wants, is the hardest to hear.
+ */
+const latestMessage = messages.at(-1);
+const liveText =
+    latestMessage === undefined ? "" : `${latestMessage.authorName}: ${latestMessage.text}`;
 
-    const id = window.setTimeout(() => setIsAngry(false), 1_200);
-    return () => window.clearTimeout(id);
-  }, [isAngry]);
 
   useEffect(() => {
     if (
       controlledId === null ||
       controlledPosition === null ||
       onUpdateCat === undefined ||
-      !controlledMovementRef.current
+      !hasMoved
     ) return;
     onUpdateCat({
       x: bounds.width === 0 ? 0 : controlledPosition.x / bounds.width,
@@ -257,41 +191,79 @@ export function CatOverlay({
       activity: localActivity,
       isPaused: false,
     });
-  }, [bounds.height, bounds.width, controlledDirection, controlledId, controlledPosition, localActivity, onUpdateCat]);
+  }, [
+    bounds.height,
+    bounds.width,
+    controlledDirection,
+    controlledId,
+    controlledPosition,
+    hasMoved,
+    localActivity,
+    onUpdateCat,
+  ]);
 
+  /**
+   * Escape is the one key the cat claims wherever the focus happens to be, because
+   * it is how you get out of a thing and nothing else on the page wants it.
+   */
   useEffect(() => {
     if (controlledId === null) return undefined;
 
+    const handleEscape = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") releaseControl();
+    };
+
+    globalThis.addEventListener("keydown", handleEscape);
+    return () => globalThis.removeEventListener("keydown", handleEscape);
+  }, [controlledId, releaseControl]);
+
+  /**
+   * Movement and the jump are claimed only while the cat itself holds the focus.
+   * The arrow keys are also how the page scrolls and the space bar is also how a
+   * button is pressed, so a handler that took them document-wide would take them
+   * from the board and from every control in it. Taking them from the focused cat
+   * keeps the native behaviour everywhere else, which is what a keyboard user is
+   * entitled to expect from a widget that has taken focus.
+   */
+  useEffect(() => {
+    const button = overlayRef.current?.querySelector<HTMLElement>(
+      `[data-testid="cat-${controlledId}"] .cat__button`,
+    );
+    if (button === null || button === undefined) return undefined;
+
     const handleKeyDown = (event: KeyboardEvent): void => {
-      // While typing, the keys belong to the text field, never to the cat.
       if (isTextTarget(event.target)) return;
+      if (event.defaultPrevented) return;
 
-      if (event.key === "Escape") {
-        releaseControl();
-        return;
-      }
-
-      if (event.key === " ") {
-        event.preventDefault();
-        triggerJump();
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        moveControlled(0, -moveStep);
-      } else if (event.key === "ArrowDown") {
-        event.preventDefault();
-        moveControlled(0, moveStep);
-      } else if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        moveControlled(-moveStep, 0);
-      } else if (event.key === "ArrowRight") {
-        event.preventDefault();
-        moveControlled(moveStep, 0);
+      switch (event.key) {
+        case " ":
+          event.preventDefault();
+          triggerJump();
+          break;
+        case "ArrowUp":
+          event.preventDefault();
+          moveControlled(0, -moveStep);
+          break;
+        case "ArrowDown":
+          event.preventDefault();
+          moveControlled(0, moveStep);
+          break;
+        case "ArrowLeft":
+          event.preventDefault();
+          moveControlled(-moveStep, 0);
+          break;
+        case "ArrowRight":
+          event.preventDefault();
+          moveControlled(moveStep, 0);
+          break;
+        default:
+          break;
       }
     };
 
-    globalThis.addEventListener("keydown", handleKeyDown);
-    return () => globalThis.removeEventListener("keydown", handleKeyDown);
-  }, [controlledId, moveControlled, moveStep, releaseControl, triggerJump]);
+    button.addEventListener("keydown", handleKeyDown);
+    return () => button.removeEventListener("keydown", handleKeyDown);
+  }, [controlledId, moveControlled, moveStep, triggerJump]);
 
   /**
    * Reaching for the composer hands the keyboard back to the text field: the cat
@@ -306,7 +278,10 @@ export function CatOverlay({
       if (isTextTarget(event.target)) releaseControl();
     };
     const onFocusOut = (event: FocusEvent): void => {
-      if (isTextTarget(event.target) && !asleep) setControlledId(ownId);
+      if (isTextTarget(event.target) && !asleep) {
+        const position = controlledPosition;
+        if (position !== null) takeControl(ownId, position, controlledDirection);
+      }
     };
 
     globalThis.addEventListener("focusin", onFocusIn);
@@ -315,9 +290,39 @@ export function CatOverlay({
       globalThis.removeEventListener("focusin", onFocusIn);
       globalThis.removeEventListener("focusout", onFocusOut);
     };
-  }, [asleep, myParticipantId, releaseControl]);
+  }, [asleep, controlledDirection, controlledPosition, myParticipantId, releaseControl, takeControl]);
 
-  const removeCat = useCallback((participantId: string) => {
+  /**
+ * A hidden id is forgotten as soon as its owner drops out of the room. Keeping it
+ * would mean that a person who hid a cat, and then watched that person come back,
+ * was still looking at a gap with no way to undo it. Reconciling against who is
+ * connected rather than who is listed is what makes the hiding temporary: a
+ * participant stays seated while they are away, so only losing the connection
+ * proves they actually left.
+ *
+ * Adjusted during the render rather than in an effect because the room it reads is
+ * a prop: an effect would publish the pruned set one frame late, which is one frame
+ * of a cat that was not meant to be on screen.
+ */
+const connectedIds = useMemo(
+  () =>
+    new Set(
+      participants
+        .filter((participant) => participant.isConnected)
+        .map((participant) => participant.id),
+    ),
+  [participants],
+);
+
+const [reconciledIds, setReconciledIds] = useState(participants);
+
+if (reconciledIds !== participants) {
+  setReconciledIds(participants);
+  const kept = new Set([...hiddenIds].filter((id) => connectedIds.has(id)));
+  if (kept.size !== hiddenIds.size) setHiddenIds(kept);
+}
+
+const removeCat = useCallback((participantId: string) => {
     setHiddenIds((previous) => {
       const next = new Set(previous);
       next.add(participantId);
@@ -347,14 +352,14 @@ export function CatOverlay({
     <div ref={overlayRef} aria-hidden="false" className="cat-overlay">
       {visibleParticipants.map((participant, index) => (
         <Cat
-          catState={catByParticipant.get(participant.id) as CatState}
+          catState={catByParticipant.get(participant.id)}
           controlledActivity={localActivity}
           controlledDirection={controlledDirection}
           controlledPosition={participant.id === myParticipantId ? controlledPosition : null}
           isControllable={participant.id === myParticipantId}
           isControlled={controlledId === participant.id}
           key={participant.id}
-          laneIndex={index}
+          laneIndex={index % (MAX_LANE_INDEX + 1)}
           messages={messages}
           name={participant.name}
           onPauseChange={handlePauseChange}
