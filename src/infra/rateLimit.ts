@@ -68,29 +68,8 @@ export class InMemoryRateLimiter implements RateLimit {
     return this.#windows.get(key)?.retryAfterSeconds(now) ?? 1;
   }
 
-  forget(key: string): void {
-    this.#windows.delete(key);
-  }
-
   #evictOldest(): void {
     const oldest = this.#windows.keys().next();
     if (oldest.done !== true) this.#windows.delete(oldest.value);
-  }
-}
-
-/** A fixed window, useful when a single global budget is enough. */
-export class SingleWindowRateLimiter implements RateLimit {
-  readonly #window: RateWindow;
-
-  constructor(limit: number, windowMs: number) {
-    this.#window = new RateWindow(limit, windowMs);
-  }
-
-  allow(_key: string, now: number): boolean {
-    return this.#window.take(now);
-  }
-
-  retryAfterSeconds(_key: string, now: number): number {
-    return this.#window.retryAfterSeconds(now);
   }
 }

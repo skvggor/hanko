@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isAllowedOrigin } from "@infra/origin";
-import { InMemoryRateLimiter, SingleWindowRateLimiter } from "@infra/rateLimit";
+import { InMemoryRateLimiter } from "@infra/rateLimit";
 
 describe("isAllowedOrigin", () => {
   const request = (origin: string | null, host = "hanko.skvggor.workers.dev") =>
@@ -81,18 +81,37 @@ describe("RateWindow", () => {
     expect(() => limiter.allow("later", 0)).not.toThrow();
   });
 
-  it("drops a key on demand", () => {
+  it("keeps a key's budget to itself", () => {
     const limiter = new InMemoryRateLimiter(1, 1000);
-    limiter.allow("a", 0);
-    limiter.forget("a");
+
     expect(limiter.allow("a", 0)).toBe(true);
+    expect(limiter.allow("a", 0)).toBe(false);
+    expect(limiter.allow("b", 0)).toBe(true);
   });
 
-  it("shares one budget across every key", () => {
-    const limiter = new SingleWindowRateLimiter(2, 1000);
+  it("answers a blocked caller with a wait worth quoting", () => {
+    const limiter = new InMemoryRateLimiter(1, 10_000);
 
-    expect(limiter.allow("a", 0)).toBe(true);
-    expect(limiter.allow("b", 0)).toBe(true);
-    expect(limiter.allow("c", 0)).toBe(false);
+    limiter.allow("a", 0);
+    limiter.allow("a", 0);
+
+    // The refusal carries a number the caller can act on, so it must be a real
+    // number of seconds rather than the fallback.
+    expect(limiter.retryAfterSeconds("a", 0)).toBe(10);
+  });
+
+  it("counts down the wait as the window runs out", () => {
+    const limiter = new InMemoryRateLimiter(1, 10_000);
+
+    limiter.allow("a", 0);
+    limiter.allow("a", 0);
+
+    expect(limiter.retryAfterSeconds("a", 6_000)).toBe(4);
+  });
+
+  it("answers a caller it has never seen with the shortest wait", () => {
+    const limiter = new InMemoryRateLimiter(1, 10_000);
+
+    expect(limiter.retryAfterSeconds("stranger", 0)).toBe(1);
   });
 });

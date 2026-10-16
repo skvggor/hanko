@@ -48,7 +48,12 @@ function createFakeStorage(initial: unknown = null) {
       return sockets;
     },
     storage: {
-      async get(key: string) {
+      async get(key: string | string[]) {
+        // Reading a list of keys answers with a map, which is what lets a cold
+        // start fetch the room and its cats in a single round trip.
+        if (Array.isArray(key)) {
+          return new Map(key.map((entry) => [entry, data.get(entry)]));
+        }
         return data.get(key);
       },
       async put(key: string, value: unknown) {

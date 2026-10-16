@@ -66,9 +66,42 @@ const CAT_WINDOW_MS = 10_000;
 /** Cat positions are cosmetic, so a short durable-write debounce is invisible. */
 const CAT_PERSIST_INTERVAL_MS = 2_000;
 
+/**
+ * How many rows of cats fit on a screen before a new arrival has to share a row.
+ * A room may seat MAX_PARTICIPANTS people, and a seed that simply divides by the
+ * number of existing cats walks off the bottom of the viewport once the room is
+ * busy: a late arrival's cat is then invisible and, because it cannot be clicked,
+ * impossible to take control of. Wrapping the lane keeps every cat somewhere a
+ * person can actually reach it.
+ */
+const CAT_LANES = 8;
+const CAT_COLUMNS = 5;
+
+/**
+ * Spreads a joining cat over the lanes and columns. The first one sits low and near
+ * the edge so the owner sees their own cat arrive without it covering the board.
+ */
+function seedPosition(index: number): { x: number; y: number } {
+  if (index === 0) return { x: 0.12, y: 0.72 };
+
+  return {
+    x: ((index % CAT_COLUMNS) + 1) / (CAT_COLUMNS + 1),
+    y: ((Math.floor(index / CAT_COLUMNS) % CAT_LANES) + 1) / (CAT_LANES + 1),
+  };
+}
+
 /** Joining mints a participant and writes the room, so it gets its own budget. */
 const JOIN_LIMIT_PER_WINDOW = 10;
 const JOIN_WINDOW_MS = 60_000;
+
+/**
+ * The public state endpoint is reachable by anyone holding the link and builds the
+ * whole room, cats included, on every call. The client never reads it, so there is
+ * nothing to tune against: the budget exists to bound what one caller can cost the
+ * Durable Object, not to serve a polling client, and the app itself is unaffected.
+ */
+const STATE_LIMIT_PER_WINDOW = 30;
+const STATE_WINDOW_MS = 60_000;
 
 /**
  * Hibernated sockets still cost a full state push on every broadcast, so the
@@ -103,6 +136,7 @@ export class Room {
     COMMAND_WINDOW_MS,
   );
   readonly #catBudget = new InMemoryRateLimiter(CAT_LIMIT_PER_WINDOW, CAT_WINDOW_MS);
+  readonly #stateBudget = new InMemoryRateLimiter(STATE_LIMIT_PER_WINDOW, STATE_WINDOW_MS);
   #catsPersistTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   #lastCatsPersistAt = 0;
 
@@ -148,6 +182,20 @@ export class Room {
   }
 
   async #handleRoomState(roomId: string, request: Request): Promise<Response> {
+    const now = Date.now();
+    // Keyed by caller because the room is shared: without a key one person looping
+    // would spend the budget of everyone else standing in the same room.
+    const caller = request.headers.get("CF-Connecting-IP") ?? "unknown";
+
+    if (!this.#stateBudget.allow(caller, now)) {
+      return new Response("Too many requests", {
+        status: 429,
+        headers: {
+          "Retry-After": String(this.#stateBudget.retryAfterSeconds(caller, now)),
+        },
+      });
+    }
+
     const room = await this.#load(roomId);
     const requestedToken = new URL(request.url).searchParams.get("token");
 
@@ -273,8 +321,7 @@ export class Room {
     this.#cats.set(participantId, {
       participantId,
       breed: this.#nextBreed(),
-      x: this.#cats.size === 0 ? 0.12 : ((this.#cats.size % 5) + 1) / 6,
-      y: this.#cats.size === 0 ? 0.72 : (Math.floor(this.#cats.size / 5) + 1) / 6,
+      ...seedPosition(this.#cats.size),
       direction: "right",
       activity: "idle",
       isPaused: false,
@@ -726,26 +773,57 @@ export class Room {
   async #load(roomId: string): Promise<RoomSnapshot> {
     if (this.#room !== null) return this.#room;
 
-    const stored = await this.storage.storage.get<{ room: Partial<RoomSnapshot> }>("room");
-    const storedCats = await this.storage.storage.get<CatState[]>("cats");
+    // One read rather than two: a cold start happens on every wake, including the
+    // one an expiry alarm causes, so the round trip is not a cost paid rarely. The
+    // storage types answer every key with one value type, hence the narrowing.
+    const stored = await this.storage.storage.get(["room", "cats"]);
+    const storedCats = stored.get("cats") as CatState[] | undefined;
     for (const cat of storedCats ?? []) this.#cats.set(cat.participantId, cat);
-    this.#room = restoreRoom(stored?.room, roomId);
+    const storedRoom = stored.get("room") as { room: Partial<RoomSnapshot> } | undefined;
+    this.#room = restoreRoom(storedRoom?.room, roomId);
     return this.#room;
   }
 
   #save(room: RoomSnapshot): Promise<void> {
     this.#room = room;
+    this.#pruneCats(room);
     return Promise.all([
       this.storage.storage.put("room", { room }),
       this.storage.storage.put("cats", [...this.#cats.values()]),
     ]).then(() => undefined);
   }
 
+  /**
+   * A cat lives exactly as long as the seat behind it. Reclaiming a seat for the
+   * participant cap has to take the cat with it, because the whole map is
+   * serialised on every save: a ghost cat makes every vote, rename and chat message
+   * in the room pay for a cat whose owner can never come back. A departure is not
+   * grounds for pruning, because the participant is still seated and a refresh
+   * should find the same breed and pose waiting.
+   */
+  #pruneCats(room: RoomSnapshot): void {
+    const seated = new Set(room.participants.map((participant) => participant.id));
+
+    for (const participantId of this.#cats.keys()) {
+      if (!seated.has(participantId)) this.#cats.delete(participantId);
+    }
+  }
+
   async #wipe(): Promise<void> {
+    // The deferred write is cancelled with the room, not left to land afterwards
+    // and put a cats key back into storage for a room that no longer exists.
+    this.#cancelCatsPersist();
     this.#room = null;
     this.#cats.clear();
     await this.storage.storage.delete("room");
     await this.storage.storage.delete("cats");
+  }
+
+  #cancelCatsPersist(): void {
+    if (this.#catsPersistTimer === null) return;
+
+    globalThis.clearTimeout(this.#catsPersistTimer);
+    this.#catsPersistTimer = null;
   }
 
   async alarm(): Promise<void> {

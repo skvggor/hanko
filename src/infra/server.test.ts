@@ -99,6 +99,7 @@ function createFakeStorage(initial: unknown = null) {
   if (initial !== null) data.set("room", initial);
   const sockets: FakeSocket[] = [];
   let alarmAt: number | null = null;
+  const reads: string[][] = [];
 
   return {
     id: { toString: () => "test-room" },
@@ -109,7 +110,14 @@ function createFakeStorage(initial: unknown = null) {
       return sockets;
     },
     storage: {
-      async get(key: string) {
+      async get(key: string | string[]) {
+        // Cloudflare's storage takes a list of keys and answers with a map, which
+        // is what lets a cold start read the room and its cats in one round trip.
+        if (Array.isArray(key)) {
+          reads.push(key);
+          return new Map(key.map((entry) => [entry, data.get(entry)]));
+        }
+        reads.push([key]);
         return data.get(key);
       },
       async put(key: string, value: unknown) {
@@ -125,6 +133,7 @@ function createFakeStorage(initial: unknown = null) {
     get alarmAt() {
       return alarmAt;
     },
+    reads,
     data,
     sockets,
     addSocket(socket: FakeSocket) {
@@ -1601,5 +1610,286 @@ describe("Room over WebSocket", () => {
     expect(latest.state.participants.find((entry) => entry.id === participantId)?.isConnected).toBe(
       true,
     );
+  });
+});
+
+describe("Room cat bookkeeping", () => {
+  /** Names carry no digits, because the join gate rejects anything but letters. */
+  const NAME_ALPHABET = "abcdefghijklmnopqrstuvwxyz";
+
+  /**
+   * A room that is already full, built straight into storage rather than by joining
+   * fifty people, because the join budget would make the test about rate limiting
+   * instead of about the cats.
+   */
+  function crowdedStorage() {
+    const base = createRoom("test-room");
+    const stale = {
+      id: "stale",
+      token: "stale-token",
+      name: "Fantasma",
+      role: "spectator" as const,
+      isOwner: false,
+      isConnected: false,
+      disconnectedAt: Date.now() - 60 * 60 * 1000,
+      vote: null,
+    };
+
+    const participants = Array.from({ length: 49 }, (_, index) => ({
+      id: `p${index}`,
+      token: `t${index}`,
+      name: `Pessoa ${NAME_ALPHABET[index % NAME_ALPHABET.length]}`,
+      role: "voter" as const,
+      isOwner: index === 0,
+      isConnected: true,
+      disconnectedAt: null,
+      vote: null,
+    }));
+
+    const storage = createFakeStorage({
+      room: { ...base, participants: [...participants, stale], ownerId: "p0" },
+    });
+
+    storage.data.set(
+      "cats",
+      [...participants, stale].map((participant, index) => ({
+        participantId: participant.id,
+        breed: "tabby",
+        x: 0.1,
+        y: 0.1,
+        direction: "right",
+        activity: "idle",
+        isPaused: false,
+        index,
+      })),
+    );
+
+    return storage;
+  }
+
+  const storedCats = (storage: ReturnType<typeof createFakeStorage>) =>
+    (storage.data.get("cats") ?? []) as Array<{ participantId: string; y: number }>;
+
+  async function joinInto(
+    storage: ReturnType<typeof createFakeStorage>,
+    name: string,
+  ): Promise<ReturnType<typeof createFakeSocket>> {
+    const room = new Room(storage as never);
+    const socket = createFakeSocket();
+    connect(storage, socket);
+    await room.webSocketMessage(
+      socket as never,
+      JSON.stringify({ type: "join", token: null, name, role: "voter" }),
+    );
+    return socket;
+  }
+
+  it("drops the cat of a participant whose seat was reclaimed", async () => {
+    const storage = crowdedStorage();
+
+    await joinInto(storage, "Chega");
+
+    // The seat was freed by the cap, but the cat was left behind holding a name and a
+    // breed that no participant can ever claim again.
+    expect(storedCats(storage).map((cat) => cat.participantId)).not.toContain("stale");
+  });
+
+  it("keeps no more cats than there are participants", async () => {
+    const storage = crowdedStorage();
+
+    const socket = await joinInto(storage, "Chega");
+    const joined = parse(socket.sent).find((entry) => entry["type"] === "joined") as {
+      participantId: string;
+    };
+
+    const seated = new Set(
+      (storage.data.get("room") as { room: { participants: Array<{ id: string }> } }).room.participants.map(
+        (participant) => participant.id,
+      ),
+    );
+
+    for (const cat of storedCats(storage)) {
+      expect(seated.has(cat.participantId)).toBe(true);
+    }
+    expect(storedCats(storage)).toHaveLength(seated.size);
+    expect(storedCats(storage).map((cat) => cat.participantId)).toContain(joined.participantId);
+  });
+
+  it("seeds every cat inside the viewport in a crowded room", async () => {
+    const storage = crowdedStorage();
+
+    await joinInto(storage, "Chega");
+
+    for (const cat of storedCats(storage)) {
+      expect(cat.y).toBeGreaterThan(0);
+      expect(cat.y).toBeLessThan(1);
+    }
+  });
+
+  it("seeds every cat inside the viewport after a long churn of departures", async () => {
+    vi.useFakeTimers();
+    try {
+      const churned = createFakeStorage();
+      const churnedRoom = new Room(churned as never);
+
+      for (let round = 0; round < 6; round += 1) {
+        const socket = createFakeSocket();
+        connect(churned, socket);
+        await churnedRoom.webSocketMessage(
+          socket as never,
+          JSON.stringify({
+            type: "join",
+            token: null,
+            name: `Pessoa ${NAME_ALPHABET[round]}`,
+            role: "voter",
+          }),
+        );
+        await churnedRoom.webSocketClose(socket as never);
+        await vi.advanceTimersByTimeAsync(61_000);
+      }
+
+      const seated = (churned.data.get("room") as {
+        room: { participants: Array<{ id: string }> };
+      }).room.participants;
+      const ids = new Set(seated.map((participant) => participant.id));
+
+      for (const cat of storedCats(churned)) {
+        expect(ids.has(cat.participantId)).toBe(true);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("Room state endpoint abuse", () => {
+  function stateRequest(ip = "203.0.113.7"): Request {
+    return new Request("https://room.internal/state", {
+      headers: { "CF-Connecting-IP": ip },
+    });
+  }
+
+  /**
+   * The endpoint is public and the room id is the only secret, so anyone holding a
+   * shared link can ask for a full state, with a scan of every cat, as often as they
+   * like. The WebSocket paths are all budgeted; this one was not.
+   */
+  it("refuses a caller who asks for the state too often", async () => {
+    const storage = createFakeStorage();
+    const room = new Room(storage as never);
+
+    let refused = 0;
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const response = await room.fetch(stateRequest());
+      if (response.status === 429) refused += 1;
+    }
+
+    expect(refused).toBeGreaterThan(0);
+  });
+
+  it("tells the caller how long to wait", async () => {
+    const storage = createFakeStorage();
+    const room = new Room(storage as never);
+
+    let headers: Headers | null = null;
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const response = await room.fetch(stateRequest());
+      if (response.status === 429) headers = response.headers;
+    }
+
+    expect(headers?.get("Retry-After")).toBeTruthy();
+    expect(Number(headers?.get("Retry-After"))).toBeGreaterThan(0);
+  });
+
+  it("keeps one caller from spending another caller's budget", async () => {
+    const storage = createFakeStorage();
+    const room = new Room(storage as never);
+
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      await room.fetch(stateRequest("198.51.100.4"));
+    }
+
+    const response = await room.fetch(stateRequest("203.0.113.9"));
+
+    expect(response.status).toBe(200);
+  });
+
+  it("still answers the first caller normally", async () => {
+    const storage = createFakeStorage();
+    const room = new Room(storage as never);
+
+    const response = await room.fetch(stateRequest());
+
+    expect(response.status).toBe(200);
+  });
+});
+
+describe("Room durability", () => {
+  it("does not resurrect the cats of a room that was just deleted", async () => {
+    vi.useFakeTimers();
+    try {
+      const storage = createFakeStorage();
+      const room = new Room(storage as never);
+      const socket = createFakeSocket();
+      connect(storage, socket);
+      await room.webSocketMessage(
+        socket as never,
+        JSON.stringify({ type: "join", token: null, name: "Ana", role: "voter" }),
+      );
+      // The deferred write is armed here, so deleting the room in the same window
+      // used to leave a timer that put the cats back into a room nobody owns.
+      await room.webSocketMessage(
+        socket as never,
+        JSON.stringify({
+          type: "cat-update",
+          x: 0.4,
+          y: 0.5,
+          direction: "right",
+          activity: "walking",
+          isPaused: false,
+        }),
+      );
+      await room.webSocketMessage(
+        socket as never,
+        JSON.stringify({ type: "delete-room" }),
+      );
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      expect(storage.data.has("cats")).toBe(false);
+      expect(storage.data.has("room")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reads the room and its cats in one round trip on a cold start", async () => {
+    const storage = createFakeStorage({ room: createRoom("test-room") });
+    const room = new Room(storage as never);
+
+    await room.fetch(new Request("https://room.internal/state"));
+
+    expect(storage.reads).toHaveLength(1);
+    expect(storage.reads[0]).toEqual(["room", "cats"]);
+  });
+
+  it("still restores the cats it read", async () => {
+    const storage = createFakeStorage({ room: createRoom("test-room") });
+    storage.data.set("cats", [
+      {
+        participantId: "p1",
+        breed: "tabby",
+        x: 0.2,
+        y: 0.3,
+        direction: "left",
+        activity: "idle",
+        isPaused: false,
+      },
+    ]);
+    const room = new Room(storage as never);
+
+    const response: Response = await room.fetch(new Request("https://room.internal/state"));
+    const state: { cats?: unknown[] } = await response.json();
+
+    expect(state.cats).toHaveLength(0);
   });
 });
