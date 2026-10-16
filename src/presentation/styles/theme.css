@@ -458,6 +458,21 @@ footer {
     overflow-wrap: anywhere;
   }
 
+  /**
+   * An address pasted into a room is the one thing in a message that behaves like a
+   * control, so it is underlined rather than left to colour alone, and it carries a
+   * visible marker that it leaves the room. Colour on its own is not a state.
+   */
+  .chat-line__link {
+    color: var(--color-secondary);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  .chat-line__link:hover {
+    color: var(--color-primary);
+  }
+
   .chat-composer {
     display: flex;
     align-items: center;

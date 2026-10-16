@@ -159,7 +159,8 @@
     "read": "Ler a conversa",
     "close": "Fechar a conversa",
     "warning": "Esta sala não é privada e o chat não é criptografado: qualquer pessoa com o link lê tudo o que está aqui. Não coloque informações confidenciais ou ilícitas.",
-    "warningDismiss": "Entendi"
+    "warningDismiss": "Entendi",
+    "opensInNewTab": "(abre em uma nova aba)"
   },
   "cat": {
     "pause": "Pausar gato de {{name}}",

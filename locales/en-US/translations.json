@@ -159,7 +159,8 @@
     "read": "Read the conversation",
     "close": "Close the conversation",
     "warning": "This room is not private and its chat is not encrypted: anyone holding the link can read everything here. Do not put confidential or unlawful information in it.",
-    "warningDismiss": "Understood"
+    "warningDismiss": "Understood",
+    "opensInNewTab": "(opens in a new tab)"
   },
   "cat": {
     "pause": "Pause {{name}}'s cat",

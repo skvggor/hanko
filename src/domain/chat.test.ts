@@ -3,6 +3,7 @@ import {
   isChatMessage,
   isSendableMessage,
   normalizeMessageText,
+  splitChatText,
 } from "@domain/chat";
 import {
   appendMessage,
@@ -172,5 +173,99 @@ describe("isChatMessage", () => {
     ["a non numeric timestamp", { id: "m1", authorId: "p1", authorName: "Ana", text: "oi", sentAt: "1" }],
   ])("refuses %s", (_label, value) => {
     expect(isChatMessage(value)).toBe(false);
+  });
+});
+
+function segments(text: string): string[] {
+  return splitChatText(text).map((segment) =>
+    segment.kind === "link" ? `link:${segment.href}` : segment.text,
+  );
+}
+
+function links(text: string): string[] {
+  return splitChatText(text)
+    .filter((segment) => segment.kind === "link")
+    .map((segment) => (segment.kind === "link" ? segment.href : ""));
+}
+
+describe("splitChatText", () => {
+  it("leaves a message with no address alone", () => {
+    expect(segments("vamos nessa")).toEqual(["vamos nessa"]);
+  });
+
+  it("finds an address in the middle of a sentence", () => {
+    expect(segments("olha https://exemplo.com/figura aqui")).toEqual([
+      "olha ",
+      "link:https://exemplo.com/figura",
+      " aqui",
+    ]);
+  });
+
+  it("keeps the words on either side of an address", () => {
+    expect(segments("antes https://exemplo.com depois")).toEqual([
+      "antes ",
+      "link:https://exemplo.com",
+      " depois",
+    ]);
+  });
+
+  it("finds every address in a message", () => {
+    expect(links("https://a.example e https://b.example")).toEqual([
+      "https://a.example",
+      "https://b.example",
+    ]);
+  });
+
+  it("opens an address at either end of a message", () => {
+    expect(links("https://a.example")).toEqual(["https://a.example"]);
+    expect(links("veja https://a.example")).toEqual(["https://a.example"]);
+  });
+
+  it("leaves out the full stop that ended the sentence", () => {
+    expect(links("olha https://exemplo.com.")).toEqual(["https://exemplo.com"]);
+  });
+
+  /**
+   * A bracket that closes something inside the address belongs to the address, which
+   * is why a trailing one is only dropped while the address still has more openings
+   * than closings. Guessing wrong either way mangles a real link.
+   */
+  it("keeps a bracket that the address opened itself", () => {
+    expect(links("https://exemplo.com/wiki/Foo_(bar)")).toEqual([
+      "https://exemplo.com/wiki/Foo_(bar)",
+    ]);
+  });
+
+  it("drops a bracket that only closed the sentence", () => {
+    expect(links("(veja https://exemplo.com/guia)")).toEqual([
+      "https://exemplo.com/guia",
+    ]);
+  });
+
+  /**
+   * A chat is text from whoever is in the room, so anything that could carry a scheme
+   * is refused outright rather than trusted and sanitised: only a real web address
+   * becomes a link, and the browser never sees a javascript: or data: href at all.
+   */
+  it("refuses an address that is not http", () => {
+    expect(segments("javascript:alert(1)")).toEqual(["javascript:alert(1)"]);
+    expect(segments("data:text/html;base64,PHNjcmlwdD4=")).toEqual([
+      "data:text/html;base64,PHNjcmlwdD4=",
+    ]);
+  });
+
+  it("keeps a bare domain that was never written as an address", () => {
+    expect(segments("exemplo.com")).toEqual(["exemplo.com"]);
+  });
+
+  it("reads nothing out of an empty message", () => {
+    expect(splitChatText("")).toEqual([]);
+  });
+
+  it("does not invent a space where there was none", () => {
+    expect(segments("olha https://exemplo.com/x")).toEqual([
+      "olha ",
+      "link:https://exemplo.com/x",
+    ]);
   });
 });

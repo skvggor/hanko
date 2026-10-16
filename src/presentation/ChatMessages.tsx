@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import type { ChatMessage } from "@domain/chat";
+import { splitChatText, type ChatMessage } from "@domain/chat";
 import type { Translator } from "@application/i18n";
 
 export interface ChatMessagesProps {
@@ -38,6 +38,8 @@ export function ChatMessages({
         messages.map((message) => {
           const isMine = message.authorId === myParticipantId;
           const hasLeft = !connectedParticipantIds.has(message.authorId);
+          const segments = splitChatText(message.text);
+          const hasAddress = segments.some((segment) => segment.kind === "link");
 
           return (
             <p
@@ -47,7 +49,34 @@ export function ChatMessages({
               key={message.id}
             >
               <span className="chat-line__name">{message.authorName}</span>
-              <span className="chat-line__text">{message.text}</span>
+              <span className="chat-line__text">
+                {segments.map((segment, index) =>
+                  segment.kind === "link" ? (
+                    <a
+                      className="chat-line__link"
+                      href={segment.href}
+                      key={`${message.id}-link-${index}`}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      {segment.href}
+                    </a>
+                  ) : (
+                    <span key={`${message.id}-text-${index}`}>{segment.text}</span>
+                  ),
+                )}
+
+                {/*
+                 * The note sits outside the anchor so the link's own name stays exactly
+                 * the address, which is what somebody repeating it out loud needs, while
+                 * a screen reader still meets the note as the next thing in the line.
+                 */}
+                {hasAddress && (
+                  <span className="visually-hidden">
+                    {translate("chat.opensInNewTab")}
+                  </span>
+                )}
+              </span>
             </p>
           );
         })
