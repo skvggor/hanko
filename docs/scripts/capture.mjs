@@ -170,9 +170,21 @@ async function sendChatMessage(page, message) {
   await page.getByText(message).waitFor();
 }
 
+/**
+ * The room shows one composer or the other depending on the pointer, so this waits on
+ * the field both of them render. Waiting on the chat panel instead would only ever
+ * match the branch a desktop screenshot is not on.
+ */
+async function waitForComposer(page) {
+  await page.getByPlaceholder("Say something").waitFor();
+}
+
 async function openChat(page) {
-  await page.getByRole("button", { name: /^Open chat/ }).click();
-  await page.getByRole("region", { name: "Chat" }).waitFor();
+  // Only the docked panel has a launcher to press; where the cats are up, the
+  // composer is already on screen and there is nothing to open.
+  const launcher = page.getByRole("button", { name: /^Open chat/ });
+  if ((await launcher.count()) > 0) await launcher.click();
+  await waitForComposer(page);
 }
 
 function contextOptions(viewport) {
@@ -254,7 +266,12 @@ async function captureManual(origin, browser) {
     await sendChatMessage(voterPage, "Should we size the login work first?");
     await openChat(ownerPage);
     await sendChatMessage(ownerPage, "I would say 3.");
-    await captureElementShot(ownerPage, ownerPage.getByRole("region", { name: "Chat" }), "10-chat");
+    // Whichever composer this viewport ended up with, it is the thing worth showing.
+    await captureElementShot(
+      ownerPage,
+      ownerPage.locator(".chat-panel, .cat-composer").first(),
+      "10-chat",
+    );
 
     await ownerPage.getByRole("button", { name: "Delete room", exact: true }).click();
     await ownerPage.getByRole("dialog").waitFor();

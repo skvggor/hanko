@@ -103,6 +103,16 @@ server code and the Worker bundle cannot reach React.
   `translate: Translator` as a prop. There is no context, no global i18n singleton and no
   store.
 
+The cat overlay is the one place where that rule is worth spelling out. The Durable Object
+mints a `CatState` per participant and publishes positions on their own `cat-state` frame,
+never as part of a state push, so a cat crossing the screen cannot re-render the board. On
+the client, `CatOverlay.tsx` renders the cats and `useControlledCat.ts` owns the state
+machine that the four arrow keys and the space bar drive; nothing about walking lives in a
+component. `RoomScreen.tsx` swaps the whole overlay for `ChatPanel` on a coarse pointer,
+which is why there are two composers and only one of them is ever on screen. The keyboard
+belongs to the cat that holds the focus and to nothing else, because the arrow keys also
+scroll and the space bar also presses buttons.
+
 Two entry points, which is why there are two tsconfigs: `presentation/main.tsx` for the
 SPA, mounted from `index.html` onto `#root`, and `infra/worker.ts`, named in
 `wrangler.jsonc` as `main`. `infra` compiles under `tsconfig.worker.json`, which excludes
@@ -314,7 +324,7 @@ Adding a key means adding it to **both** files with matching `{{variable}}` name
 `i18n.test.ts` enforces key parity and placeholder hygiene. Missing keys return the path
 itself rather than throwing. Keys are namespaced (`join`, `welcome`, `room`, `controls`,
 `vote`, `errors`, `a11y`, `landing`, `brand`, `result`, `progress`, `consensus`, `chat`,
-`session`) and error codes map onto `errors.<code>` dynamically.
+`session`, `cat`) and error codes map onto `errors.<code>` dynamically.
 
 The selected locale persists under `localStorage["hanko:locale"]`. Storage access is
 wrapped in `try/catch` because it can be denied by the browser.
@@ -333,8 +343,15 @@ these properties intact:
   fixture easier to build.
 - WebSocket upgrades validate `Origin`, refusing a missing one as a non browser client to
   block cross site WebSocket hijacking.
-- Chat and commands have separate per window rate limits, and `MAX_SOCKETS` caps sockets
-  per room.
+- Chat, commands, cat movement and the public state endpoint each have their own per
+  window rate limit, and `MAX_SOCKETS` caps sockets per room. The state endpoint is keyed
+  by caller rather than by room, because the room is shared: without a key one person
+  looping over it would spend everybody else's budget. Nothing in the app reads that
+  endpoint, so the limit is there to bound cost, not to serve a polling client.
+- A dropped WebSocket is chased rather than reported. The room keeps the seat for the
+  whole grace window, so the client retries on the token it was issued, backing off from
+  half a second to thirty before it admits the connection is gone and offers a retry.
+  A deliberate `close()` is not a fault and must never start that chase.
 - `public/_headers` carries the CSP and the other response headers, and Workers parses it
   on deploy. A comment is a line beginning with `#`; there is no block comment syntax, and
   a header must be indented under a URL pattern. Getting that wrong fails the deploy at the

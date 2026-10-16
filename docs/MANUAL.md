@@ -142,7 +142,25 @@ Messages are limited to 280 characters, and the conversation keeps the last 100.
 badge counts what you missed while the chat was minimised. The owner can clear the
 conversation.
 
-## 10. Leaving and deleting
+## 10. Your cat
+
+Every person in the room has a cat. It walks about on its own, and it sleeps once
+nobody has moved anything for a minute. Its breed and its pace belong to you, so
+your cat is the same one every time you come back.
+
+Click your own cat to take the keyboard: the arrow keys walk it, space makes it hop,
+and escape lets go of it. While you are holding it, those keys are yours and nothing
+else on the page takes them, so the room still scrolls as usual. Walking into another
+cat earns you a short-lived sulk, and the cat carries on afterwards.
+
+Two small buttons sit under your cat. One pauses it where it stands, for everybody,
+and one sends it away for you. Sending it away lasts only until that person next
+loses and regains their connection.
+
+On a phone or tablet the cats are replaced by the chat panel instead: a moving
+target is not something to tap at, so the cats step aside rather than sit in the way.
+
+## 11. Leaving and deleting
 
 ![The delete confirmation](images/11-confirm-dialog.png)
 
@@ -163,3 +181,7 @@ after the last person leaves.
 - **Language.** The `EN` / `PT` switch in the header covers the interface.
 - **Accessibility.** Every action is keyboard reachable, dialogs move focus on their
   own, and animations step aside when your system asks for reduced motion.
+- **A dropped connection is chased, not the end of the room.** The room holds your seat
+  for five minutes, so the page keeps trying to get back on its own, waiting longer
+  between each attempt. After a minute of no luck it says so and offers a button to try
+  again. Nothing you voted is lost while that happens.

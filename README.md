@@ -38,6 +38,9 @@ screenshots, from opening a room to reading the consensus.
    reveal; the server holds them and broadcasts only the aggregate progress.
 5. The room owner reveals. Everyone sees the distribution, the average and a consensus
    verdict at the same moment.
+6. Everyone has a cat. Clicking your own takes the keyboard: the arrows walk it, space
+   makes it hop and escape lets go. On a device with a coarse pointer the cats are
+   replaced by the chat panel instead, because a moving target is not something to tap at.
 
 Decks are Fibonacci (with `?` for "needs discussion" and `coffee`), T-shirt sizes and
 Linear 1–10.
@@ -126,7 +129,28 @@ landed on the "close" side of the threshold, which is how 3, 8 and 10 got labell
 agreement.
 
 **Chat arrives on its own frame.** Speaking no longer pushes a fresh `PublicRoomState` onto
-every client and re-renders the whole board.
+every client and re-renders the whole board. A walking cat travels the same way, as a
+`cat-state` frame carrying one cat, because a cat crossing the screen must not re-render
+the board either. The client throttles movement to ten updates a second and the durable
+write is debounced by two seconds: positions are cosmetic, so paying for them on every
+tick would buy nothing.
+
+**A cat lives exactly as long as its seat.** A departure keeps the cat, because a refresh
+should find the same breed and pose waiting. Losing the seat prunes it, because the whole
+map is serialised on every save and a ghost cat would make every vote in the room pay for
+a cat whose owner can never come back. For the same reason a cat is seeded into a lane
+that wraps: a room seats fifty people, and a seed that divides by the number of existing
+cats walks the late arrival off the bottom of the screen, where it cannot be clicked.
+
+**A dropped socket is not a lost seat.** The room keeps the seat for the whole grace
+window, so the honest response to a dropped connection is to open it again rather than
+leave someone watching a frozen board. The retry stretches from half a second to thirty
+and then stops, because past a minute of continuous failure a spinner is worse than an
+admission.
+
+**A cat that cannot be driven does not intercept clicks.** Only your own cat is worth
+clicking, so only your own cat is given a hit area. The rest are scenery, and scenery
+that crosses the vote grid at four rem a side is scenery that eats the votes.
 
 **Origin is validated on the WebSocket upgrade.** Browsers always send `Origin` on a
 handshake, so a missing one is a non-browser client. Refusing it costs the app nothing and
@@ -252,8 +276,9 @@ accounts, so the room id is the only secret and guessing or leaking one is the a
 
 The properties worth preserving are: ids are drawn uniformly from a large alphabet and
 validated against the same source; votes stay server-side until reveal; `Origin` is checked
-on upgrade; chat and commands have separate per-window rate limits; sockets per room are
-capped; and `public/_headers` carries a strict CSP.
+on upgrade; chat, commands, cat movement and the public state endpoint each have their own
+per-window rate limit, the last keyed by caller because the room is shared; sockets per room
+are capped; and `public/_headers` carries a strict CSP.
 
 `public/_headers` is plain text that nothing typechecks and no test reads. If you edit it,
 read it back: an unterminated `/*` comment silently turns the file into a comment and
