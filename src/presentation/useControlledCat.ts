@@ -15,6 +15,12 @@ export interface UseControlledCatOptions {
   cats: CatState[];
   /** A sleeping cat ignores the keyboard. */
   asleep: boolean;
+  /**
+   * Whose cat this browser is drawing. The room never echoes a person's own movement
+   * back to them, so their cat is drawn from local state, and without this there is no
+   * way to notice the one case where the room moves it anyway.
+   */
+  myParticipantId: string | null;
 }
 
 export interface UseControlledCatResult {
@@ -69,6 +75,7 @@ export function useControlledCat({
   catSize,
   cats,
   asleep,
+  myParticipantId,
 }: Readonly<UseControlledCatOptions>): UseControlledCatResult {
   const [controlledId, setControlledId] = useState<string | null>(null);
   const [controlledPosition, setControlledPosition] = useState<ControlledPosition | null>(null);
@@ -78,6 +85,7 @@ export function useControlledCat({
   const [isAngry, setIsAngry] = useState(false);
   const [hasMoved, setHasMoved] = useState(false);
   const strideTimeoutRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const [roomPlacedAt, setRoomPlacedAt] = useState<string | null>(null);
   const jumpTimeoutRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
 
   useEffect(
@@ -189,6 +197,36 @@ function poseFor(
     const id = window.setTimeout(() => setIsAngry(false), ANGER_MS);
     return () => window.clearTimeout(id);
   }, [isAngry]);
+
+  /**
+   * A cat under the keyboard is drawn from local state, so the room moving it has to be
+   * told apart from this cat having moved itself. Keyed on the room's copy changing and
+   * never on the local one, because the room's copy goes stale the moment the cat takes
+   * a step and reacting to that snapped it back on the first arrow key. Held cats only:
+   * one nobody is holding already draws from the room's number and moves for free.
+   *
+   * Unclamped, because the room's number is the one every other screen draws from.
+   */
+  if (myParticipantId !== null && controlledPosition !== null && controlledId === myParticipantId) {
+    const mine = cats.find((cat) => cat.participantId === myParticipantId);
+
+    if (mine !== undefined) {
+      const where = `${mine.x},${mine.y}`;
+
+      if (where !== roomPlacedAt) {
+        setRoomPlacedAt(where);
+        const fromRoomX = mine.x * bounds.width;
+        const fromRoomY = mine.y * bounds.height;
+
+        if (
+          Math.abs(controlledPosition.x - fromRoomX) >= 1 ||
+          Math.abs(controlledPosition.y - fromRoomY) >= 1
+        ) {
+          setControlledPosition({ x: fromRoomX, y: fromRoomY });
+        }
+      }
+    }
+  }
 
   return {
     activity,

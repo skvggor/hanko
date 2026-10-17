@@ -113,6 +113,18 @@ which is why there are two composers and only one of them is ever on screen. The
 belongs to the cat that holds the focus and to nothing else, because the arrow keys also
 scroll and the space bar also presses buttons.
 
+Two things follow from that swap, and both were got wrong once. A person's own cat is
+drawn from local state, because the server never echoes their movement back, so the one
+case where the room does move it has to be adopted explicitly and only while it is held:
+a cat nobody is holding already reads the room's own number. And the broom belongs to
+`RoomScreen`, not to the overlay, because the overlay is not rendered on a coarse pointer
+at all and the cats it moves are very much still standing on everybody else's screen.
+
+The chat has the same two composers and one more shared component. `ChatMessages` renders
+the transcript for the dock and the transcript panel alike, so a message reads the same in
+both, and what somebody said outlives their seat: reclaiming a seat keeps their messages,
+because the transcript is only worth having if a person who left still said it.
+
 Two entry points, which is why there are two tsconfigs: `presentation/main.tsx` for the
 SPA, mounted from `index.html` onto `#root`, and `infra/worker.ts`, named in
 `wrangler.jsonc` as `main`. `infra` compiles under `tsconfig.worker.json`, which excludes
@@ -179,6 +191,13 @@ This is the strongest convention in the repo. Comments are complete sentences th
 explain the reasoning and often the rejected alternative. There are no `// TODO`, no
 comments restating the code, and no commented-out blocks.
 
+The corollary is worth stating because it is the half that gets forgotten: a comment that
+earns nothing goes. One or two sentences carrying the decision and the alternative it
+replaces is the target, and a block that has grown to restate the mechanism around it is
+worse than nothing, because it goes stale silently while the code beside it does not. A
+field doc that restates its own type, a prop comment that names the prop, or a comment on a
+line that says what the line says are all noise; delete them rather than shortening them.
+
 ```ts
 /**
  * Removal has to hold, otherwise the person just reloads with the token still in
@@ -226,10 +245,11 @@ bars share one rem based height token so they stay equal at any root size, and t
 display. Pinned chrome takes a frosted background through `data-glass` when there is
 something behind it to blur.
 
-Destructive actions confirm first. `ConfirmDialog` opens focused on the safe answer and
-hands focus back to whatever opened it. Dialogs are ours: `prompt`, `confirm` and `alert`
-are refused by `presentation/dialogs.test.ts`, which also requires the app to carry its
-own replacement.
+Destructive actions confirm first, except the cat's permanent remove control: it sends
+the cat away for the whole room without a confirmation. `ConfirmDialog` opens focused on
+the safe answer and hands focus back to whatever opened it. Dialogs are ours: `prompt`,
+`confirm` and `alert` are refused by `presentation/dialogs.test.ts`, which also requires
+the app to carry its own replacement.
 
 Accessibility is a requirement, not polish. Every icon gets `aria-hidden`, every icon only
 button an `aria-label`, errors `role="alert"`, chat `role="log"`, the meter a native
@@ -343,8 +363,11 @@ these properties intact:
   fixture easier to build.
 - WebSocket upgrades validate `Origin`, refusing a missing one as a non browser client to
   block cross site WebSocket hijacking.
-- Chat, commands, cat movement and the public state endpoint each have their own per
-  window rate limit, and `MAX_SOCKETS` caps sockets per room. The state endpoint is keyed
+- The chat is not encrypted and the interface says so once per browser, because anyone
+  holding the room link reads the room and pretending otherwise is the only lie that
+  would matter here. Keep that warning next to the chat rather than only in a README.
+- Chat, commands, cat movement, the shoo and the public state endpoint each have their own
+  per window rate limit, and `MAX_SOCKETS` caps sockets per room. The state endpoint is keyed
   by caller rather than by room, because the room is shared: without a key one person
   looping over it would spend everybody else's budget. Nothing in the app reads that
   endpoint, so the limit is there to bound cost, not to serve a polling client.
@@ -352,6 +375,17 @@ these properties intact:
   whole grace window, so the client retries on the token it was issued, backing off from
   half a second to thirty before it admits the connection is gone and offers a retry.
   A deliberate `close()` is not a fault and must never start that chase.
+- A client command names a target or it does not. `remove-cat` carries no participant id
+  at all, because the server reads who is asking off the socket and a field naming a
+  target would put the decision in the hands of whoever holds the keyboard. `remove-participant`
+  does carry one, because kicking somebody is the owner's to decide.
+- Linkification matches the scheme. Only `http` and `https` become a link; a loose shape
+  followed by a scheme check would let a chat message become a `javascript:` href, which is
+  a hole in a page that has no other reason to trust the text.
+- Reclaiming a seat does not tombstone the token. `removeParticipant` does, so a kick
+  cannot be undone by a reload; a five minute timeout deliberately does not, because the
+  point of the grace window is that the person can come back and the stored name gets them
+  in through the ordinary join.
 - `public/_headers` carries the CSP and the other response headers, and Workers parses it
   on deploy. A comment is a line beginning with `#`; there is no block comment syntax, and
   a header must be indented under a URL pattern. Getting that wrong fails the deploy at the
@@ -382,4 +416,8 @@ underlying failure instead.
 Durable Object bundle is never replaced by a commit whose tests never ran.
 
 Changes to the `Room` Durable Object's storage shape need a migration entry in
-`wrangler.jsonc`; the existing one is tagged `v1`.
+`wrangler.jsonc`; the existing one is tagged `v1`. An *added* field does not: a migration
+transforms stored data, and data without the field is still valid data. `restoreRoom`
+backfills instead, and each of those fields carries a regression test that loads a snapshot
+stored before it existed. Reshaping data that is already written, or dropping a field
+people's rooms depend on, is a migration.

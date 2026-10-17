@@ -1,4 +1,4 @@
-import { PauseIcon, PlayIcon, XIcon } from "@phosphor-icons/react";
+import { PauseIcon, PlayIcon } from "@phosphor-icons/react";
 import type { Translator } from "@application/i18n";
 
 export interface CatControlsProps {
@@ -33,9 +33,9 @@ export function CatControls({
         onClick={onTogglePause}
       >
         {isPaused ? (
-          <PlayIcon aria-hidden="true" size={12} weight="fill" />
+          <PlayIcon aria-hidden="true" size={16} weight="fill" />
         ) : (
-          <PauseIcon aria-hidden="true" size={12} weight="fill" />
+          <PauseIcon aria-hidden="true" size={16} weight="fill" />
         )}
       </button>
       <button
@@ -44,7 +44,20 @@ export function CatControls({
         type="button"
         onClick={onRemove}
       >
-        <XIcon aria-hidden="true" size={12} weight="bold" />
+        {/* The Phosphor X is a filled outline whose arms are too thin to read at this
+            size, so the X is drawn as a stroke instead: two bold lines the eye catches. */}
+        <svg
+          aria-hidden="true"
+          width="18"
+          height="18"
+          viewBox="0 0 18 18"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="4"
+        >
+          <path d="M4 4 14 14 M14 4 4 14" />
+        </svg>
       </button>
     </span>
   );

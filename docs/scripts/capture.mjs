@@ -39,9 +39,17 @@ const SOCIAL_VIEWPORT = { width: 1200, height: 630 };
 function parseArguments(argv) {
   const target = argv[2] ?? "all";
   const urlIndex = argv.indexOf("--url");
+  const onlyIndex = argv.indexOf("--only");
 
   if (!["manual", "og", "all"].includes(target)) {
     throw new Error(`unknown capture target "${target}" (expected manual, og or all)`);
+  }
+
+  if (onlyIndex !== -1) {
+    const raw = argv[onlyIndex + 1] ?? "";
+    for (const figure of raw.split(",")) {
+      if (figure.trim() !== "") ONLY_FIGURES.add(figure.trim());
+    }
   }
 
   return {
@@ -121,23 +129,66 @@ async function waitForServer(origin) {
   throw new Error(`the dev server never answered on ${origin}`);
 }
 
-async function captureShot(page, name) {
+async function captureShot(page, name, { pointer = "park" } = {}) {
+  if (ONLY_FIGURES.size > 0 && !ONLY_FIGURES.has(name)) return;
   await page.evaluate(() => globalThis.document.fonts.ready);
   // The pointer stays where the last click left it, and a card still hovered under
-  // the cursor photographs as a hover the reader never triggered.
-  await page.mouse.move(0, 0);
+  // the cursor photographs as a hover the reader never triggered. Held is the
+  // exception, for the one thing that only exists under the cursor: a tooltip.
+  if (pointer === "park") await page.mouse.move(0, 0);
   const target = path.join(IMAGES_DIRECTORY, `${name}.png`);
   await page.screenshot({ path: target, scale: "css" });
   console.log(`captured ${path.relative(REPOSITORY_ROOT, target)}`);
 }
 
-async function captureElementShot(page, element, name) {
+async function captureElementShot(page, element, name, { pointer = "park" } = {}) {
+  if (ONLY_FIGURES.size > 0 && !ONLY_FIGURES.has(name)) return;
   // Centring keeps the pinned header and footer from landing on top of the figure,
   // which is what a plain scroll into view leaves behind.
   await element.evaluate((node) => node.scrollIntoView({ block: "center" }));
-  await page.mouse.move(0, 0);
+  if (pointer === "park") await page.mouse.move(0, 0);
   const target = path.join(IMAGES_DIRECTORY, `${name}.png`);
   await element.screenshot({ path: target, scale: "css" });
+  console.log(`captured ${path.relative(REPOSITORY_ROOT, target)}`);
+}
+
+/**
+ * Frames the cat together with its two controls, which hang below it. At room scale
+ * those buttons are 1.5rem — a figure of the whole room photographs them as specks —
+ * so this crops to the cat plus its controls with enough margin to read both.
+ */
+async function captureCatControls(page, name) {
+  if (ONLY_FIGURES.size > 0 && !ONLY_FIGURES.has(name)) return;
+  const composerStyle = await page.addStyleTag({
+    content: ".cat-composer { visibility: hidden !important; }",
+  });
+  const clip = await page.evaluate(() => {
+    const cat = globalThis.document.querySelector(".cat");
+    const controls = cat?.querySelector(".cat-controls");
+    const catRect = cat?.getBoundingClientRect();
+    const controlsRect = controls?.getBoundingClientRect();
+    if (catRect === undefined || controlsRect === undefined) return null;
+
+    const marginTop = 80;
+    const marginBottom = 4;
+    const marginX = 80;
+    const left = Math.min(catRect.left, controlsRect.left);
+    const top = Math.min(catRect.top, controlsRect.top);
+    const right = Math.max(catRect.right, controlsRect.right);
+    const bottom = Math.max(catRect.bottom, controlsRect.bottom);
+
+    return {
+      x: Math.max(0, Math.round(left - marginX)),
+      y: Math.max(0, Math.round(top - marginTop)),
+      width: Math.round(right - left + marginX * 2),
+      height: Math.round(bottom - top + marginTop + marginBottom),
+    };
+  });
+
+  if (clip === null) throw new Error("the cat and its controls are not on the page");
+  const target = path.join(IMAGES_DIRECTORY, `${name}.png`);
+  await page.screenshot({ path: target, clip, scale: "css" });
+  await composerStyle.evaluate((style) => style.remove());
   console.log(`captured ${path.relative(REPOSITORY_ROOT, target)}`);
 }
 
@@ -167,7 +218,16 @@ async function minimizeChatIfOpen(page) {
 async function sendChatMessage(page, message) {
   await page.getByPlaceholder("Say something").fill(message);
   await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await page.getByText(message).waitFor();
+  // The sentence now lives in more than one place: the speaker's own cat wears it as a
+  // bubble, and the transcript announces the newest line for anybody who cannot see it.
+  // Asking for the text alone matches both and is an ambiguity, so this waits on the
+  // first of them this layout actually rendered.
+  await page
+    .locator(".speech-bubble__text, div[role='log'][aria-live='polite']", {
+      hasText: message,
+    })
+    .first()
+    .waitFor();
 }
 
 /**
@@ -187,12 +247,107 @@ async function openChat(page) {
   await waitForComposer(page);
 }
 
+/**
+ * The transcript is the one surface that carries a notice the reader has to act on,
+ * and it is shown once per browser rather than at every opening, so a capture that
+ * wants the notice has to be the first thing this context opens.
+ */
+async function openTranscript(page) {
+  await page.getByRole("button", { name: "Read the conversation", exact: true }).click();
+  await page.locator('.chat-transcript[data-open="true"]').waitFor();
+}
+
+async function closeTranscript(page) {
+  await page.getByRole("button", { name: "Close the conversation", exact: true }).click();
+  await page.getByRole("button", { name: "Read the conversation", exact: true }).waitFor();
+}
+
+async function dismissPrivacyNotice(page) {
+  await page.getByRole("button", { name: "Understood", exact: true }).click();
+  await page.locator('[data-role="warning"]').waitFor({ state: "detached" });
+}
+
+/**
+ * Every capture runs with reduced motion on, so a cat that has been told where to go
+ * is already there. What is still possible is a position that has not been written
+ * yet, and a figure taken then shows the room as it was before the button.
+ */
+async function waitForCatsToSettle(page) {
+  await page.waitForFunction(() => {
+    const cats = [...globalThis.document.querySelectorAll(".cat")];
+    const read = cats
+      .map((cat) => `${cat.style.left}|${cat.style.top}|${cat.style.transform}`)
+      .join();
+
+    const previous = globalThis.__hankoCatPositions;
+    globalThis.__hankoCatPositions = read;
+    return cats.length > 0 && read === previous;
+  });
+}
+
+/**
+ * Holding a cat takes the keyboard, and the ring and the name only appear while the
+ * focus is on it, so the click has to be a real one and the figure taken before
+ * anything else takes the focus back.
+ */
+async function takeHoldOfOwnCat(page) {
+  await page.locator('[data-controllable="true"] .cat__button').click();
+  await page.locator('[data-driving="true"]').waitFor();
+  // The controls fade in over ~120ms once the cat is driven; waiting on the attribute
+  // only is enough to land mid-fade, and the shutter catches the remove button invisible.
+  await whenControlsOpaque(page, "[data-driving='true'] .cat-controls");
+}
+
+/**
+ * Hides the cats for a single figure and puts them straight back afterwards. The chat
+ * figure is about the conversation, and a cat the owner holds — which the room grabs
+ * for itself on a timer — parks its pause/remove buttons on top of the composer, which
+ * photographs as clutter the reader has to look past. Only this one figure does it; the
+ * room behind the composer is untouched.
+ */
+async function setCatsHidden(page, hidden) {
+  await page.evaluate((shouldHide) => {
+    let style = globalThis.document.getElementById("hanko-hide-cats");
+    if (shouldHide && style === null) {
+      style = globalThis.document.createElement("style");
+      style.id = "hanko-hide-cats";
+      style.textContent = ".cat { display: none; }";
+      globalThis.document.head.append(style);
+    } else if (!shouldHide && style !== null) {
+      style.remove();
+    }
+  }, hidden);
+}
+
+/**
+ * The cat controls begin at opacity 0 and ride a 120ms transition to 1, whether the
+ * fade is started by driving the cat or by hovering it. Playwright knows the attribute
+ * is set, not that the transition has finished, so a figure taken too soon photographs
+ * the buttons (the remove X most of all) as absent. This pins the shutter to the moment
+ * the strip is fully painted.
+ */
+async function whenControlsOpaque(page, selector) {
+  await page.waitForFunction(
+    (sel) => {
+      const el = globalThis.document.querySelector(sel);
+      if (el === null) return false;
+      return parseFloat(globalThis.getComputedStyle(el).opacity) >= 1;
+    },
+    selector,
+    { timeout: 1500 },
+  );
+}
+
 function contextOptions(viewport) {
   return {
     viewport,
     deviceScaleFactor: 2,
     reducedMotion: "reduce",
     locale: "en-US",
+    // The room now says so when the clipboard refuses rather than pretending it worked,
+    // and a headless Chromium refuses by default. Without this the share figure waits
+    // forever for a "Copied" that the app is being honest about not being able to give.
+    permissions: ["clipboard-read", "clipboard-write"],
   };
 }
 
@@ -266,12 +421,72 @@ async function captureManual(origin, browser) {
     await sendChatMessage(voterPage, "Should we size the login work first?");
     await openChat(ownerPage);
     await sendChatMessage(ownerPage, "I would say 3.");
-    // Whichever composer this viewport ended up with, it is the thing worth showing.
+    // Whichever composer this viewport ended up with, is the thing worth showing. The
+    // cats are put away for this one: a cat the room grabs for itself parks its buttons
+    // on the composer, which photographs as clutter.
+    await setCatsHidden(ownerPage, true);
     await captureElementShot(
       ownerPage,
       ownerPage.locator(".chat-panel, .cat-composer").first(),
       "10-chat",
     );
+    await setCatsHidden(ownerPage, false);
+
+    // The transcript, which is where the room says out loud that it is not private.
+    // Opened first in this context on purpose: the notice is shown once per browser,
+    // so a figure of it only exists the first time anybody reads the conversation.
+    await openTranscript(ownerPage);
+    await captureShot(ownerPage, "12-chat-warning");
+    await dismissPrivacyNotice(ownerPage);
+    await captureShot(ownerPage, "13-chat-transcript");
+    await closeTranscript(ownerPage);
+
+    // Clearing the conversation is the one erasing control that was left unconfirmed,
+    // and the figure is the question rather than the answer.
+    const clearChat = ownerPage.getByRole("button", {
+      name: "Clear the conversation for everyone",
+      exact: true,
+    });
+    await clearChat.click();
+    await ownerPage.getByRole("dialog").waitFor();
+    await captureShot(ownerPage, "14-clear-chat-confirm");
+    await ownerPage.getByRole("button", { name: "Keep it", exact: true }).click();
+
+    // The ring and the cat's own name, which the keyboard deserves and nothing else.
+    await takeHoldOfOwnCat(ownerPage);
+    await captureShot(ownerPage, "15-driving-your-cat");
+    await ownerPage.locator('[data-driving="true"] .cat__button').press("Escape");
+
+    // The two buttons under the cat, photographed while it is back in its lane and both
+    // controls are on screen. Resting state, no hover, so the X stays ink on paper. Shot
+    // as an element rather than the whole room: at room scale two 1.5rem buttons vanish.
+    const sendAway = ownerPage.getByRole("button", {
+      name: "Send this cat away for good",
+      exact: true,
+    });
+    await ownerPage.locator(".cat__button").first().evaluate((button) => button.blur());
+    await ownerPage.locator(".cat").first().hover();
+    await whenControlsOpaque(ownerPage, ".cat-controls");
+    // The released cat glides back to its lane over a 700ms left/top transition; give
+    // it that and a little more before framing it, or the crop lands on an empty corner.
+    await ownerPage.waitForTimeout(800);
+    await captureCatControls(ownerPage, "17-send-cat-away");
+
+    // The broom, with two cats it is worth pressing at all.
+    await waitForCatsToSettle(ownerPage);
+    await ownerPage
+      .getByRole("button", { name: "Shoo everyone's cats to the edges", exact: true })
+      .click();
+    await waitForCatsToSettle(ownerPage);
+    await captureShot(ownerPage, "16-cats-to-the-edges");
+
+    // Sending one away, which says what it reaches before it does it, and then does
+    // it. Last of the cat figures because nothing brings the cat back.
+    await sendAway.click();
+    await ownerPage
+      .getByRole("button", { name: "Shoo everyone's cats to the edges", exact: true })
+      .waitFor({ state: "detached" });
+    await captureShot(ownerPage, "18-cat-sent-away");
 
     await ownerPage.getByRole("button", { name: "Delete room", exact: true }).click();
     await ownerPage.getByRole("dialog").waitFor();
@@ -280,6 +495,32 @@ async function captureManual(origin, browser) {
   } finally {
     await owner.close();
     await voter.close();
+  }
+}
+
+/**
+ * Coming back to a room. The name is kept per browser, so the gate says who was here
+ * instead of opening blank and leaving the reader to wonder why their room is not
+ * waiting for them. Reloading the same address is all it takes: no leaving, no second
+ * room, and the server has still got the seat because the grace window is open.
+ */
+async function captureReturning(origin, browser) {
+  const context = await browser.newContext(contextOptions(DESKTOP_VIEWPORT));
+
+  try {
+    const page = await context.newPage();
+
+    await page.goto(origin);
+    await page.getByRole("button", { name: "Start a room", exact: true }).click();
+    await page.waitForURL(/\/room\//);
+    await enterRoom(page, "Ana");
+    await page.getByText("Round 1", { exact: true }).waitFor();
+
+    await page.reload();
+    await page.getByRole("heading", { name: "What is your name?" }).waitFor();
+    await captureShot(page, "19-coming-back");
+  } finally {
+    await context.close();
   }
 }
 
@@ -332,6 +573,15 @@ function runCompattor(arguments_) {
 }
 
 /**
+ * Figures the shutter is allowed to take. Empty means "every figure": when set, the
+ * capture still walks through all the interactions that lead each one up (so a room
+ * reaches the state a late figure needs), but only writes the PNGs whose name is listed.
+ * The cat animation is non-deterministic, so this keeps a good sample of 01-14/18-19
+ * from being overwritten while one broken figure is re-shot.
+ */
+const ONLY_FIGURES = new Set();
+
+/**
  * Lossy quantisation suits the social card, whose palette is a handful of flat
  * colours. The screenshots carry antialiased text and keep lossless.
  */
@@ -352,6 +602,7 @@ async function main() {
     try {
       if (target !== "og") {
         await captureManual(origin, browser);
+        await captureReturning(origin, browser);
         await captureHero(origin, browser);
       }
       if (target !== "manual") {

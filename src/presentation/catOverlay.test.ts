@@ -101,4 +101,38 @@ describe("the cat overlay", () => {
   it("keeps no rule for an element nothing renders", () => {
     expect(theme).not.toContain(".cat__figure");
   });
+
+  /**
+   * Walking the cats out to the walls is the whole gesture. A cat that blinks from the
+   * middle of the room to the edge reads as a glitch rather than as being moved.
+   */
+  it("lets a cat glide to where the room put it", () => {
+    const gliding = rule('.cat[data-synced="true"]');
+
+    expect(gliding).toContain("transition");
+    expect(gliding).toContain("left");
+    expect(gliding).toContain("top");
+  });
+
+  it("does not glide a cat that has no position of its own", () => {
+    const unsynced = rule('.cat:not([data-synced="true"])');
+
+    expect(unsynced).not.toContain("transition");
+  });
+
+  /**
+   * The overlay is transparent to clicks so the board underneath stays reachable, and
+   * nothing opts a child back in by itself. This is the same trap the transcript dock
+   * fell into: a control that is in the DOM, in the accessibility tree, and dead.
+   */
+  it("makes the shoo pressable through a click-through overlay", () => {
+    expect(rule(".cat-shoo")).toContain("pointer-events: auto");
+  });
+
+  it("keeps a cat from covering the control that moves it", () => {
+    const shooZ = /z-index:\s*(\d+)/.exec(rule(".cat-shoo"))?.[1];
+    const controlledZ = /z-index:\s*(\d+)/.exec(rule('.cat[data-controlled="true"]'))?.[1];
+
+    expect(Number(shooZ)).toBeGreaterThan(Number(controlledZ));
+  });
 });

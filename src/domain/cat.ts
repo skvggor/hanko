@@ -74,3 +74,73 @@ export function breedForParticipantId(participantId: string): CatBreed {
   const breed = CAT_BREEDS[stableHash(participantId) % CAT_BREEDS.length];
   return breed ?? CAT_BREEDS[0];
 }
+
+export interface EdgeSpot {
+  readonly x: number;
+  readonly y: number;
+  readonly direction: "left" | "right";
+}
+
+/** The header and the footer are pinned over the top and bottom edges, so a cat has to stand inside them. */
+const EDGE_INSET = 0.08;
+
+// Clamped rather than trusted: a nonsense aspect folds the border into a line and drops
+// half the cats on top of each other.
+const NARROWEST_SCREEN = 0.35;
+const WIDEST_SCREEN = 3.5;
+
+/**
+ * The border rather than a corner, which holds one cat and leaves the rest of them in
+ * the way. Deterministic on purpose, so pressing it twice reads as a reset rather than
+ * as a shuffle nobody can predict.
+ */
+export function spreadAlongTheEdges(count: number, aspect: number): EdgeSpot[] {
+  if (!Number.isFinite(count) || count <= 0) return [];
+  const total = Math.floor(count);
+  if (total === 0) return [];
+
+  const usable = Number.isFinite(aspect)
+    ? Math.min(WIDEST_SCREEN, Math.max(NARROWEST_SCREEN, aspect))
+    : 1;
+
+  // Worked out in the units of the screen and normalised at the end, because the
+  // inset has to be the same distance on every side and the two axes are not the
+  // same length.
+  const width = usable - 2 * EDGE_INSET;
+  const height = 1 - 2 * EDGE_INSET;
+  const perimeter = 2 * (width + height);
+  const spots: EdgeSpot[] = [];
+
+  for (let index = 0; index < total; index += 1) {
+    let along = ((index + 0.5) / total) * perimeter;
+    let x: number;
+    let y: number;
+
+    // Clockwise from the top left, spending exactly as much of the walk on each side
+    // as that side is long.
+    if (along < width) {
+      x = EDGE_INSET + along;
+      y = EDGE_INSET;
+    } else if ((along -= width) < height) {
+      x = EDGE_INSET + width;
+      y = EDGE_INSET + along;
+    } else if ((along -= height) < width) {
+      x = EDGE_INSET + width - along;
+      y = EDGE_INSET + height;
+    } else {
+      along -= width;
+      x = EDGE_INSET;
+      y = EDGE_INSET + height - along;
+    }
+
+    const normalizedX = Math.min(1, Math.max(0, x / usable));
+
+    spots.push({
+      x: normalizedX,
+      y: Math.min(1, Math.max(0, y)),
+      direction: normalizedX < 0.5 ? "right" : "left",
+    });
+  }
+
+  return spots;
+}

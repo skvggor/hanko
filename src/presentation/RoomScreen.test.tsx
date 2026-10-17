@@ -113,6 +113,10 @@ vi.mock("@application/roomConnection", () => ({
     removeCat() {
       this.#record({ type: "remove-cat" });
     }
+
+    shooCats(aspect: number) {
+      this.#record({ type: "shoo-cats", aspect });
+    }
     removeParticipant(participantId: string) {
       this.#record({ type: "remove-participant", participantId });
     }
@@ -147,6 +151,7 @@ interface MockConnection {
   errorListener: ((code: string) => void) | null;
   deletedListener: (() => void) | null;
   chatListener: ((message: unknown) => void) | null;
+  catStateListener: ((cat: unknown) => void) | null;
   removedListener: (() => void) | null;
 }
 
@@ -163,6 +168,12 @@ function pushState(state: unknown) {
 function pushError(code: string) {
   act(() => {
     currentConnection()?.errorListener?.(code);
+  });
+}
+
+function pushCat(cat: unknown) {
+  act(() => {
+    currentConnection()?.catStateListener?.(cat);
   });
 }
 
@@ -1401,5 +1412,348 @@ describe("RoomScreen sending a cat away", () => {
     // for everyone and for good. Someone reading it out loud needs the whole thing.
     const button = screen.getByRole("button", { name: "Send this cat away for good" });
     expect(button.getAttribute("aria-label")).toBe("Send this cat away for good");
+  });
+});
+/**
+ * The shoo is a room-wide event, and every other client learns about it through a cat
+ * frame rather than through a state push. Nothing drove that listener until here, so the
+ * whole path from the wire to the pixel was untested, which is exactly the path the
+ * button depends on being true for everybody else in the room.
+ */
+describe("RoomScreen and a cat the room moved", () => {
+  const catAt = (participantId: string, x: number, y: number) => ({
+    participantId,
+    breed: "tabby",
+    x,
+    y,
+    direction: "left",
+    activity: "idle",
+    isPaused: false,
+  });
+
+  const others = [
+    ...roomState.participants,
+    { id: "p2", name: "Bia", role: "voter", isOwner: false, isConnected: true, hasVoted: false },
+  ];
+
+  it("moves somebody else's cat when the room says so", async () => {
+    const { container } = renderRoom();
+    await joinAs("Ana");
+    pushState({ ...roomState, participants: others, cats: [catAt("p2", 0.5, 0.5)] });
+
+    const bia = container.querySelector<HTMLElement>('[data-testid="cat-p2"]');
+    expect(bia?.style.left).toBe("50%");
+
+    pushCat(catAt("p2", 0.08, 0.5));
+
+    const moved = container.querySelector<HTMLElement>('[data-testid="cat-p2"]');
+    expect(moved?.style.left).toBe("8%");
+  });
+
+  it("moves my own cat too, even after I have driven it", async () => {
+    const { container } = renderRoom();
+    await joinAs("Ana");
+    pushState({ ...roomState, participants: others, cats: [catAt("p1", 0.5, 0.5)] });
+
+    // Taking hold of the cat is what makes it draw from local state instead of from the
+    // room, which is the case the room's move has to be able to overrule.
+    const cat = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
+    await userEvent.click(cat?.querySelector(".cat__button") as HTMLElement);
+    expect(cat?.getAttribute("data-controlled")).toBe("true");
+
+    pushCat(catAt("p1", 0.08, 0.92));
+
+    const moved = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
+    // Placed from the room's own numbers against this window, rather than against a
+    // viewport somebody hard coded once.
+    expect(moved?.style.transform).toContain(
+      `translate(${(0.08 * globalThis.innerWidth).toString().slice(0, 7)}`,
+    );
+    expect(moved?.style.top).not.toBe("50%");
+  });
+
+  /**
+   * The reported failure, and the harder version of the one above: the owner has driven
+   * their cat somewhere with the arrow keys before the shoo, which is the state that
+   * marks the room's copy of the cat as stale and the one the click-only case never
+   * reached.
+   */
+  it("moves the owner's cat after they have driven it somewhere", async () => {
+    const { container } = renderRoom();
+    await joinAs("Ana");
+    pushState({
+      ...roomState,
+      participants: [
+        ...others,
+        { id: "p3", name: "Caio", role: "voter", isOwner: false, isConnected: true, hasVoted: false },
+      ],
+      cats: [catAt("p1", 0.5, 0.5), catAt("p2", 0.5, 0.5), catAt("p3", 0.5, 0.5)],
+    });
+
+    const mine = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
+    await userEvent.click(mine?.querySelector(".cat__button") as HTMLElement);
+
+    act(() => {
+      (mine?.querySelector(".cat__button") as HTMLElement).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+      );
+    });
+
+    const driven = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
+    const drivenStyle = driven?.style.transform;
+    expect(drivenStyle).not.toBe("");
+
+    // Now the shoo lands: three cat frames, including the owner's own.
+    for (const id of ["p1", "p2", "p3"]) pushCat(catAt(id, 0.08, 0.92));
+
+    const moved = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
+    expect(moved?.style.transform).not.toBe(drivenStyle);
+    expect(moved?.style.transform).toContain(
+      `translate(${(0.08 * globalThis.innerWidth).toString().slice(0, 7)}`,
+    );
+  });
+
+  /**
+   * The whole thing in one go, through the button rather than by calling the listener:
+   * press it, let the room answer with a frame for every cat including the presser's,
+   * and read where the presser's own cat ended up.
+   */
+  it("moves the presser's own cat when the shoo comes back", async () => {
+    const { container } = renderRoom();
+    await joinAs("Ana");
+    pushState({
+      ...roomState,
+      participants: [
+        ...roomState.participants,
+        { id: "p2", name: "Bia", role: "voter", isOwner: false, isConnected: true, hasVoted: false },
+        { id: "p3", name: "Caio", role: "voter", isOwner: false, isConnected: true, hasVoted: false },
+      ],
+      cats: [catAt("p1", 0.5, 0.5), catAt("p2", 0.5, 0.5), catAt("p3", 0.5, 0.5)],
+    });
+
+    const before = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
+    const beforeStyle = `${before?.style.left}|${before?.style.top}`;
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Shoo everyone's cats to the edges" }),
+    );
+    expect(harness.sent).toContainEqual({ type: "shoo-cats", aspect: expect.any(Number) });
+
+    for (const id of ["p1", "p2", "p3"]) pushCat(catAt(id, 0.08, 0.92));
+
+    const after = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
+    expect(`${after?.style.left}|${after?.style.top}`).not.toBe(beforeStyle);
+
+    // The presser's own cat is drawn from its held position rather than from left and
+    // top, so the transform is where the move has to show up. Before the shoo it sat at
+    // the middle; afterwards it is the room's own numbers, which is what everybody else
+    // is looking at.
+    expect(after?.style.transform).toContain(
+      `translate(${(0.08 * globalThis.innerWidth).toString().slice(0, 7)}`,
+    );
+    expect(after?.style.transform).toContain(
+      `${(0.92 * globalThis.innerHeight).toString().slice(0, 6)}`,
+    );
+    expect(after?.getAttribute("data-controlled")).toBe("true");
+  });
+
+  it("leaves a cat the room said nothing about exactly where it was", async () => {
+    const { container } = renderRoom();
+    await joinAs("Ana");
+    pushState({ ...roomState, participants: others, cats: [catAt("p2", 0.5, 0.5)] });
+
+    pushCat(catAt("p1", 0.08, 0.92));
+
+    const bia = container.querySelector<HTMLElement>('[data-testid="cat-p2"]');
+    expect(bia?.style.left).toBe("50%");
+  });
+});
+
+/**
+ * The bin was the one destructive control in the room that asked nothing. It takes
+ * every message from under everybody at once and there is no way back, which is the
+ * definition the repository already applies to every other control that erases.
+ */
+describe("RoomScreen erasing the conversation", () => {
+  const withMessages = {
+    ...roomState,
+    messages: [{ id: "m1", authorId: "p1", authorName: "Ana", text: "oi", sentAt: 1 }],
+  };
+
+  const openTheQuestion = async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(withMessages);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear the conversation for everyone" }),
+    );
+  };
+
+  it("asks before taking the conversation away from everybody", async () => {
+    await openTheQuestion();
+
+    expect(screen.getByRole("button", { name: "Yes, clear it" })).toBeTruthy();
+    expect(harness.sent).not.toContainEqual({ type: "clear-chat" });
+  });
+
+  it("keeps the conversation when the answer is no", async () => {
+    await openTheQuestion();
+
+    await userEvent.click(screen.getByRole("button", { name: "Keep it" }));
+
+    expect(harness.sent).not.toContainEqual({ type: "clear-chat" });
+  });
+
+  it("takes the conversation away once the answer is yes", async () => {
+    await openTheQuestion();
+
+    await userEvent.click(screen.getByRole("button", { name: "Yes, clear it" }));
+
+    expect(harness.sent).toContainEqual({ type: "clear-chat" });
+  });
+
+  it("asks again next time rather than remembering the answer", async () => {
+    await openTheQuestion();
+    await userEvent.click(screen.getByRole("button", { name: "Yes, clear it" }));
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear the conversation for everyone" }),
+    );
+
+    expect(screen.getByRole("button", { name: "Yes, clear it" })).toBeTruthy();
+  });
+});
+
+/**
+ * The broom is drawn by the room, not by the overlay, because on a coarse pointer the
+ * overlay is not rendered at all. That is exactly when it matters most: somebody on a
+ * phone cannot drive their cat, so it stands where they left it on every other screen
+ * in the room, and the host is the one person who could move it and cannot.
+ */
+describe("RoomScreen shooing the cats", () => {
+  const crowdedRoom = {
+    ...roomState,
+    participants: [
+      ...roomState.participants,
+      { id: "p2", name: "Bia", role: "voter", isOwner: false, isConnected: true, hasVoted: false },
+      { id: "p3", name: "Caio", role: "voter", isOwner: false, isConnected: true, hasVoted: false },
+    ],
+  };
+
+  function stubPointer(coarse: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: coarse && query.includes("pointer: coarse"),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+  }
+
+  it("asks the room to clear the middle", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(crowdedRoom);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Shoo everyone's cats to the edges" }),
+    );
+
+    expect(harness.sent).toContainEqual({
+      type: "shoo-cats",
+      aspect: globalThis.innerWidth / globalThis.innerHeight,
+    });
+  });
+
+  it("says whose cats it moves", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(crowdedRoom);
+
+    await userEvent.hover(
+      screen.getByRole("button", { name: "Shoo everyone's cats to the edges" }),
+    );
+
+    const label = screen.getByRole("tooltip");
+    expect(label.textContent).toBe("Shoo everyone's cats to the edges");
+    expect(label.className).toContain("right-0");
+  });
+
+  it("is offered to the host as well", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    // Ana is p1 and p1 owns the room, so this is the host's own screen.
+    pushState(crowdedRoom);
+
+    expect(screen.getByRole("button", { name: "Shoo everyone's cats to the edges" })).toBeTruthy();
+  });
+
+  /**
+   * Not the host's alone. A cat over the vote grid is in the way of everyone reading
+   * it, and the answer to somebody else's cat covering your screen is not to wait for
+   * the host to notice.
+   */
+  it("is offered to somebody who is not the host", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState({
+      ...crowdedRoom,
+      ownerId: "p2",
+      participants: crowdedRoom.participants.map((entry) => ({
+        ...entry,
+        isOwner: entry.id === "p2",
+      })),
+    });
+
+    expect(screen.getByRole("button", { name: "Shoo everyone's cats to the edges" })).toBeTruthy();
+  });
+
+  it("is not offered to somebody sitting alone", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+
+    expect(screen.queryByRole("button", { name: "Shoo everyone's cats to the edges" })).toBeNull();
+  });
+
+  it("is offered on a coarse pointer, where no cat is drawn at all", async () => {
+    stubPointer(true);
+    renderRoom();
+    await joinAs("Ana");
+    pushState(crowdedRoom);
+
+    expect(screen.getByRole("button", { name: "Shoo everyone's cats to the edges" })).toBeTruthy();
+    // The overlay that would have carried it is not on this layout at all.
+    expect(document.querySelector(".cat-overlay")).toBeNull();
+  });
+
+  it("does not count a cat that was sent away for good", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState({
+      ...crowdedRoom,
+      participants: crowdedRoom.participants.map((entry) => ({
+        ...entry,
+        hasCat: entry.id === "p1",
+      })),
+    });
+
+    // Three people in the room and one cat on it, which is no more of a pile than a
+    // host sitting alone has.
+    expect(screen.queryByRole("button", { name: "Shoo everyone's cats to the edges" })).toBeNull();
+  });
+
+  it("does not count a cat whose owner has walked out", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState({
+      ...crowdedRoom,
+      participants: crowdedRoom.participants.map((entry) => ({
+        ...entry,
+        isConnected: entry.id === "p1",
+      })),
+    });
+
+    // The seat is still there for the grace window and the cat is still listed, but
+    // nobody else can see it and neither can the host, so there is nothing to clear.
+    expect(screen.queryByRole("button", { name: "Shoo everyone's cats to the edges" })).toBeNull();
   });
 });

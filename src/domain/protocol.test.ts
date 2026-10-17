@@ -100,6 +100,8 @@ describe("isClientMessage", () => {
     expect(isClientMessage({ type: "set-name", name: "Ana" })).toBe(true);
     expect(isClientMessage({ type: "transfer-ownership", participantId: "ana" })).toBe(true);
     expect(isClientMessage({ type: "remove-participant", participantId: "ana" })).toBe(true);
+    expect(isClientMessage({ type: "shoo-cats", aspect: 1.78 })).toBe(true);
+    expect(isClientMessage({ type: "remove-cat" })).toBe(true);
     expect(isClientMessage({ type: "delete-room" })).toBe(true);
     expect(isClientMessage({ type: "ping" })).toBe(true);
     expect(
@@ -180,5 +182,22 @@ describe("PublicRoomState", () => {
   it("carries the grace period for the countdown display", () => {
     const state: PublicRoomState = toPublicState(roomWithVoted());
     expect(state.gracePeriodMs).toBe(300_000);
+  });
+});
+
+describe("isClientMessage and the shoo", () => {
+  /**
+   * The room cannot guess the shape of somebody else's window, so the frame has to
+   * carry it. A missing or unusable shape would leave the room spreading cats across
+   * a border it invented, and half of them would land off the screen it was drawn on.
+   */
+  it("refuses a shoo with no shape to work from", () => {
+    expect(isClientMessage({ type: "shoo-cats" })).toBe(false);
+    expect(isClientMessage({ type: "shoo-cats", aspect: "wide" })).toBe(false);
+  });
+
+  it("refuses a shape that is not a real number", () => {
+    expect(isClientMessage({ type: "shoo-cats", aspect: Number.NaN })).toBe(false);
+    expect(isClientMessage({ type: "shoo-cats", aspect: Number.POSITIVE_INFINITY })).toBe(false);
   });
 });

@@ -23,7 +23,22 @@ function controlled(
   options: Partial<Parameters<typeof useControlledCat>[0]> = {},
 ) {
   return renderHook(() =>
-    useControlledCat({ asleep: false, bounds, catSize, cats: [], ...options }),
+    useControlledCat({ asleep: false, bounds, catSize, cats: [], myParticipantId: null, ...options }),
+  );
+}
+
+/**
+ * The hook above closes over its options, so rerendering it changes nothing. Anything
+ * that needs the room to change under the hook has to hand its options in as props.
+ */
+function drivenByTheRoom(
+  initial: Partial<Parameters<typeof useControlledCat>[0]> = {},
+) {
+  return renderHook(
+    (props: Parameters<typeof useControlledCat>[0]) => useControlledCat(props),
+    {
+      initialProps: { asleep: false, bounds, catSize, cats: [], myParticipantId: null, ...initial },
+    },
   );
 }
 
@@ -230,5 +245,137 @@ describe("useControlledCat taking hold of a cat that is already standing", () =>
     act(() => result.current.moveControlled(0, 10));
 
     expect(result.current.hasMoved).toBe(true);
+  });
+});
+
+/**
+ * The cat a person is driving is drawn from local state, because the room never echoes
+ * their own movement back and there would be nothing to redraw from. That works right
+ * up until the room moves it for them, and then the one cat that ignores the room is
+ * the owner's own, standing in the middle of a screen that was just cleared.
+ */
+describe("useControlledCat and a cat the room moved", () => {
+  it("goes where the room says when the room moves my cat", () => {
+    const { result, rerender } = drivenByTheRoom({ myParticipantId: "p1" });
+    act(() => result.current.requestControl("p1", { x: 400, y: 300 }));
+
+    rerender({
+      asleep: false,
+      bounds,
+      catSize,
+      myParticipantId: "p1",
+      cats: [cat({ participantId: "p1", x: 0.1, y: 0.9 })],
+    });
+
+    expect(result.current.controlledPosition).toEqual({ x: 80, y: 540 });
+  });
+
+  it("stays put when somebody else's cat moves", () => {
+    const { result, rerender } = drivenByTheRoom({
+      myParticipantId: "p1",
+      cats: [cat({ participantId: "p1", x: 0.5, y: 0.5 })],
+    });
+    act(() => result.current.requestControl("p1", { x: 400, y: 300 }));
+
+    rerender({
+      asleep: false,
+      bounds,
+      catSize,
+      myParticipantId: "p1",
+      cats: [
+        cat({ participantId: "p1", x: 0.5, y: 0.5 }),
+        cat({ participantId: "p2", x: 0.2, y: 0.3 }),
+      ],
+    });
+
+    expect(result.current.controlledPosition).toEqual({ x: 400, y: 300 });
+  });
+
+  /**
+   * Publishing divides by the viewport and the room's copy divides back, so the number
+   * can come back a fraction off. Adopting that would put the cat back where it was
+   * told to go on every echo and it would never settle.
+   */
+  it("does not treat a fraction of a pixel as the room moving it", () => {
+    const { result, rerender } = drivenByTheRoom({ myParticipantId: "p1" });
+    act(() => result.current.requestControl("p1", { x: 400, y: 300 }));
+    act(() => result.current.moveControlled(100, 0));
+
+    rerender({
+      asleep: false,
+      bounds,
+      catSize,
+      myParticipantId: "p1",
+      cats: [
+        cat({
+          participantId: "p1",
+          x: 500.5 / bounds.width,
+          y: 300.5 / bounds.height,
+        }),
+      ],
+    });
+
+    expect(result.current.controlledPosition).toEqual({ x: 500, y: 300 });
+  });
+
+  it("walks on from where the room put it rather than from where it was", () => {
+    const { result, rerender } = drivenByTheRoom({ myParticipantId: "p1" });
+    act(() => result.current.requestControl("p1", { x: 400, y: 300 }));
+
+    rerender({
+      asleep: false,
+      bounds,
+      catSize,
+      myParticipantId: "p1",
+      cats: [cat({ participantId: "p1", x: 0.1, y: 0.9 })],
+    });
+    act(() => result.current.moveControlled(0, -50));
+
+    // 540 is where the room put it and 490 is a step up from there. Had the adoption
+    // not happened the step would have started from 300 and landed on 250.
+    expect(result.current.controlledPosition).toEqual({ x: 80, y: 490 });
+  });
+});
+
+/**
+ * Taken while the room moves a cat nobody is holding. Adopting the position into the
+ * local state without taking hold of the cat put the two out of step: the drawing
+ * switched to the held position while nothing was held, and the next focus change
+ * picked up that stray position and declared the cat held after all. A cat that is not
+ * held already reads the room's number, so there is nothing here to adopt.
+ */
+describe("useControlledCat and a cat nobody is holding", () => {
+  it("leaves a cat it is not holding to the room's own numbers", () => {
+    const { result, rerender } = drivenByTheRoom({
+      myParticipantId: "p1",
+      cats: [cat({ participantId: "p1", x: 0.5, y: 0.5 })],
+    });
+
+    rerender({
+      asleep: false,
+      bounds,
+      catSize,
+      myParticipantId: "p1",
+      cats: [cat({ participantId: "p1", x: 0.08, y: 0.92 })],
+    });
+
+    expect(result.current.controlledPosition).toBeNull();
+    expect(result.current.controlledId).toBeNull();
+  });
+
+  it("still takes a held cat where the room put it", () => {
+    const { result, rerender } = drivenByTheRoom({ myParticipantId: "p1" });
+    act(() => result.current.requestControl("p1", { x: 400, y: 300 }));
+
+    rerender({
+      asleep: false,
+      bounds,
+      catSize,
+      myParticipantId: "p1",
+      cats: [cat({ participantId: "p1", x: 0.08, y: 0.92 })],
+    });
+
+    expect(result.current.controlledPosition).toEqual({ x: 64, y: 552 });
+    expect(result.current.controlledId).toBe("p1");
   });
 });

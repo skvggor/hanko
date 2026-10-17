@@ -227,19 +227,39 @@ export function Meter({
 export interface TooltipProps {
   label: string;
   children: ReactNode;
+  /** Replaces the default box outright, for a tooltip that is pinned to a corner. */
+  className?: string;
+  placement?: keyof typeof TOOLTIP_PLACEMENT;
 }
+
+/**
+ * The label never wraps, so where it hangs from is the whole decision: centring suits a
+ * button in a row and grows off the screen for one pinned to the edge of the window.
+ */
+const TOOLTIP_PLACEMENT = {
+  above: "left-1/2 -translate-x-1/2",
+  "above-end": "right-0",
+} as const;
 
 /**
  * A tooltip the app draws itself, for the same reason the dialogs are ours: the
  * browser's own is a delay and a font the design has no say over. It opens on hover
  * and on keyboard focus alike, because an icon nobody can name is only half drawn.
  */
-export function Tooltip({ label, children }: Readonly<TooltipProps>) {
+export function Tooltip({
+  label,
+  children,
+  className,
+  placement = "above",
+}: Readonly<TooltipProps>) {
   const [open, setOpen] = useState(false);
 
   return (
     <span
-      className="relative inline-flex"
+      // A caller that places this owns the box, default and all: overriding the position
+      // from a stylesheet would mean fighting the utility layer over a `relative` that
+      // stays there winning.
+      className={className ?? "relative inline-flex"}
       onBlur={() => setOpen(false)}
       onFocus={() => setOpen(true)}
       onMouseEnter={() => setOpen(true)}
@@ -248,7 +268,7 @@ export function Tooltip({ label, children }: Readonly<TooltipProps>) {
       {children}
       {open && (
         <span
-          className="absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 rounded-chip bg-ink px-snug py-1 text-[0.625rem] font-semibold tracking-[0.06em] whitespace-nowrap text-paper"
+          className={`absolute bottom-full z-20 mb-1 rounded-chip bg-ink px-snug py-1 text-[0.625rem] font-semibold tracking-[0.06em] whitespace-nowrap text-paper ${TOOLTIP_PLACEMENT[placement]}`}
           role="tooltip"
         >
           {label}

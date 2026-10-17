@@ -792,3 +792,24 @@ describe("sending a cat away", () => {
     expect(sent).toEqual([{ type: "remove-cat" }]);
   });
 });
+
+describe("shooing the cats", () => {
+  /**
+   * The shape of the window goes on the wire because the room stores positions
+   * normalised and has no way to know what the edge of somebody else's screen is.
+   */
+  it("carries the shape of the window so the room can find the edges", async () => {
+    const { RoomConnection } = await import("@application/roomConnection");
+    const socket = createFakeSocket();
+
+    const connection = new RoomConnection("room-1", () => socket as unknown as WebSocket);
+    await connection.join("Ana", "voter", null);
+
+    connection.shooCats(16 / 9);
+
+    expect(JSON.parse(socket.sent[1] ?? "{}")).toEqual({
+      type: "shoo-cats",
+      aspect: 16 / 9,
+    });
+  });
+});

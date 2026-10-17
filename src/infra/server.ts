@@ -19,7 +19,6 @@ import {
   castVote,
   clearMessages,
   clearRoomName,
-  countConnected,
   disconnectParticipant,
   findByToken,
   isRemovedToken,
@@ -30,6 +29,7 @@ import {
   removeParticipant,
   resetRound,
   restoreRoom,
+  shouldRoomExpire,
   reveal,
   setDeck,
   setParticipantName,
@@ -38,7 +38,7 @@ import {
   startNextRound,
   transferOwnership,
 } from "@domain/room";
-import { CAT_BREEDS, type CatState } from "@domain/cat";
+import { CAT_BREEDS, type CatState, spreadAlongTheEdges } from "@domain/cat";
 
 interface SocketIdentity {
   participantId: string | null;
@@ -53,6 +53,9 @@ const CHAT_WINDOW_MS = 5_000;
 
 /** Everything else a joined participant can ask for. */
 const COMMAND_LIMIT_PER_WINDOW = 60;
+
+// One frame per cat, so the most expensive command in the room gets its own small budget.
+const SHOO_LIMIT_PER_WINDOW = 3;
 const COMMAND_WINDOW_MS = 10_000;
 
 /**
@@ -137,6 +140,10 @@ export class Room {
     COMMAND_WINDOW_MS,
   );
   readonly #catBudget = new InMemoryRateLimiter(CAT_LIMIT_PER_WINDOW, CAT_WINDOW_MS);
+  readonly #shooBudget = new InMemoryRateLimiter(
+    SHOO_LIMIT_PER_WINDOW,
+    COMMAND_WINDOW_MS,
+  );
   readonly #stateBudget = new InMemoryRateLimiter(STATE_LIMIT_PER_WINDOW, STATE_WINDOW_MS);
   #catsPersistTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   #lastCatsPersistAt = 0;
@@ -420,18 +427,20 @@ export class Room {
       case "transfer-ownership":
         return { room: transferOwnership(room, message.participantId), finished: false };
       /**
-       * Carried off the socket rather than off a field, so a participant can only ever
-       * reach their own cat, and the seat is left exactly as it was: sending a cat away
-       * is not removing a person, and it must not take their vote with it.
+       * Carried off the socket, so nobody can reach a cat but their own, and the seat is
+       * left alone: sending a cat away is not removing a person.
        *
-       * The next room is handed back rather than saved here. A command that saves for
-       * itself has to finish, or the room it started from is written straight back over
-       * the change, which is a mistake that leaves no trace of ever having happened.
+       * The next room is handed back rather than saved here, because a command that saves
+       * for itself has to finish, and the caller then writes the room it started from
+       * straight back over the change.
        */
       case "remove-cat": {
         this.#cats.delete(actor.id);
         return { room: removeCat(room, actor.id), finished: false };
       }
+      case "shoo-cats":
+        this.#shooCats(message.aspect);
+        return { room, finished: true };
       case "remove-participant": {
         const removed = message.participantId;
 
@@ -478,6 +487,52 @@ export class Room {
     this.#scheduleCatsPersist();
 
     return { room, finished: true };
+  }
+
+  /**
+   * Walks every cat out to the border of the screen the caller is looking at.
+   *
+   * It is a nudge rather than a rule: an idle cat keeps wandering, so the middle of the
+   * room fills up again on its own and the button stays worth having. Being a nudge is
+   * the point, because the alternative would be the room deciding where a cat may go
+   * and a person deciding where their own cat goes, which is the opposite of a cat.
+   *
+   * Open to everybody, because a cat sitting on the vote grid is in the way of
+   * everyone reading it. What stops it from being a lever is the spread being
+   * deterministic and a cat that has not moved being left unannounced: pressing it twice
+   * in the same window costs nothing and says nothing.
+   */
+  #shooCats(aspect: number): void {
+    const spots = spreadAlongTheEdges(this.#cats.size, aspect);
+    let index = 0;
+    let changed = false;
+
+    for (const cat of this.#cats.values()) {
+      const spot = spots[index];
+      if (spot === undefined) break;
+
+      const alreadyThere =
+        cat.x === spot.x && cat.y === spot.y && cat.direction === spot.direction;
+
+      if (alreadyThere) {
+        index += 1;
+        continue;
+      }
+
+      const moved: CatState = {
+        ...cat,
+        x: spot.x,
+        y: spot.y,
+        direction: spot.direction,
+      };
+
+      this.#cats.set(cat.participantId, moved);
+      this.#broadcastCatState(moved);
+      changed = true;
+      index += 1;
+    }
+
+    if (changed) this.#scheduleCatsPersist();
   }
 
   #advanceRoom(message: ClientMessage, room: RoomSnapshot): RoomSnapshot {
@@ -621,9 +676,7 @@ export class Room {
     await this.#save(room);
     this.#broadcast();
 
-    if (countConnected(room) === 0) {
-      await this.#scheduleExpiry();
-    }
+    await this.#scheduleReclaim();
   }
 
   #hasOtherSocketFor(token: string, current: WebSocket): boolean {
@@ -633,10 +686,26 @@ export class Room {
     });
   }
 
-  #scheduleExpiry(): Promise<void> {
+  /**
+   * Aimed at the earliest deadline rather than at the clock, which made a seat whose
+   * window had already elapsed wait another whole grace period for somebody to look.
+   * Armed for nothing while nobody is away: a wake to find no deadline is a wake for
+   * no reason.
+   */
+  #scheduleReclaim(): Promise<void> {
     const room = this.#room;
     if (room === null) return Promise.resolve();
-    return this.storage.storage.setAlarm(Date.now() + room.gracePeriodMs);
+
+    const deadlines: number[] = [];
+
+    for (const participant of room.participants) {
+      if (participant.isConnected || participant.disconnectedAt === null) continue;
+      deadlines.push(participant.disconnectedAt + room.gracePeriodMs);
+    }
+
+    if (deadlines.length === 0) return Promise.resolve();
+
+    return this.storage.storage.setAlarm(Math.min(...deadlines));
   }
 
   #identity(socket: WebSocket): SocketIdentity | null {
@@ -689,6 +758,7 @@ export class Room {
     let budget = this.#commandBudget;
     if (message.type === "chat") budget = this.#chatBudget;
     if (message.type === "cat-update") budget = this.#catBudget;
+    if (message.type === "shoo-cats") budget = this.#shooBudget;
     const now = Date.now();
 
     if (budget.allow(key, now)) return true;
@@ -759,7 +829,9 @@ export class Room {
    * push, which is what makes frequent updates affordable. The sender is skipped
    * because it already has the position it just reported.
    */
-  #broadcastCatState(cat: CatState, exceptSocket: WebSocket): void {
+  // The owner is skipped because they already know where their cat is, except on a shoo,
+  // which moves cats nobody moved and would otherwise leave the presser uninformed.
+  #broadcastCatState(cat: CatState, exceptSocket: WebSocket | null = null): void {
     for (const socket of this.storage.getWebSockets()) {
       if (socket === exceptSocket) continue;
       this.#send(socket, { type: "cat-state", cat });
@@ -849,12 +921,30 @@ export class Room {
     this.#catsPersistTimer = null;
   }
 
+  /**
+   * Two different jobs land on the same alarm. A room nobody is in any more is finished
+   * and goes. A room that still has people in it may have seats held by somebody who
+   * is never coming back, and those are freed here and the room is told, because a list
+   * still carrying somebody who left an hour ago is not a record of the room.
+   */
   async alarm(): Promise<void> {
     const room = await this.#load(this.#currentRoomId());
 
-    if (countConnected(room) === 0) {
+    if (shouldRoomExpire(room)) {
       await this.#wipe();
+      return;
     }
+
+    const reclaimed = reclaimDisconnected(room);
+
+    if (reclaimed !== room) {
+      // #save also prunes the cats of anybody whose seat just went, so a reclaimed
+      // seat does not leave a cat standing in the room with nobody behind it.
+      await this.#save(reclaimed);
+      this.#broadcast();
+    }
+
+    await this.#scheduleReclaim();
   }
 }
 

@@ -94,6 +94,10 @@ owner can hand the room over to you (see [Managing people](#8-managing-people)).
 - The small print counts the `?` votes, the coffee votes and how many votes the
   average used.
 
+**The numbers do not move after the reveal.** If somebody's connection drops and their
+seat is freed five minutes later, the figures you are reading stay exactly as they
+were shown, name included. The next round starts from who is actually there.
+
 ## 7. Running a session
 
 ![The owner controls](images/06-owner-controls.png)
@@ -128,8 +132,10 @@ its name appears.
 - **Eye (Make watcher / Make voter)**: move someone between voting and watching. The
   owner can turn their own row into a watcher as well, which is how someone runs the
   room without voting in it.
-- **Remove**: kick someone out. A removed person cannot rejoin with the same link,
-  not even by reloading.
+- **Remove**: kick someone out. That browser is refused the room from then on, even
+  after a reload. It is not the link that is closed, only that person's place in it:
+  the room id is the only secret this app has, so anyone opening the link from another
+  browser still gets in.
 
 ## 9. Chat
 
@@ -139,8 +145,26 @@ The chat dock sits in the corner of the room. It opens itself on a wide screen; 
 the launcher to open it, the minus to minimise it.
 
 Messages are limited to 280 characters, and the conversation keeps the last 100. A
-badge counts what you missed while the chat was minimised. The owner can clear the
-conversation.
+badge counts what you missed while the chat was minimised. Anything that looks like a
+web address turns into a link you can follow, which opens in a new tab.
+
+**This room is not private and the chat is not encrypted.** Anyone holding the room
+link can read everything said here. You are told this the first time you open the
+chat, once per browser.
+
+![The privacy notice, the first time the conversation is opened](images/12-chat-warning.png)
+
+On a desktop there is a button in the bottom corner that reads the whole conversation
+back, including anything said before you arrived. What people said outlives their
+presence in the room: leaving, being removed, or having your seat freed five minutes
+after a dropped connection all leave their words in place.
+
+![The whole conversation, read back](images/13-chat-transcript.png)
+
+The owner can clear the conversation. It asks first, because it takes every message
+from under the room at once.
+
+![Asking before the conversation goes](images/14-clear-chat-confirm.png)
 
 ## 10. Your cat
 
@@ -153,12 +177,38 @@ and escape lets go of it. While you are holding it, those keys are yours and not
 else on the page takes them, so the room still scrolls as usual. Walking into another
 cat earns you a short-lived sulk, and the cat carries on afterwards.
 
+A ring and your cat's name appear while you are actually driving it, focus and all.
+Letting the focus go puts them away even if you are still holding the cat, because
+the arrow keys have stopped answering to it.
+
+![Your own cat, ringed and named while you drive it](images/15-driving-your-cat.png)
+
 Two small buttons sit under your cat. One pauses it where it stands, for everybody,
-and one sends it away for you. Sending it away lasts only until that person next
-loses and regains their connection.
+and one sends it away. **Sending a cat away is for good and for everyone:** it leaves
+the screen for the whole room and does not come back, including for you. The button
+is an X and does not ask for confirmation, so use it only if you mean to remove the
+cat permanently. Your seat, your name and your vote are untouched by it.
+
+![The pause and remove controls beneath the cat](images/17-send-cat-away.png)
+
+![The room after a cat has gone for good](images/18-cat-sent-away.png)
+
+![Two cats walked out to the edges of the screen](images/16-cats-to-the-edges.png)
+
+A broom in the top corner walks every cat out to the edges of the screen, so the
+grid is readable again in a crowded room. Anyone can use it, not only the owner,
+because a cat over the grid is in the way of everyone reading it. It is a nudge and
+not a rule: a cat nobody is driving wanders back on its own, and you can press it
+again.
 
 On a phone or tablet the cats are replaced by the chat panel instead: a moving
 target is not something to tap at, so the cats step aside rather than sit in the way.
+The broom is still there, because the cats you cannot see are still standing on
+everybody else's screen.
+
+**The conversation on a phone is the chat panel and nothing more.** The read-back
+button and the privacy notice live with the cats, so on a touch device you get the
+conversation as it arrives and not the whole history.
 
 ## 11. Leaving and deleting
 
@@ -166,7 +216,12 @@ target is not something to tap at, so the cats step aside rather than sit in the
 
 Pressing the Hanko mark in the header asks before leaving. **Your seat is kept for
 five minutes** after you go, so a reload or a lost connection does not cost you your
-spot. After that the seat is freed for someone else.
+spot, and your cat waits where you left it. After that your seat is freed and your
+name leaves the list, along with your vote and your cat. What you said in the chat
+stays.
+
+If the person who goes was the owner, the room hands itself to somebody still in it
+rather than sitting there with a name nobody can answer to.
 
 Deleting a room asks first. The room, the votes and the chat disappear for everyone
 and cannot be brought back. The same thing happens on its own about five minutes
@@ -178,6 +233,11 @@ after the last person leaves.
   returned to the client that cast them. There is nothing to inspect in the page.
 - **Limits.** 50 people in a room, names up to 24 letters, session names up to 60
   characters, chat messages up to 280.
+- **Coming back.** The name you used is kept per browser, so returning to a room
+  fills the field in for you and says so. One press of Enter is enough, and if the room
+  has since expired you are told that instead.
+
+  ![Coming back to a room that remembers you](images/19-coming-back.png)
 - **Language.** The `EN` / `PT` switch in the header covers the interface.
 - **Accessibility.** Every action is keyboard reachable, dialogs move focus on their
   own, and animations step aside when your system asks for reduced motion.

@@ -1,6 +1,7 @@
 import { ArrowUpIcon, TrashIcon } from "@phosphor-icons/react";
 import { MESSAGE_MAX_LENGTH } from "@domain/chat";
 import type { Translator } from "@application/i18n";
+import { Tooltip } from "@presentation/ui";
 import { useMessageDraft } from "@presentation/useMessageDraft";
 
 export interface CatComposerProps {
@@ -52,14 +53,23 @@ export function CatComposer({
       </button>
 
       {isOwner && hasMessages && (
-        <button
-          aria-label={translate("chat.clear")}
-          className="cat-composer__clear"
-          type="button"
-          onClick={onClear}
-        >
-          <TrashIcon aria-hidden="true" size={15} weight="bold" />
-        </button>
+        /*
+         * The one icon in this room that was drawn bare. A bin says what it throws
+         * away and nothing about how far that reaches, and this one takes the whole
+         * conversation out from under everybody at once. The tooltip carries the same
+         * sentence as the name, because a tooltip is drawn and not announced, so
+         * splitting them would leave the sentence nobody can hear.
+         */
+        <Tooltip label={translate("chat.clear")}>
+          <button
+            aria-label={translate("chat.clear")}
+            className="cat-composer__clear"
+            type="button"
+            onClick={onClear}
+          >
+            <TrashIcon aria-hidden="true" size={15} weight="bold" />
+          </button>
+        </Tooltip>
       )}
     </form>
   );

@@ -36,6 +36,13 @@ export function NameGate({
       </h2>
       <p className="m-0 text-[0.8125rem] text-ink-dim">{translate("join.hint")}</p>
 
+      {/* A field that comes back full with no explanation reads as a typo; saying the name turns it into an offer. */}
+      {suggestedName !== null && suggestedName.trim().length > 0 && (
+        <p className="m-0 font-display text-[0.9375rem] font-bold text-ink">
+          {translate("join.returning", { name: suggestedName.trim() })}
+        </p>
+      )}
+
       <label
         className="text-[0.625rem] font-semibold tracking-[0.16em] text-ink-faint uppercase"
         htmlFor="gate-name"

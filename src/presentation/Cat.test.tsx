@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ChatMessage } from "@domain/chat";
 import { createTranslator } from "@application/i18n";
@@ -149,5 +149,81 @@ describe("Cat", () => {
     await userEvent.click(container.querySelector(".cat-controls__button") as HTMLElement);
 
     expect(onPauseChange).toHaveBeenCalledWith(true);
+  });
+});
+
+/**
+ * The ring and the name are the one marker in the cat that says "your arrow keys go to
+ * this cat right now". The arrow keys answer to the focus and to nothing else, so a cat
+ * that is held but not focused is not being driven and should stop claiming to be.
+ */
+describe("Cat and the marker for the cat being driven", () => {
+  const heldAndFocused = {
+    isControllable: true,
+    isControlled: true,
+    controlledPosition: { x: 0, y: 0 },
+  };
+
+  it("names the cat while it is being driven", async () => {
+    const { container } = renderCat(heldAndFocused);
+    await userEvent.click(container.querySelector(".cat__button") as HTMLElement);
+
+    expect(container.querySelector(".cat__badge--controlled")?.textContent).toBe("Ana");
+  });
+
+  it("calls the cat driven when it is held and focused", async () => {
+    const { container } = renderCat(heldAndFocused);
+    await userEvent.click(container.querySelector(".cat__button") as HTMLElement);
+
+    expect(container.querySelector(".cat")?.getAttribute("data-driving")).toBe("true");
+  });
+
+  it("drops the marker when the focus moves away", async () => {
+    const { container } = renderCat(heldAndFocused);
+    const button = container.querySelector(".cat__button") as HTMLElement;
+    await userEvent.click(button);
+
+    act(() => {
+      fireEvent.blur(button);
+    });
+
+    expect(container.querySelector(".cat__badge--controlled")).toBeNull();
+    expect(container.querySelector(".cat")?.getAttribute("data-driving")).toBe("false");
+  });
+
+  /**
+   * Held and not focused is still held, and the room still knows it: this cat is above
+   * the others, its patrol is stopped and its controls are showing. Collapsing the two
+   * states would have taken all of that with them.
+   */
+  it("keeps holding the cat after the focus moves away", async () => {
+    const { container } = renderCat(heldAndFocused);
+    const button = container.querySelector(".cat__button") as HTMLElement;
+    await userEvent.click(button);
+
+    act(() => {
+      fireEvent.blur(button);
+    });
+
+    expect(container.querySelector(".cat")?.getAttribute("data-controlled")).toBe("true");
+  });
+
+  it("marks nothing on a cat nobody is holding", () => {
+    const { container } = renderCat({ isControllable: true, isControlled: false });
+
+    expect(container.querySelector(".cat__badge--controlled")).toBeNull();
+    expect(container.querySelector(".cat")?.getAttribute("data-driving")).toBe("false");
+  });
+
+  it("still tells a screen reader who holds the cat when the focus is gone", async () => {
+    const { container } = renderCat(heldAndFocused);
+    const button = container.querySelector(".cat__button") as HTMLElement;
+    await userEvent.click(button);
+
+    act(() => {
+      fireEvent.blur(button);
+    });
+
+    expect(container.querySelector(".visually-hidden")?.textContent).toContain("controlled");
   });
 });

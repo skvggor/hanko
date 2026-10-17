@@ -94,8 +94,14 @@ describe("clearMessages", () => {
   });
 });
 
+/**
+ * The seat is what leaves. What somebody said does not, because the transcript is only
+ * worth having while it is a record of the room rather than of whoever is still in it.
+ * These tests used to assert the opposite, which made a readable transcript a thing that
+ * quietly emptied itself whenever the room moved on.
+ */
 describe("messages of removed participants", () => {
-  it("drops them when the participant leaves", () => {
+  it("keeps them when the participant leaves", () => {
     let room = appendMessage(roomWith("Ana", "Bia"), messageAt(0));
     room = appendMessage(room, { ...messageAt(1), authorId: "p1", authorName: "Bia" });
 
@@ -103,17 +109,27 @@ describe("messages of removed participants", () => {
 
     room = leaveRoom(room, "p1");
 
-    expect(room.messages).toHaveLength(1);
-    expect(room.messages[0]?.authorId).toBe("p0");
+    expect(room.messages).toHaveLength(2);
+    expect(room.messages[1]?.authorId).toBe("p1");
   });
 
-  it("drops them when the owner removes them", () => {
+  it("keeps them when the owner removes the participant", () => {
     let room = appendMessage(roomWith("Ana", "Bia"), messageAt(0));
     room = appendMessage(room, { ...messageAt(1), authorId: "p1", authorName: "Bia" });
 
     room = removeParticipant(room, "p1");
 
-    expect(room.messages).toHaveLength(1);
+    expect(room.messages).toHaveLength(2);
+  });
+
+  it("still bounds the backlog so a long room cannot grow without end", () => {
+    let room = roomWith("Ana");
+
+    for (let index = 0; index < MESSAGE_LIMIT + 20; index += 1) {
+      room = appendMessage(room, messageAt(index));
+    }
+
+    expect(room.messages.length).toBeLessThanOrEqual(MESSAGE_LIMIT);
   });
 
   it("keeps messages when someone reconnects", () => {

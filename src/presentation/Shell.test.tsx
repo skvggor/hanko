@@ -502,8 +502,31 @@ describe("Shell chrome", () => {
     });
   }
 
+  /**
+   * The chrome re-measures itself whenever the page changes shape, and the only way to
+   * say that in a test is to be holding the observer it asked for. Every other test here
+   * dispatched a scroll by hand, which is precisely the thing a reader does not have to
+   * do for this bug and therefore the thing that hid it.
+   */
+  const observers: Array<() => void> = [];
+
+  function contentResized() {
+    act(() => {
+      for (const notify of [...observers]) notify();
+    });
+  }
+
   beforeEach(() => {
     vi.unstubAllGlobals();
+    observers.length = 0;
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: () => void) {
+        observers.push(callback);
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    });
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
     stubViewport(0, { scrollHeight: 1000, innerHeight: 800 });
   });
@@ -594,6 +617,48 @@ describe("Shell chrome", () => {
 
     act(() => {
       globalThis.dispatchEvent(new Event("scroll"));
+    });
+
+    expect(footer(container).getAttribute("data-glass")).toBe("true");
+  });
+
+  /**
+   * The reported bug. The footer is pinned, so it has to know whether anything sits
+   * behind it, and on arrival it does not: the room has not been laid out yet, so the
+   * document still measures as one screen tall. Nothing scrolled, so nothing re-measured,
+   * and the footer sat there with no fill until a scroll happened by accident.
+   */
+  it("frosts the footer when the page grows taller without anybody scrolling", () => {
+    stubViewport(0, { scrollHeight: 800, innerHeight: 800 });
+    const { container } = renderShell();
+
+    expect(footer(container).getAttribute("data-glass")).toBe("false");
+
+    stubViewport(0, { scrollHeight: 2400, innerHeight: 800 });
+    contentResized();
+
+    expect(footer(container).getAttribute("data-glass")).toBe("true");
+  });
+
+  it("drops the fill again when the room shrinks back to one screen", () => {
+    stubViewport(0, { scrollHeight: 2400, innerHeight: 800 });
+    const { container } = renderShell();
+
+    expect(footer(container).getAttribute("data-glass")).toBe("true");
+
+    stubViewport(0, { scrollHeight: 800, innerHeight: 800 });
+    contentResized();
+
+    expect(footer(container).getAttribute("data-glass")).toBe("false");
+  });
+
+  it("re-measures when the window itself changes shape", () => {
+    stubViewport(0, { scrollHeight: 800, innerHeight: 800 });
+    const { container } = renderShell();
+
+    stubViewport(0, { scrollHeight: 800, innerHeight: 400 });
+    act(() => {
+      globalThis.dispatchEvent(new Event("resize"));
     });
 
     expect(footer(container).getAttribute("data-glass")).toBe("true");

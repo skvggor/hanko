@@ -71,6 +71,11 @@ export function Shell({
    * The chrome is pinned, so it stops being the only thing on screen and starts being a
    * lid over the content. It stays plain paper until there is actually something behind
    * it to blur, because frosting a surface that has nothing behind it only costs paint.
+   *
+   * Asked on scroll alone this was unanswerable on arrival: the room has not laid out
+   * when this first runs, so the document still measures as one screen tall and a reader
+   * who never scrolled never gave the footer a reason to fill in. The answer changes
+   * when the content or the window changes shape, so both are listened to.
    */
   useEffect(() => {
     const sync = () => {
@@ -82,8 +87,22 @@ export function Shell({
     };
 
     sync();
+
+    // Guarded like the reduced motion query: a browser without it keeps the scroll.
+    const observer =
+      typeof globalThis.ResizeObserver === "function"
+        ? new globalThis.ResizeObserver(() => sync())
+        : null;
+    observer?.observe(globalThis.document.documentElement);
+
     globalThis.addEventListener("scroll", sync, { passive: true });
-    return () => globalThis.removeEventListener("scroll", sync);
+    globalThis.addEventListener("resize", sync);
+
+    return () => {
+      observer?.disconnect();
+      globalThis.removeEventListener("scroll", sync);
+      globalThis.removeEventListener("resize", sync);
+    };
   }, []);
 
   return (

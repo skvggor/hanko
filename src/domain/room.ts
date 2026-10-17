@@ -36,6 +36,8 @@ export interface RoomSnapshot {
   deckId: DeckId;
   round: number;
   isRevealed: boolean;
+  /** Kept rather than rebuilt, so a seat freed after the reveal cannot move a number the room already read. */
+  revealedEntries: RevealEntry[] | null;
   participants: Participant[];
   ownerId: string | null;
   gracePeriodMs: number;
@@ -58,6 +60,7 @@ export function createRoom(id: string): RoomSnapshot {
     deckId: DEFAULT_DECK_ID,
     round: 1,
     isRevealed: false,
+    revealedEntries: null,
     participants: [],
     ownerId: null,
     gracePeriodMs: GRACE_PERIOD_MS,
@@ -65,6 +68,23 @@ export function createRoom(id: string): RoomSnapshot {
     name: null,
     removedTokens: [],
   };
+}
+
+// Backfilled rather than read as nothing, which would show an empty result to a room mid-discussion.
+function restoredReveals(
+  base: RoomSnapshot,
+  stored: Partial<RoomSnapshot>,
+  participants: Participant[],
+): RevealEntry[] | null {
+  if (Array.isArray(stored.revealedEntries)) return stored.revealedEntries;
+  if (stored.isRevealed !== true) return null;
+
+  return buildRevealEntries({
+    ...base,
+    ...stored,
+    participants,
+    revealedEntries: null,
+  });
 }
 
 /**
@@ -79,23 +99,24 @@ export function restoreRoom(
 
   if (stored === null || stored === undefined) return base;
 
+  const participants: Participant[] = Array.isArray(stored.participants)
+    ? stored.participants.map((participant) => ({
+        ...participant,
+        disconnectedAt:
+          typeof participant.disconnectedAt === "number" ? participant.disconnectedAt : null,
+        // Backfilled rather than left undefined: everybody who was already seated
+        // has a cat, and an upgrade is not the moment to take it off them.
+        hasCat: participant.hasCat ?? true,
+      }))
+    : [];
+
   return {
     ...base,
     ...stored,
     id: stored.id ?? base.id,
     gracePeriodMs: stored.gracePeriodMs ?? base.gracePeriodMs,
-    participants: Array.isArray(stored.participants)
-      ? stored.participants.map((participant) => ({
-          ...participant,
-          disconnectedAt:
-            typeof participant.disconnectedAt === "number"
-              ? participant.disconnectedAt
-              : null,
-          // Backfilled rather than left undefined: everybody who was already seated
-          // has a cat, and an upgrade is not the moment to take it off them.
-          hasCat: participant.hasCat ?? true,
-        }))
-      : [],
+    participants,
+    revealedEntries: restoredReveals(base, stored, participants),
     messages: Array.isArray(stored.messages) ? stored.messages : [],
     name: typeof stored.name === "string" ? stored.name : null,
     removedTokens: Array.isArray(stored.removedTokens) ? stored.removedTokens : [],
@@ -164,6 +185,12 @@ export function reconnectParticipant(
   };
 }
 
+/**
+ * Hands back the seat and nothing else: the transcript is a record of what the room
+ * said rather than of who is still standing in it. The reveal does close, because a
+ * card that was turned over was the whole room's moment and a seat leaving underneath
+ * it would move numbers everybody has read.
+ */
 export function leaveRoom(room: RoomSnapshot, participantId: string): RoomSnapshot {
   const participants = room.participants.filter(
     (participant) => participant.id !== participantId,
@@ -176,39 +203,55 @@ export function leaveRoom(room: RoomSnapshot, participantId: string): RoomSnapsh
     participants,
     ownerId,
     isRevealed: false,
-    messages: room.messages.filter(
-      (message) => message.authorId !== participantId,
-    ),
+    revealedEntries: null,
   };
 }
 
 /**
  * Frees the seats of people who have been gone longer than the grace window.
- * Without this the participant cap is permanent: a room could be filled with dead
- * slots and refuse everyone while one socket stayed open.
+ *
+ * Not gated on the room being full, which is how a dropped person used to sit in the
+ * list for the rest of the room's life, and not gated on the seat still being wanted.
+ * Their messages stay: the transcript is only worth having if somebody who left still
+ * said it, and a dropped connection retracts nothing.
  */
 export function reclaimDisconnected(
   room: RoomSnapshot,
   now: number = Date.now(),
 ): RoomSnapshot {
-  if (room.participants.length < MAX_PARTICIPANTS) return room;
-
   const stale = room.participants.filter(
     (participant) =>
       !participant.isConnected &&
       participant.disconnectedAt !== null &&
-      now - participant.disconnectedAt >= room.gracePeriodMs &&
-      participant.id !== room.ownerId,
+      now - participant.disconnectedAt >= room.gracePeriodMs,
   );
 
   if (stale.length === 0) return room;
 
   const gone = new Set(stale.map((participant) => participant.id));
+  const remaining = room.participants.filter(
+    (participant) => !gone.has(participant.id),
+  );
+
+  /**
+   * The owner is reclaimable too. Exempt left a room carrying a name nobody could
+   * answer to, so the room is handed to somebody in it, preferring one who is connected
+   * over one still inside their window: that person may be a packet away from coming
+   * back, and a stranger who never had the room is the worse answer.
+   */
+  const ownerIsGone = room.ownerId !== null && gone.has(room.ownerId);
+  const heir = ownerIsGone
+    ? (remaining.find((participant) => participant.isConnected) ?? remaining[0])
+    : undefined;
+  const ownerId = ownerIsGone ? (heir?.id ?? null) : room.ownerId;
 
   return {
     ...room,
-    participants: room.participants.filter((participant) => !gone.has(participant.id)),
-    messages: room.messages.filter((message) => !gone.has(message.authorId)),
+    ownerId,
+    participants: remaining.map((participant) => ({
+      ...participant,
+      isOwner: participant.id === ownerId,
+    })),
   };
 }
 
@@ -256,7 +299,11 @@ export function setDeck(room: RoomSnapshot, deckId: DeckId): RoomSnapshot {
 }
 
 export function reveal(room: RoomSnapshot): RoomSnapshot {
-  return { ...room, isRevealed: true };
+  return {
+    ...room,
+    isRevealed: true,
+    revealedEntries: buildRevealEntries(room),
+  };
 }
 
 export function startNextRound(room: RoomSnapshot): RoomSnapshot {
@@ -264,6 +311,7 @@ export function startNextRound(room: RoomSnapshot): RoomSnapshot {
     ...room,
     round: room.round + 1,
     isRevealed: false,
+    revealedEntries: null,
     participants: room.participants.map((participant) => ({
       ...participant,
       vote: null,
@@ -275,6 +323,7 @@ export function resetRound(room: RoomSnapshot): RoomSnapshot {
   return {
     ...room,
     isRevealed: false,
+    revealedEntries: null,
     participants: room.participants.map((participant) => ({
       ...participant,
       vote: null,

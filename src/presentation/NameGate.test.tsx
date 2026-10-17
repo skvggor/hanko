@@ -132,3 +132,37 @@ describe("NameGate", () => {
     expect(screen.getByText("Letters only. Accents are fine.")).toBeTruthy();
   });
 });
+
+/**
+ * The gate already remembers the name and one click brings somebody back, so what was
+ * missing was not the way back but the reason the field is full. A prefilled input
+ * looks like a typo to whoever lands on it.
+ */
+describe("NameGate for somebody who has been here", () => {
+  it("says they were here before and under which name", () => {
+    render(<NameGate onJoin={vi.fn()} suggestedName="Ana" translate={translate} />);
+
+    expect(screen.getByText("You were here recently as Ana.")).toBeTruthy();
+  });
+
+  it("says nothing to somebody arriving for the first time", () => {
+    render(<NameGate onJoin={vi.fn()} suggestedName={null} translate={translate} />);
+
+    expect(screen.queryByText(/You were here recently/)).toBeNull();
+  });
+
+  it("says nothing when the name on file is only spaces", () => {
+    render(<NameGate onJoin={vi.fn()} suggestedName="   " translate={translate} />);
+
+    expect(screen.queryByText(/You were here recently/)).toBeNull();
+  });
+
+  it("brings them back in one click", async () => {
+    const onJoin = vi.fn();
+    render(<NameGate onJoin={onJoin} suggestedName="Ana" translate={translate} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Enter" }));
+
+    expect(onJoin).toHaveBeenCalledWith("Ana", "voter");
+  });
+});

@@ -8,6 +8,7 @@ import {
 import { MESSAGE_MAX_LENGTH, type ChatMessage } from "@domain/chat";
 import type { Translator } from "@application/i18n";
 import { ChatMessages } from "@presentation/ChatMessages";
+import { Tooltip } from "@presentation/ui";
 import { useMessageDraft } from "@presentation/useMessageDraft";
 
 const WIDE_QUERY = "(min-width: 640px)";
@@ -92,14 +93,16 @@ export function ChatPanel({
 
           <div className="flex items-center gap-1">
             {isOwner && messages.length > 0 && (
-              <button
-                aria-label={translate("chat.clear")}
-                className="chat-icon"
-                type="button"
-                onClick={onClear}
-              >
-                <TrashIcon aria-hidden="true" size={15} weight="bold" />
-              </button>
+              <Tooltip label={translate("chat.clear")} placement="above-end">
+                <button
+                  aria-label={translate("chat.clear")}
+                  className="chat-icon"
+                  type="button"
+                  onClick={onClear}
+                >
+                  <TrashIcon aria-hidden="true" size={15} weight="bold" />
+                </button>
+              </Tooltip>
             )}
             <button
               aria-label={translate("chat.minimize")}

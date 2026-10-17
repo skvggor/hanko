@@ -138,7 +138,7 @@ describe("CatOverlay", () => {
       />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Clear the conversation" }));
+    await userEvent.click(screen.getByRole("button", { name: "Clear the conversation for everyone" }));
 
     expect(onClear).toHaveBeenCalledTimes(1);
   });
@@ -1026,5 +1026,94 @@ describe("a cat that was sent away", () => {
     );
 
     expect(container.querySelector('[data-testid="cat-p2"]')).toBeTruthy();
+  });
+});
+
+/**
+ * The room hands you your own cat as soon as it publishes one, so that the arrow keys
+ * have something to answer to without anybody having to click first. The claim that it
+ * had done so used to be written before the timer ran, which meant a room that moved a
+ * cat in that window cancelled the timer and then refused to try again: the cat was
+ * never handed over at all, and the keyboard answered to nothing.
+ */
+describe("CatOverlay handing over your own cat", () => {
+  it("still hands it over when the room moved it first", () => {
+    vi.useFakeTimers();
+    try {
+      const view = render(
+        <CatOverlay
+          connectedParticipantIds={new Set(["p1"])}
+          isOwner={false}
+          messages={[]}
+          myParticipantId="p1"
+          onClear={vi.fn()}
+          onRemoveCat={vi.fn()}
+          onSend={vi.fn()}
+          participants={[participant()]}
+          translate={translate}
+        />,
+      );
+
+      const cat = () => view.container.querySelector('[data-testid="cat-p1"]');
+
+      view.rerender(
+        <CatOverlay
+          connectedParticipantIds={new Set(["p1"])}
+          isOwner={false}
+          messages={[]}
+          myParticipantId="p1"
+          onClear={vi.fn()}
+          onRemoveCat={vi.fn()}
+          onSend={vi.fn()}
+          participants={[participant()]}
+          translate={translate}
+          cats={[
+            {
+              participantId: "p1",
+              breed: "tabby",
+              x: 0.1,
+              y: 0.9,
+              direction: "left",
+              activity: "idle",
+              isPaused: false,
+            },
+          ]}
+        />,
+      );
+
+      // The room moves the cat again before the hand-over timer gets to run.
+      view.rerender(
+        <CatOverlay
+          connectedParticipantIds={new Set(["p1"])}
+          isOwner={false}
+          messages={[]}
+          myParticipantId="p1"
+          onClear={vi.fn()}
+          onRemoveCat={vi.fn()}
+          onSend={vi.fn()}
+          participants={[participant()]}
+          translate={translate}
+          cats={[
+            {
+              participantId: "p1",
+              breed: "tabby",
+              x: 0.2,
+              y: 0.8,
+              direction: "left",
+              activity: "idle",
+              isPaused: false,
+            },
+          ]}
+        />,
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+
+      expect(cat()?.getAttribute("data-controlled")).toBe("true");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

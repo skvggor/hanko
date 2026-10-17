@@ -98,7 +98,13 @@ export function CatOverlay({
     requestControl,
     takeControl,
     triggerJump,
-  } = useControlledCat({ asleep: isAsleep, bounds, catSize, cats });
+  } = useControlledCat({
+    asleep: isAsleep,
+    bounds,
+    catSize,
+    cats,
+    myParticipantId,
+  });
 
   /**
    * A cat is drawn for as long as the room says it is there. Read as present unless
@@ -158,8 +164,11 @@ export function CatOverlay({
     const ownCat = catByParticipant.get(myParticipantId);
     if (ownCat === undefined) return;
 
-    initialControlParticipantRef.current = myParticipantId;
+    // Claimed when the hand-over happens rather than when it is scheduled: a room
+    // movement in between re-runs this effect and cancels the timer, and a claim made
+    // up front would refuse every later attempt and leave the keys answering to nothing.
     const controlTimer = window.setTimeout(() => {
+      initialControlParticipantRef.current = myParticipantId;
       takeControl(
         myParticipantId,
         {
@@ -324,7 +333,9 @@ export function CatOverlay({
           catState={catByParticipant.get(participant.id)}
           controlledActivity={localActivity}
           controlledDirection={controlledDirection}
-          controlledPosition={participant.id === myParticipantId ? controlledPosition : null}
+          controlledPosition={
+            controlledId === participant.id ? controlledPosition : null
+          }
           isControllable={participant.id === myParticipantId}
           isControlled={controlledId === participant.id}
           key={participant.id}

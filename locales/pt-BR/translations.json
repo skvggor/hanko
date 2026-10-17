@@ -3,6 +3,7 @@
     "title": "Entrar na sala",
     "heading": "Qual é o seu nome?",
     "hint": "Apenas letras. Acentos são permitidos.",
+    "returning": "Você já esteve aqui como {{name}}.",
     "placeholder": "Seu nome",
     "submit": "Entrar",
     "entering": "Entrando...",
@@ -151,7 +152,11 @@
     "title": "Bate-papo",
     "open": "Open chat",
     "minimize": "Minimizar bate-papo",
-    "clear": "Limpar a conversa",
+    "clear": "Limpar a conversa para todos",
+    "clearConfirmTitle": "Limpar a conversa?",
+    "clearConfirmBody": "Todas as mensagens desta sala somem, para todo mundo, e não dá para trazer de volta.",
+    "clearConfirmAccept": "Sim, limpar",
+    "clearConfirmCancel": "Manter",
     "send": "Enviar mensagem",
     "placeholder": "Diga alguma coisa",
     "empty": "Nenhuma mensagem ainda",
@@ -176,7 +181,8 @@
       "sleeping": "dormindo",
       "controlled": "controlado"
     },
-    "statusPaused": "movimento pausado"
+    "statusPaused": "movimento pausado",
+    "shooAction": "Espantar os gatos de todos para as bordas"
   },
   "session": {
     "label": "Nome da sessão",

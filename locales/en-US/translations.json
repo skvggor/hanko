@@ -3,6 +3,7 @@
     "title": "Join the room",
     "heading": "What is your name?",
     "hint": "Letters only. Accents are fine.",
+    "returning": "You were here recently as {{name}}.",
     "placeholder": "Your name",
     "submit": "Enter",
     "entering": "Entering...",
@@ -151,7 +152,11 @@
     "title": "Chat",
     "open": "Open chat",
     "minimize": "Minimize chat",
-    "clear": "Clear the conversation",
+    "clear": "Clear the conversation for everyone",
+    "clearConfirmTitle": "Clear the conversation?",
+    "clearConfirmBody": "Every message in this room goes, for everybody, and it cannot be brought back.",
+    "clearConfirmAccept": "Yes, clear it",
+    "clearConfirmCancel": "Keep it",
     "send": "Send message",
     "placeholder": "Say something",
     "empty": "No messages yet",
@@ -176,7 +181,8 @@
       "sleeping": "sleeping",
       "controlled": "controlled"
     },
-    "statusPaused": "movement paused"
+    "statusPaused": "movement paused",
+    "shooAction": "Shoo everyone's cats to the edges"
   },
   "session": {
     "label": "Session name",

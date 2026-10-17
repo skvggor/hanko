@@ -126,7 +126,7 @@ describe("ChatPanel", () => {
   it("hides the clear button from non owners", () => {
     renderPanel({ messages: [message()], isOwner: false });
 
-    expect(screen.queryByRole("button", { name: "Clear the conversation" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Clear the conversation for everyone" })).toBeNull();
 
   });
 
@@ -134,7 +134,7 @@ describe("ChatPanel", () => {
     vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("min-width") }));
     const { onClear } = renderPanel({ messages: [message()], isOwner: true });
 
-    await userEvent.click(screen.getByRole("button", { name: "Clear the conversation" }));
+    await userEvent.click(screen.getByRole("button", { name: "Clear the conversation for everyone" }));
 
     expect(onClear).toHaveBeenCalledTimes(1);
 
@@ -258,5 +258,24 @@ describe("ChatPanel reading the conversation", () => {
     const list = screen.getByRole("log");
 
     expect(list.scrollTop).toBe(list.scrollHeight);
+  });
+});
+
+/**
+ * The same bin as the composer, on the phone layout, and it was the only icon on either
+ * layout drawn without a sentence. It hangs off the end here rather than centring,
+ * because the button sits against the right edge of a narrow screen.
+ */
+describe("ChatPanel and the bin", () => {
+  it("says what clearing reaches while the pointer is on it", async () => {
+    renderPanel({ isOwner: true, messages: [message()] });
+
+    await userEvent.hover(
+      screen.getByRole("button", { name: "Clear the conversation for everyone" }),
+    );
+
+    const label = screen.getByRole("tooltip");
+    expect(label.textContent).toBe("Clear the conversation for everyone");
+    expect(label.className).toContain("right-0");
   });
 });

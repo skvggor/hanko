@@ -9,7 +9,9 @@ import type { Translator } from "@application/i18n";
 import { roomPath } from "@application/routing";
 import { CatOverlay } from "@presentation/CatOverlay";
 import { ChatPanel } from "@presentation/ChatPanel";
+import { BroomIcon } from "@phosphor-icons/react";
 import { ConfirmDialog } from "@presentation/ConfirmDialog";
+import { Tooltip } from "@presentation/ui";
 import { Hanko } from "@presentation/Hanko";
 import { NameGate } from "@presentation/NameGate";
 import { RoomBoard } from "@presentation/RoomBoard";
@@ -87,6 +89,7 @@ export function RoomScreen({
   const [wasRemoved, setWasRemoved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connected");
   /** Waiting the round trip left a tap looking like it had done nothing. */
   const [pendingVote, setPendingVote] = useState<string | null | undefined>(undefined);
@@ -192,6 +195,12 @@ export function RoomScreen({
     [connection],
   );
   const handleRemoveCat = useCallback(() => connection.removeCat(), [connection]);
+
+  /** Cat positions are normalised, so the room needs this window's shape to know where the edge is. */
+  const handleShooCats = useCallback(
+    () => connection.shooCats(globalThis.innerWidth / Math.max(1, globalThis.innerHeight)),
+    [connection],
+  );
   const handleSetRole = useCallback(
     (participantId: string, role: ParticipantRole) =>
       connection.setRole(participantId, role),
@@ -220,10 +229,12 @@ export function RoomScreen({
     (text: string) => connection.sendMessage(text),
     [connection],
   );
-  const handleClearMessages = useCallback(
-    () => connection.clearMessages(),
-    [connection],
-  );
+  /** Asking, because this erases the room's conversation with no way back, like every other erasing control here. */
+  const handleClearMessages = useCallback(() => setConfirmingClear(true), []);
+  const confirmClearMessages = useCallback(() => {
+    connection.clearMessages();
+    setConfirmingClear(false);
+  }, [connection]);
   const handleUpdateCat = useCallback(
     (update: {
       x: number;
@@ -277,6 +288,16 @@ export function RoomScreen({
 
   const isOwner =
     state !== null && state.ownerId === connection.participantId;
+
+  /**
+   * Counted from the room's list rather than from the last cat position: a cat whose
+   * owner has just gone is still drawn on everybody else's screen, and only the room
+   * knows it is gone.
+   */
+  const canShooCats =
+    (state?.participants ?? []).filter(
+      (participant) => participant.isConnected && participant.hasCat !== false,
+    ).length > 1;
 
   const connectedParticipantIds = useMemo(
     () =>
@@ -436,7 +457,36 @@ export function RoomScreen({
         </output>
       )}
 
+      {/* Drawn by the room rather than the overlay, which a coarse pointer does not render at all. */}
+      {canShooCats && (
+        <Tooltip
+          className="cat-shoo"
+          label={translate("cat.shooAction")}
+          placement="above-end"
+        >
+          <button
+            aria-label={translate("cat.shooAction")}
+            className="cat-shoo__button"
+            type="button"
+            onClick={handleShooCats}
+          >
+            <BroomIcon aria-hidden="true" size={18} weight="bold" />
+          </button>
+        </Tooltip>
+      )}
+
       {body}
+
+      {confirmingClear && (
+        <ConfirmDialog
+          acceptLabel={translate("chat.clearConfirmAccept")}
+          body={translate("chat.clearConfirmBody")}
+          cancelLabel={translate("chat.clearConfirmCancel")}
+          title={translate("chat.clearConfirmTitle")}
+          onAccept={confirmClearMessages}
+          onCancel={() => setConfirmingClear(false)}
+        />
+      )}
 
       {confirmingDelete && (
         <ConfirmDialog

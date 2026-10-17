@@ -476,11 +476,32 @@ describe("reclaimDisconnected", () => {
     );
   }
 
-  it("leaves a room that is not full alone", () => {
-    const room = roomWith(draft("ana"), draft("bruno"));
-    const gone = disconnectParticipant(room, "bruno");
+  /**
+   * Pushes a dropped seat back past the window without waiting five minutes for it,
+   * so the tests can put three people at three different ages in one room.
+   */
+  function ageOut(room: RoomSnapshot, participantId: string): RoomSnapshot {
+    return {
+      ...room,
+      participants: room.participants.map((entry) =>
+        entry.id === participantId && entry.disconnectedAt !== null
+          ? { ...entry, disconnectedAt: entry.disconnectedAt - GRACE_PERIOD_MS - 1000 }
+          : entry,
+      ),
+    };
+  }
 
-    expect(reclaimDisconnected(gone)).toBe(gone);
+  /**
+   * Read at call time rather than at import: disconnectParticipant stamps the moment
+   * of the drop, and a clock fixed before it ran would put the deadline in the past
+   * of a seat that had not been given up yet.
+   */
+  const wellPastTheWindow = () => Date.now() + GRACE_PERIOD_MS + 1;
+
+  it("changes nothing while everybody is still connected", () => {
+    const room = fullRoom();
+
+    expect(reclaimDisconnected(room, wellPastTheWindow())).toBe(room);
   });
 
   it("keeps the seat of someone who just left", () => {
@@ -491,14 +512,31 @@ describe("reclaimDisconnected", () => {
 
   it("frees the seat once the grace window has passed", () => {
     const gone = disconnectParticipant(fullRoom(), "p7");
-    const later = Date.now() + GRACE_PERIOD_MS + 1;
 
-    expect(reclaimDisconnected(gone, later).participants).toHaveLength(
+    expect(reclaimDisconnected(gone, wellPastTheWindow()).participants).toHaveLength(
       MAX_PARTICIPANTS - 1,
     );
   });
 
-  it("takes the messages of the person it removed", () => {
+  /**
+   * The rule used to be that a room below the cap was left alone, on the reasoning
+   * that a seat costs nothing until it blocks somebody. It does cost something: a room
+   * where somebody dropped carried their ghost in the list for the rest of its life,
+   * because the only thing that ever called this was a new arrival.
+   */
+  it("frees the seat in a room that is nowhere near full", () => {
+    const room = roomWith(draft("ana"), draft("bruno"));
+    const gone = disconnectParticipant(room, "bruno");
+
+    expect(reclaimDisconnected(gone, wellPastTheWindow()).participants).toHaveLength(1);
+  });
+
+  /**
+   * The seat is what gets reclaimed. What somebody said is not, because the whole
+   * point of a readable transcript is that a person who leaves still said it, and a
+   * five minute network drop is not a retraction.
+   */
+  it("keeps what the person said", () => {
     let room = appendMessage(fullRoom(), {
       id: "m1",
       authorId: "p7",
@@ -508,28 +546,69 @@ describe("reclaimDisconnected", () => {
     });
     room = disconnectParticipant(room, "p7");
 
-    expect(reclaimDisconnected(room, Date.now() + GRACE_PERIOD_MS + 1).messages).toEqual([]);
-  });
-
-  it("never reclaims the owner, even long past the window", () => {
-    const gone = disconnectParticipant(fullRoom(), "p0");
-
-    expect(reclaimDisconnected(gone, Date.now() + GRACE_PERIOD_MS + 1).ownerId).toBe("p0");
+    expect(reclaimDisconnected(room, wellPastTheWindow()).messages).toHaveLength(1);
   });
 
   it("reclaims several stale seats at once", () => {
     let room = fullRoom();
     for (const id of ["p3", "p4", "p5"]) room = disconnectParticipant(room, id);
 
-    const reclaimed = reclaimDisconnected(room, Date.now() + GRACE_PERIOD_MS + 1);
-    expect(reclaimed.participants).toHaveLength(MAX_PARTICIPANTS - 3);
+    expect(reclaimDisconnected(room, wellPastTheWindow()).participants).toHaveLength(
+      MAX_PARTICIPANTS - 3,
+    );
   });
 
-  it("keeps someone who is still connected", () => {
-    const room = fullRoom();
-    const later = Date.now() + GRACE_PERIOD_MS + 1;
+  /**
+   * The owner used to be exempt, so a host who dropped stayed in the list forever and
+   * the room had a name on it that nobody could answer to. Handing the room to somebody
+   * in it is better than keeping a ghost, and better than leaving nobody in charge.
+   */
+  it("hands the room to somebody still in it when the owner is the one who goes", () => {
+    const gone = disconnectParticipant(fullRoom(), "p0");
 
-    expect(reclaimDisconnected(room, later)).toBe(room);
+    const reclaimed = reclaimDisconnected(gone, wellPastTheWindow());
+
+    expect(reclaimed.ownerId).toBe("p1");
+    expect(reclaimed.participants.find((entry) => entry.id === "p1")?.isOwner).toBe(true);
+  });
+
+  /**
+   * A person inside their grace window is still seated, so taking the room from
+   * somebody who is quietly reconnecting and giving it to a stranger already here
+   * would be the worse betrayal.
+   */
+  it("prefers somebody who is connected over somebody who may yet come back", () => {
+    let room = roomWith(draft("ana"), draft("bruno"), draft("carla"));
+    room = ageOut(disconnectParticipant(room, "ana"), "ana");
+    room = disconnectParticipant(room, "bruno");
+
+    // Ana is well past the window and goes. Bruno is only moments gone, so he survives
+    // and is still seated ahead of Carla, but Carla is the one who is actually here.
+    const reclaimed = reclaimDisconnected(room, Date.now() + 1);
+
+    expect(reclaimed.participants.map((entry) => entry.id)).toEqual(["bruno", "carla"]);
+    expect(reclaimed.ownerId).toBe("carla");
+  });
+
+  it("leaves the room without an owner when nobody is left in it", () => {
+    const room = disconnectParticipant(roomWith(draft("ana")), "ana");
+
+    const reclaimed = reclaimDisconnected(room, wellPastTheWindow());
+
+    expect(reclaimed.participants).toHaveLength(0);
+    expect(reclaimed.ownerId).toBeNull();
+  });
+
+  it("takes the vote of somebody it removed with them", () => {
+    const room = castVote(fullRoom(), "p7", "5");
+    const gone = disconnectParticipant(room, "p7");
+
+    const reclaimed = reclaimDisconnected(gone, wellPastTheWindow());
+
+    expect(reclaimed.participants.some((entry) => entry.id === "p7")).toBe(false);
+    expect(
+      buildRevealEntries(reclaimed).some((entry) => entry.participantId === "p7"),
+    ).toBe(false);
   });
 });
 
@@ -646,5 +725,83 @@ describe("removeCat", () => {
     const room = restoreRoom(legacy, "abc");
 
     expect(room.participants.every((participant) => participant.hasCat)).toBe(true);
+  });
+});
+
+/**
+ * A reveal is a moment the room read together. A number that moves five minutes later,
+ * under people who are still talking about it, because somebody's connection dropped
+ * and their seat was freed, is not a correction: it is the room quietly rewriting a
+ * record everybody has already seen. So the numbers are kept as they were shown.
+ */
+describe("a revealed tally that stays put", () => {
+  function revealedRoom() {
+    const room = roomWith(draft("ana"), draft("bruno"), draft("carla"));
+    return reveal(
+      castVote(castVote(castVote(room, "ana", "5"), "bruno", "8"), "carla", "13"),
+    );
+  }
+
+  it("shows what everybody voted when the reveal happens", () => {
+    const state = toPublicState(revealedRoom());
+
+    expect(state.totalPoints).toBe(26);
+    expect(state.reveals).toHaveLength(3);
+  });
+
+  it("keeps showing those numbers after a seat is freed", () => {
+    let room = revealedRoom();
+    room = disconnectParticipant(room, "bruno");
+    room = reclaimDisconnected(
+      room,
+      Date.now() + GRACE_PERIOD_MS + 1,
+    );
+
+    expect(room.participants).toHaveLength(2);
+
+    const state = toPublicState(room);
+    expect(state.totalPoints).toBe(26);
+    expect(state.reveals?.map((entry) => entry.name)).toEqual(["ana", "bruno", "carla"]);
+  });
+
+  it("still counts somebody who never voted", () => {
+    const room = reveal(castVote(roomWith(draft("ana"), draft("bruno")), "ana", "5"));
+
+    expect(toPublicState(room).totalPoints).toBe(5);
+  });
+
+  it("starts the numbers again on the next round", () => {
+    const room = startNextRound(revealedRoom());
+
+    expect(room.isRevealed).toBe(false);
+    expect(toPublicState(room).reveals).toBeNull();
+    expect(toPublicState(room).totalPoints).toBeNull();
+  });
+
+  it("starts them again on a reset", () => {
+    const room = resetRound(revealedRoom());
+
+    expect(toPublicState(room).reveals).toBeNull();
+    expect(toPublicState(room).totalPoints).toBeNull();
+  });
+
+  it("shows nothing at all before anybody reveals", () => {
+    const state = toPublicState(castVote(roomWith(draft("ana")), "ana", "5"));
+
+    expect(state.reveals).toBeNull();
+    expect(state.totalPoints).toBeNull();
+  });
+
+  /**
+   * A room stored before this field existed is revealed on somebody's screen, and the
+   * reveal is one click away. Reading the field as missing would mean showing nothing at
+   * all until the round restarted.
+   */
+  it("rebuilds the numbers for a room stored before the field existed", () => {
+    const room = revealedRoom();
+    const { revealedEntries: _dropped, ...legacy } = room as Partial<RoomSnapshot>;
+    const restored = restoreRoom({ ...legacy, isRevealed: true }, "abc");
+
+    expect(toPublicState(restored).totalPoints).toBe(26);
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ChatMessage } from "@domain/chat";
 import { breedForParticipantId, type CatActivity, type CatBreed, type CatState } from "@domain/cat";
 import type { Translator } from "@application/i18n";
@@ -56,6 +56,10 @@ export function Cat({
     participantId,
   });
   const catRef = useRef<HTMLDivElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
+
+  /** The arrow keys answer to the focus and nothing else, so this is when the keyboard is actually driving. */
+  const isDriving = isControlled && isFocused;
 
   // The controlled cat's state is local, since the server skips echoing it back;
   // remote cats read the position and pose the server last published for them.
@@ -159,14 +163,16 @@ export function Cat({
       data-activity={effectiveActivity}
       data-controllable={isControllable}
       data-controlled={isControlled}
+      data-driving={isDriving}
       data-paused={paused}
       data-synced={catState !== undefined}
       data-testid={`cat-${participantId}`}
       style={style}
     >
-      {isControlled && (
+      {/* Names the cat rather than the state: steering is looking for your own, not for a word. */}
+      {isDriving && (
         <span aria-hidden="true" className="cat__badge cat__badge--controlled">
-          {translate("cat.status.controlled")}
+          {name}
         </span>
       )}
 
@@ -181,7 +187,9 @@ export function Cat({
         aria-pressed={isControlled}
         className="cat__button"
         type="button"
+        onBlur={() => setIsFocused(false)}
         onClick={handleClick}
+        onFocus={() => setIsFocused(true)}
       >
         <CatSprite
           activity={effectiveActivity}

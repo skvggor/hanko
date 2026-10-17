@@ -57,7 +57,15 @@ export function toPublicState(
   viewerToken: string | null = null,
   cats: CatState[] = [],
 ): PublicRoomState {
-  const reveals = room.isRevealed ? buildRevealEntries(room) : null;
+  /**
+   * Read from the frozen record rather than rebuilt, so a seat freed after the reveal
+   * cannot move a number the room has already read together. Rebuilt only when the
+   * record is missing altogether, because a revealed round with no numbers on it is
+   * worse than a set of numbers nobody froze.
+   */
+  const reveals = room.isRevealed
+    ? (room.revealedEntries ?? buildRevealEntries(room))
+    : null;
   const viewer = viewerToken === null ? undefined : findByToken(room, viewerToken);
 
   return {
@@ -121,6 +129,8 @@ export type ClientMessage =
    * off a field anybody could have filled in with somebody else's name.
    */
   | { type: "remove-cat" }
+  /** Carries the pressing window's shape, since cat positions are normalised and "the edge" means nothing without it. */
+  | { type: "shoo-cats"; aspect: number }
   | { type: "set-room-name"; name: string | null }
   | { type: "chat"; text: string }
   | { type: "clear-chat" }
@@ -210,6 +220,10 @@ export function isClientMessage(value: unknown): value is ClientMessage {
       return typeof (candidate as { participantId?: unknown }).participantId === "string";
     case "remove-cat":
       return true;
+    case "shoo-cats": {
+      const aspect = (candidate as { aspect?: unknown }).aspect;
+      return typeof aspect === "number" && Number.isFinite(aspect);
+    }
     case "reveal":
     case "next-round":
     case "reset-round":

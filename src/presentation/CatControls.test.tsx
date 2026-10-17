@@ -85,4 +85,23 @@ describe("CatControls", () => {
 
     expect(screen.getByRole("toolbar", { name: "Cat controls" })).toBeTruthy();
   });
+
+  it("draws each control large enough to be seen, not sub-pixel", () => {
+    renderControls();
+
+    for (const button of screen.getAllByRole("button")) {
+      const svg = button.querySelector("svg");
+      expect(Number(svg?.getAttribute("width"))).toBeGreaterThanOrEqual(16);
+    }
+  });
+
+  it("draws the remove X with a stroke thick enough to read", () => {
+    renderControls();
+
+    const remove = screen.getByRole("button", { name: "Send this cat away for good" });
+    const svg = remove.querySelector("svg");
+
+    expect(svg?.getAttribute("stroke")).toBe("currentColor");
+    expect(Number(svg?.getAttribute("stroke-width"))).toBeGreaterThanOrEqual(2);
+  });
 });

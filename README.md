@@ -41,6 +41,9 @@ screenshots, from opening a room to reading the consensus.
 6. Everyone has a cat. Clicking your own takes the keyboard: the arrows walk it, space
    makes it hop and escape lets go. On a device with a coarse pointer the cats are
    replaced by the chat panel instead, because a moving target is not something to tap at.
+7. There is a chat, which is not private and not encrypted, with a transcript to read
+   back and links you can follow. A broom walks every cat out to the edges of the screen
+   so the vote grid is readable again, and sending your own cat away is permanent.
 
 Decks are Fibonacci (with `?` for "needs discussion" and `coffee`), T-shirt sizes and
 Linear 1–10.
@@ -135,12 +138,28 @@ the board either. The client throttles movement to ten updates a second and the 
 write is debounced by two seconds: positions are cosmetic, so paying for them on every
 tick would buy nothing.
 
-**A cat lives exactly as long as its seat.** A departure keeps the cat, because a refresh
-should find the same breed and pose waiting. Losing the seat prunes it, because the whole
+**A cat ends when the room says it ends.** A departure keeps the cat, because a refresh
+should find the same breed and pose waiting. Two things end it: losing the seat, and the
+owner sending it off, which keeps the seat. Losing the seat prunes it, because the whole
 map is serialised on every save and a ghost cat would make every vote in the room pay for
 a cat whose owner can never come back. For the same reason a cat is seeded into a lane
 that wraps: a room seats fifty people, and a seed that divides by the number of existing
 cats walks the late arrival off the bottom of the screen, where it cannot be clicked.
+
+**Sending a cat away is permanent and it is the room's decision, not the screen's.** A
+cat only one person stopped drawing is still in the room for everyone else and still comes
+back on the next reload, so the earlier behaviour was a cat hidden from one person with the
+button claiming otherwise. The state is a flag on the participant, the frame carries no id
+so the only cat a socket can reach is its own, and the seat, the name and the vote are left
+alone because sending a cat away is not removing a person. There is no undo: a cat that
+came back would undo the only thing that was asked for.
+
+**The broom moves every cat to the border, not to a corner.** A corner holds one cat and
+leaves the rest in the way, so the spread walks the whole perimeter at even spacing. It is
+deterministic on purpose, which is also what keeps it from being a lever now that anybody
+may press it: pressing it twice in the same window finds every cat already where it would
+go, sends nothing, and costs nothing. It is a nudge and not a rule, because a cat nobody is
+driving wanders back.
 
 **A dropped socket is not a lost seat.** The room keeps the seat for the whole grace
 window, so the honest response to a dropped connection is to open it again rather than
@@ -152,12 +171,35 @@ admission.
 clicking, so only your own cat is given a hit area. The rest are scenery, and scenery
 that crosses the vote grid at four rem a side is scenery that eats the votes.
 
+**Room, participant, leave and chat deletion ask first, and labels say what they reach.**
+The permanent cat-removal control is an exception: its X button has an accessible name but
+does not show a confirmation or tooltip. Two other icon-only controls carry a tooltip, and
+its sentence is the same one as the button's accessible name, because a tooltip is drawn
+and not announced and a split would leave the sentence nobody can hear. The broom says
+whose cats it moves; the bin says it clears the conversation *for everyone*.
+
+**Chat is not private and the interface says so.** There is no encryption and no accounts,
+so anyone holding the room link reads the room. The chat says this once per browser when
+it is first opened, and linkification only ever matches an `http` or `https` scheme: a
+loose shape followed by a scheme check would let a chat message become a `javascript:`
+href, so the scheme is part of what is matched and the browser is never handed a
+destination the reader did not type.
+
 **Origin is validated on the WebSocket upgrade.** Browsers always send `Origin` on a
 handshake, so a missing one is a non-browser client. Refusing it costs the app nothing and
 removes cross-site WebSocket hijacking.
 
-**Seats are reclaimed after a grace window.** Without that, a room could fill with dead
-slots and refuse everyone while a single socket stayed open.
+**A seat is kept for five minutes and then reclaimed, and what the person said is not.**
+The reclaim used to run only when the room was full, on the reasoning that a seat costs
+nothing until it blocks somebody, which left a dropped person's name in the list for the
+rest of the room's life. Their messages stay with it, because the transcript is only worth
+having if somebody who left still said it, and a dropped connection retracts nothing. The
+owner is reclaimable too: exempting it left rooms carrying a name nobody could answer to,
+so the room is handed to somebody in it.
+
+**A revealed tally is frozen.** The cards are kept as they were shown rather than rebuilt
+from whoever is left, because a seat can be freed underneath a reveal and a number that
+moves while the room is still reading it is a record being rewritten.
 
 **The quality gate lives on an instance that does not survive the run.** SonarQube is the
 only thing in the setup that sees across files, and it needs a server; so the server is a

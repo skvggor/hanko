@@ -392,4 +392,46 @@ describe("Tooltip", () => {
     await userEvent.tab();
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
+
+  /**
+   * Some of these are pinned to a corner of the room rather than sitting in a row, and
+   * the thing that carries the position has to be the wrapper the label hangs off. The
+   * alternative was the button being fixed and the wrapper left behind it in the flow,
+   * which works by accident until the markup around it changes.
+   */
+  /**
+   * Centring the label is right for a button sitting in a row and wrong for one pinned
+   * to the edge of the window, where the same sentence grows straight off the screen.
+   * Whitespace is not wrapped, so there is nothing to save a long label but choosing
+   * the end it hangs from.
+   */
+  it("centres the label by default", async () => {
+    renderTip();
+    await userEvent.hover(screen.getByRole("button", { name: "go" }));
+
+    expect(screen.getByRole("tooltip").className).toContain("-translate-x-1/2");
+  });
+
+  it("hangs the label off the other end when it is told to", async () => {
+    render(
+      <Tooltip label="Espantar os gatos de todos para as bordas" placement="above-end">
+        <button type="button">go</button>
+      </Tooltip>,
+    );
+    await userEvent.hover(screen.getByRole("button", { name: "go" }));
+
+    const label = screen.getByRole("tooltip");
+    expect(label.className).toContain("right-0");
+    expect(label.className).not.toContain("-translate-x-1/2");
+  });
+
+  it("lets the caller place the tooltip", () => {
+    const { container } = render(
+      <Tooltip className="pinned" label="Remove">
+        <button type="button">go</button>
+      </Tooltip>,
+    );
+
+    expect(container.querySelector(".pinned")).toBeTruthy();
+  });
 });

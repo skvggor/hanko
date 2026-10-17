@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Room } from "@infra/server";
 import type { castVote} from "@domain/room";
-import { createRoom, joinRoom } from "@domain/room";
+import { createRoom, GRACE_PERIOD_MS, joinRoom, MAX_PARTICIPANTS } from "@domain/room";
 import { isServerMessage, type PublicRoomState } from "@domain/protocol";
 
 interface FakeSocket {
@@ -677,7 +677,12 @@ describe("Room over WebSocket", () => {
       expect(parse(again.sent).some((entry) => entry["type"] === "joined")).toBe(false);
     });
 
-    it("keeps their messages out of the room", async () => {
+    /**
+     * Removing a seat never took the words with it. The transcript is a record of what
+     * the room said, so a person can be gone from the list and still be part of the
+     * conversation that is still going on.
+     */
+    it("keeps their messages in the room", async () => {
       const ana = await joinAs("Ana");
       const bia = await joinAs("Bia");
       await room.webSocketMessage(bia as never, JSON.stringify({
@@ -690,7 +695,9 @@ describe("Room over WebSocket", () => {
         participantId: lastJoined(bia).participantId,
       }));
 
-      expect(lastState(ana).state.messages).toEqual([]);
+      expect(lastState(ana).state.messages.map((entry) => entry.text)).toEqual([
+        "sou removida",
+      ]);
     });
 
     it("lets a brand new person still join afterwards", async () => {
@@ -1044,7 +1051,7 @@ describe("Room over WebSocket", () => {
       expect(storedMessages().map((entry) => entry.text)).toEqual(["some"]);
     });
 
-    it("drops messages of a removed participant", async () => {
+    it("keeps messages of a removed participant", async () => {
       const ana = await joinAs("Ana");
       const bia = await joinAs("Bia");
       const biaId = lastJoined(bia).participantId;
@@ -1058,7 +1065,9 @@ describe("Room over WebSocket", () => {
         participantId: biaId,
       }));
 
-      expect(lastState(ana).state.messages).toEqual([]);
+      expect(lastState(ana).state.messages.map((entry) => entry.text)).toEqual([
+        "sou removida",
+      ]);
     });
 
     it("keeps messages across a round change", async () => {
@@ -1515,6 +1524,135 @@ describe("Room over WebSocket", () => {
     expect(ownerSocket.sent).toHaveLength(sentBefore);
   });
 
+  /**
+   * The alarm used to be armed only when the last person left, on the assumption that
+   * a room with somebody still in it had nothing left to settle. It did: it had a seat
+   * held by someone who was never coming back, and nobody ever asked for it again.
+   */
+  it("schedules the grace period when somebody goes offline while the room is still busy", async () => {
+    await joinAs("Ana");
+    const voterSocket = await joinAs("Bruno");
+
+    await room.webSocketClose(voterSocket as never);
+
+    expect(storage.alarmAt).not.toBeNull();
+  });
+
+  it("frees the seat of somebody who has been gone past the window", async () => {
+    vi.useFakeTimers();
+    try {
+      const ownerSocket = await joinAs("Ana");
+      const voterSocket = await joinAs("Bruno");
+      await room.webSocketClose(voterSocket as never);
+
+      await vi.advanceTimersByTimeAsync(GRACE_PERIOD_MS + 1000);
+      await room.alarm();
+
+      const latest = lastState(ownerSocket).state;
+      expect(latest.participants).toHaveLength(1);
+      expect(latest.participants[0]?.name).toBe("Ana");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /**
+   * Reclaiming the seat used to delete the person's messages along with it, which made
+   * a readable transcript a thing that emptied itself the moment the room moved on.
+   */
+  it("keeps what they said when the seat is reclaimed", async () => {
+    vi.useFakeTimers();
+    try {
+      await joinAs("Ana");
+      const voterSocket = await joinAs("Bruno");
+      await room.webSocketMessage(voterSocket as never, JSON.stringify({
+        type: "chat",
+        text: "ainda aqui",
+      }));
+      await room.webSocketClose(voterSocket as never);
+
+      await vi.advanceTimersByTimeAsync(GRACE_PERIOD_MS + 1000);
+      await room.alarm();
+
+      const stored = storage.data.get("room") as { room: { messages: unknown[] } };
+      expect(stored.room.messages).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hands the room on when the owner is the one who goes", async () => {
+    vi.useFakeTimers();
+    try {
+      const ownerSocket = await joinAs("Ana");
+      await room.webSocketMessage(ownerSocket as never, JSON.stringify({
+        type: "chat",
+        text: "comeco",
+      }));
+      const voterSocket = await joinAs("Bruno");
+      await room.webSocketClose(ownerSocket as never);
+
+      await vi.advanceTimersByTimeAsync(GRACE_PERIOD_MS + 1000);
+      await room.alarm();
+
+      const latest = lastState(voterSocket).state;
+      expect(latest.ownerId).toBe(latest.participants[0]?.id);
+      expect(latest.participants).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /**
+   * Two people dropping at different times is the case an alarm armed once gets wrong.
+   * The first deadline fires and frees that seat, and the second person is still well
+   * inside her own window, so unless the room arms again her seat is never looked at
+   * again and her ghost stays for the rest of the room's life.
+   */
+  it("asks again for the seat that is still inside its window", async () => {
+    vi.useFakeTimers();
+    try {
+      const ownerSocket = await joinAs("Ana");
+      const first = await joinAs("Bruno");
+      await room.webSocketClose(first as never);
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      const second = await joinAs("Carla");
+      await room.webSocketClose(second as never);
+
+      // The armed deadline is Bruno's, because he left first. Step just past it
+      // without reaching Carla's, which is a whole grace period further on.
+      const brunoDeadline = storage.alarmAt ?? Date.now();
+      await vi.advanceTimersByTimeAsync(brunoDeadline - Date.now() + 1000);
+      await room.alarm();
+
+      const latest = lastState(ownerSocket).state;
+      expect(latest.participants.map((entry) => entry.name)).toEqual(["Ana", "Carla"]);
+      expect(storage.alarmAt).toBeGreaterThan(Date.now());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("survives an alarm that finds nothing left to do", async () => {
+    vi.useFakeTimers();
+    try {
+      const ownerSocket = await joinAs("Ana");
+      const voterSocket = await joinAs("Bruno");
+      await room.webSocketClose(voterSocket as never);
+
+      await vi.advanceTimersByTimeAsync(GRACE_PERIOD_MS + 1000);
+      await room.alarm();
+      await room.alarm();
+      await room.alarm();
+
+      expect(storage.data.has("room")).toBe(true);
+      expect(lastState(ownerSocket).state.participants).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("restores state written by a previous instance", async () => {
     let roomState = createRoom("test-room");
     roomState = joinRoom(roomState, {
@@ -1668,7 +1806,11 @@ describe("Room cat bookkeeping", () => {
   }
 
   const storedCats = (storage: ReturnType<typeof createFakeStorage>) =>
-    (storage.data.get("cats") ?? []) as Array<{ participantId: string; y: number }>;
+    (storage.data.get("cats") ?? []) as Array<{
+      participantId: string;
+      x: number;
+      y: number;
+    }>;
 
   /**
    * The cats block drives the object through plain sockets rather than through the
@@ -1841,6 +1983,339 @@ describe("Room cat bookkeeping", () => {
     const state: { cats?: unknown[] } = await response.json();
 
     expect(state.cats).toHaveLength(0);
+  });
+
+  /** The vote grid sits in the middle of the screen, which is the whole complaint. */
+  const overTheMiddle = (cat: { x: number; y: number }) =>
+    cat.x > 0.35 && cat.x < 0.65 && cat.y > 0.25 && cat.y < 0.75;
+
+  const participantIdOf = (socket: ReturnType<typeof createFakeSocket>): string => {
+    const joined = parse(socket.sent).find((entry) => entry["type"] === "joined");
+    return (joined as { participantId: string }).participantId;
+  };
+
+  const shoo = async (
+    storage: ReturnType<typeof createFakeStorage>,
+    socket: ReturnType<typeof createFakeSocket>,
+    aspect = 16 / 9,
+  ) => {
+    await new Room(storage as never).webSocketMessage(
+      socket as never,
+      JSON.stringify({ type: "shoo-cats", aspect }),
+    );
+  };
+
+  /**
+   * Read from the frames the clients were handed rather than from storage, because the
+   * write of the cats is debounced and storage answers with where everybody was before
+   * the button was pressed.
+   */
+  const lastCatStates = (socket: ReturnType<typeof createFakeSocket>) =>
+    parse(socket.sent)
+      .filter((entry) => entry["type"] === "cat-state")
+      .map((entry) => entry["cat"] as { participantId: string; x: number; y: number });
+
+  it("clears the middle of the screen when the owner shoos", async () => {
+    const storage = createFakeStorage();
+    const owner = await joinInto(storage, "Ana");
+    await joinInto(storage, "Bruno");
+    await joinInto(storage, "Carla");
+
+    await shoo(storage, owner);
+
+    const cats = lastCatStates(owner);
+    expect(cats).toHaveLength(3);
+    for (const cat of cats) {
+      expect(overTheMiddle(cat)).toBe(false);
+    }
+  });
+
+  /**
+   * Movement normally skips the person who caused it, because they already know where
+   * their cat is. The shoo is not that: it moves everybody, so the owner has to be
+   * told too or their own cat would stay in the middle on their screen and be against
+   * a wall on everybody else's, which is the one thing two people looking at the same
+   * cat must never see.
+   */
+  it("tells the owner about their own cat", async () => {
+    const storage = createFakeStorage();
+    const owner = await joinInto(storage, "Ana");
+    const ownId = participantIdOf(owner);
+
+    await shoo(storage, owner);
+
+    const catStates = parse(owner.sent).filter((entry) => entry["type"] === "cat-state");
+    expect(catStates.length).toBeGreaterThan(0);
+    expect(
+      catStates.some((entry) => (entry["cat"] as { participantId: string }).participantId === ownId),
+    ).toBe(true);
+  });
+
+  /**
+   * The point of the button is that everybody watches it happen. A shoo one person can
+   * see and the others cannot would be worse than the clutter it cleared: their cats
+   * would appear to have moved on their own, or not at all, and a cat that is where it
+   * should be on one screen and in the middle of the grid on the next is the one thing
+   * two people looking at the same cat must never see.
+   *
+   * Every socket, every cat, including the one that belongs to whoever is being told.
+   */
+  it("tells every person in the room about every cat", async () => {
+    const storage = createFakeStorage();
+    const owner = await joinInto(storage, "Ana");
+    const bruno = await joinInto(storage, "Bruno");
+    const carla = await joinInto(storage, "Carla");
+
+    await shoo(storage, owner);
+
+    const seated = new Set([
+      participantIdOf(owner),
+      participantIdOf(bruno),
+      participantIdOf(carla),
+    ]);
+    const seenByOwner = lastCatStates(owner);
+
+    for (const listener of [owner, bruno, carla]) {
+      const seen = lastCatStates(listener);
+      expect(seen).toHaveLength(seated.size);
+      expect(seen.map((cat) => cat.participantId).sort()).toEqual([...seated].sort());
+      expect(seen.map((cat) => `${cat.x},${cat.y}`).sort()).toEqual(
+        seenByOwner.map((cat) => `${cat.x},${cat.y}`).sort(),
+      );
+    }
+  });
+
+  /**
+   * The same sentence twice over is what makes a move visible rather than a jump: the
+   * person who pressed the button has to watch their own cat travel, exactly as
+   * everybody else watches it.
+   */
+  it("moves every cat off the middle for every listener alike", async () => {
+    const storage = createFakeStorage();
+    const owner = await joinInto(storage, "Ana");
+    const bruno = await joinInto(storage, "Bruno");
+    await joinInto(storage, "Carla");
+
+    await shoo(storage, owner);
+
+    for (const listener of [owner, bruno]) {
+      expect(lastCatStates(listener).filter(overTheMiddle)).toHaveLength(0);
+    }
+  });
+
+  /**
+   * A cat standing on the vote grid is in the way of everyone reading it, so the
+   * button belongs to everyone. It used to be the host's alone, on the reasoning that
+   * it moves cats that are not yours, which is exactly what makes it worth having.
+   */
+  it("lets anybody in the room shoo", async () => {
+    const storage = createFakeStorage();
+    const owner = await joinInto(storage, "Ana");
+    const bruno = await joinInto(storage, "Bruno");
+
+    await shoo(storage, bruno);
+
+    expect(parse(bruno.sent).filter((entry) => entry["type"] === "error")).toHaveLength(0);
+    expect(lastCatStates(bruno)).toHaveLength(2);
+    expect(lastCatStates(owner)).toHaveLength(2);
+  });
+
+  /**
+   * One object throughout, because that is what pressing the button twice actually is.
+   * Building a new one per press would read the cats back out of storage, where the
+   * write is deferred and still holds where they were before the first press.
+   */
+  async function roomWithTwoCats() {
+    const storage = createFakeStorage();
+    const room = new Room(storage as never);
+    const owner = createFakeSocket();
+    connect(storage, owner);
+    await room.webSocketMessage(owner as never, JSON.stringify({
+      type: "join",
+      token: null,
+      name: "Ana",
+      role: "voter",
+    }));
+
+    const second = createFakeSocket();
+    connect(storage, second);
+    await room.webSocketMessage(second as never, JSON.stringify({
+      type: "join",
+      token: null,
+      name: "Bruno",
+      role: "voter",
+    }));
+
+    return { owner, room, storage };
+  }
+
+  /**
+   * Named on its own because it used to be the other way round and was reversed once
+   * already. The host is a person in the room reading the grid like everybody else, and
+   * a rule that says "everybody but you" is a rule nobody asked for.
+   */
+  it("lets the host shoo along with everybody else", async () => {
+    const { owner, room } = await roomWithTwoCats();
+    const hostId = participantIdOf(owner);
+
+    await room.webSocketMessage(
+      owner as never,
+      JSON.stringify({ type: "shoo-cats", aspect: 16 / 9 }),
+    );
+
+    const errors = parse(owner.sent).filter((entry) => entry["type"] === "error");
+    expect(errors).toHaveLength(0);
+    expect(lastCatStates(owner)).toHaveLength(2);
+    expect(lastCatStates(owner).map((cat) => cat.participantId)).toContain(hostId);
+  });
+
+  /**
+   * The spread is deterministic, so pressing it again in the same window puts nobody
+   * anywhere new. Sending the whole room a frame per cat to say nothing has moved is
+   * the one thing a button that everybody can press must not do.
+   */
+  it("says nothing about a cat that is already where it would go", async () => {
+    const { owner, room } = await roomWithTwoCats();
+
+    await room.webSocketMessage(
+      owner as never,
+      JSON.stringify({ type: "shoo-cats", aspect: 16 / 9 }),
+    );
+    const sentBefore = owner.sent.length;
+
+    await room.webSocketMessage(
+      owner as never,
+      JSON.stringify({ type: "shoo-cats", aspect: 16 / 9 }),
+    );
+
+    const afterTheSecond = parse(owner.sent.slice(sentBefore)).filter(
+      (entry) => entry["type"] === "cat-state",
+    );
+    expect(afterTheSecond).toHaveLength(0);
+    expect(owner.sent.length).toBe(sentBefore);
+  });
+
+  it("still moves a cat that has walked since the last shoo", async () => {
+    const { owner, room } = await roomWithTwoCats();
+
+    await room.webSocketMessage(
+      owner as never,
+      JSON.stringify({ type: "shoo-cats", aspect: 16 / 9 }),
+    );
+
+    await room.webSocketMessage(owner as never, JSON.stringify({
+      type: "cat-update",
+      x: 0.42,
+      y: 0.42,
+      direction: "right",
+      activity: "walking",
+      isPaused: false,
+    }));
+    const sentBefore = owner.sent.length;
+
+    await room.webSocketMessage(
+      owner as never,
+      JSON.stringify({ type: "shoo-cats", aspect: 16 / 9 }),
+    );
+
+    const afterTheSecond = parse(owner.sent.slice(sentBefore)).filter(
+      (entry) => entry["type"] === "cat-state",
+    ) as Array<{ cat: { participantId: string } }>;
+
+    expect(afterTheSecond).toHaveLength(1);
+    expect(afterTheSecond[0]?.cat.participantId).toBe(participantIdOf(owner));
+  });
+
+  /**
+   * A room with more cats than fit down the middle, which is the only situation the
+   * button exists for. The owner is already seated rather than joining, because a room
+   * holding everybody a room can hold has no room left for one more arrival.
+   */
+  function busyStorage(count: number) {
+    const participants = Array.from({ length: count }, (_, index) => ({
+      id: `p${index}`,
+      token: `t${index}`,
+      name: `Pessoa ${NAME_ALPHABET[index % NAME_ALPHABET.length]}`,
+      role: "voter" as const,
+      isOwner: index === 0,
+      isConnected: true,
+      disconnectedAt: null,
+      vote: null,
+      hasCat: true,
+    }));
+
+    const storage = createFakeStorage({
+      room: { ...createRoom("abc"), participants, ownerId: "p0" },
+    });
+
+    storage.data.set(
+      "cats",
+      participants.map((participant, index) => ({
+        participantId: participant.id,
+        breed: "tabby",
+        x: 0.5,
+        y: 0.5,
+        direction: "right",
+        activity: "idle",
+        isPaused: false,
+        index,
+      })),
+    );
+
+    return storage;
+  }
+
+  it("spreads a room full of cats instead of stacking them in a corner", async () => {
+    const storage = busyStorage(MAX_PARTICIPANTS);
+    const owner = createFakeSocket();
+    owner.attachment = { participantId: "p0", token: "t0" };
+    connect(storage, owner);
+
+    await new Room(storage as never).webSocketMessage(
+      owner as never,
+      JSON.stringify({ type: "shoo-cats", aspect: 16 / 9 }),
+    );
+
+    const cats = lastCatStates(owner);
+    const seen = new Set(cats.map((cat) => `${cat.x},${cat.y}`));
+    expect(cats).toHaveLength(MAX_PARTICIPANTS);
+    expect(seen.size).toBe(cats.length);
+  });
+
+  /**
+   * Every cat was sitting dead centre before the button was pressed, which is the whole
+   * complaint, and not one of them may still be there afterwards.
+   */
+  it("empties the middle of a room where everybody was sitting in it", async () => {
+    const storage = busyStorage(MAX_PARTICIPANTS);
+    const owner = createFakeSocket();
+    owner.attachment = { participantId: "p0", token: "t0" };
+    connect(storage, owner);
+
+    await new Room(storage as never).webSocketMessage(
+      owner as never,
+      JSON.stringify({ type: "shoo-cats", aspect: 16 / 9 }),
+    );
+
+    for (const cat of lastCatStates(owner)) {
+      expect(overTheMiddle(cat)).toBe(false);
+    }
+  });
+
+  it("survives a shoo from a screen that reports no shape at all", async () => {
+    const storage = createFakeStorage();
+    const owner = await joinInto(storage, "Ana");
+    await joinInto(storage, "Bruno");
+
+    await shoo(storage, owner, 0);
+
+    const cats = lastCatStates(owner);
+    expect(cats).toHaveLength(2);
+    for (const cat of cats) {
+      expect(Number.isFinite(cat.x)).toBe(true);
+      expect(Number.isFinite(cat.y)).toBe(true);
+      expect(overTheMiddle(cat)).toBe(false);
+    }
   });
 
   it("seeds every cat inside the viewport in a crowded room", async () => {
