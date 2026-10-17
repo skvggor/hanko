@@ -113,7 +113,7 @@ describe("Cat", () => {
       controlledPosition: { x: 0, y: 0 },
     });
 
-    await userEvent.click(screen.getByRole("button", { name: /remove/i }));
+    await userEvent.click(screen.getByRole("button", { name: /send this cat away/i }));
 
     expect(onRemove).toHaveBeenCalledTimes(1);
     expect(onReleaseControl).toHaveBeenCalledTimes(1);

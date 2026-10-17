@@ -110,6 +110,9 @@ vi.mock("@application/roomConnection", () => ({
     transferOwnership(participantId: string) {
       this.#record({ type: "transfer-ownership", participantId });
     }
+    removeCat() {
+      this.#record({ type: "remove-cat" });
+    }
     removeParticipant(participantId: string) {
       this.#record({ type: "remove-participant", participantId });
     }
@@ -1362,5 +1365,41 @@ describe("RoomScreen connection recovery", () => {
     // The room is not gone, so the vote grid must not be replaced by the notice.
     expect(screen.getAllByRole("button", { name: /^Vote/ }).length).toBeGreaterThan(0);
     expect(screen.getByRole("status").textContent).toContain("Reconnecting...");
+  });
+});
+
+
+/** Sending a cat away is a room-wide, permanent act, so the room has to hear it. */
+describe("RoomScreen sending a cat away", () => {
+  it("asks the room rather than only hiding it on this screen", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+
+    await userEvent.click(screen.getByRole("button", { name: "Send this cat away for good" }));
+
+    expect(harness.sent).toContainEqual({ type: "remove-cat" });
+  });
+
+  it("stops drawing a cat the room says is gone", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState({
+      ...roomState,
+      participants: roomState.participants.map((entry) => ({ ...entry, hasCat: false })),
+    });
+
+    expect(document.querySelector('[data-testid="cat-p1"]')).toBeNull();
+  });
+
+  it("names the button after what it really does", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+
+    // The old label was a bare "Remove", which said nothing about the cat being gone
+    // for everyone and for good. Someone reading it out loud needs the whole thing.
+    const button = screen.getByRole("button", { name: "Send this cat away for good" });
+    expect(button.getAttribute("aria-label")).toBe("Send this cat away for good");
   });
 });

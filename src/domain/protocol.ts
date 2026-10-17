@@ -17,6 +17,14 @@ export interface PublicParticipant {
   isOwner: boolean;
   isConnected: boolean;
   hasVoted: boolean;
+  /**
+   * False once their cat has been sent away, which every client has to honour.
+   *
+   * Optional rather than required, and read as present unless it says false. A state
+   * that predates the field has to keep every cat on screen rather than blank the
+   * room, so the absent case and the true case are the same answer by design.
+   */
+  hasCat?: boolean;
 }
 
 export interface RevealedVote {
@@ -64,6 +72,7 @@ export function toPublicState(
       isOwner: participant.isOwner,
       isConnected: participant.isConnected,
       hasVoted: participant.vote !== null,
+      hasCat: participant.hasCat,
     })),
     ownerId: room.ownerId,
     gracePeriodMs: room.gracePeriodMs,
@@ -106,6 +115,12 @@ export type ClientMessage =
   | { type: "set-name"; name: string }
   | { type: "transfer-ownership"; participantId: string }
   | { type: "remove-participant"; participantId: string }
+  /**
+   * Carries no participant id on purpose. Sending a cat away is a thing a person does
+   * to their own cat, so the server reads who is asking off the socket rather than
+   * off a field anybody could have filled in with somebody else's name.
+   */
+  | { type: "remove-cat" }
   | { type: "set-room-name"; name: string | null }
   | { type: "chat"; text: string }
   | { type: "clear-chat" }
@@ -193,6 +208,8 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     case "transfer-ownership":
     case "remove-participant":
       return typeof (candidate as { participantId?: unknown }).participantId === "string";
+    case "remove-cat":
+      return true;
     case "reveal":
     case "next-round":
     case "reset-round":

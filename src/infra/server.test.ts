@@ -1670,6 +1670,18 @@ describe("Room cat bookkeeping", () => {
   const storedCats = (storage: ReturnType<typeof createFakeStorage>) =>
     (storage.data.get("cats") ?? []) as Array<{ participantId: string; y: number }>;
 
+  /**
+   * The cats block drives the object through plain sockets rather than through the
+   * helpers the rest of the file uses, so it needs its own way of reading the last
+   * state a socket was handed.
+   */
+  const lastState = (socket: ReturnType<typeof createFakeSocket>): {
+    state: PublicRoomState;
+  } => {
+    const states = parse(socket.sent).filter((entry) => entry["type"] === "state");
+    return states.at(-1) as { state: PublicRoomState };
+  };
+
   async function joinInto(
     storage: ReturnType<typeof createFakeStorage>,
     name: string,
@@ -1713,6 +1725,122 @@ describe("Room cat bookkeeping", () => {
     }
     expect(storedCats(storage)).toHaveLength(seated.size);
     expect(storedCats(storage).map((cat) => cat.participantId)).toContain(joined.participantId);
+  });
+
+  it("sends a cat away for everybody in the room", async () => {
+    const storage = createFakeStorage();
+    const ana = await joinInto(storage, "Ana");
+    const bruno = await joinInto(storage, "Bruno");
+
+    await new Room(storage as never).webSocketMessage(
+      ana as never,
+      JSON.stringify({ type: "remove-cat" }),
+    );
+
+    // The point of the change: Bruno's own screen is the one that has to stop
+    // drawing it, because a cat only its owner cannot see is still in the room.
+    const fromBruno = lastState(bruno).state;
+    const anaSeen = fromBruno.participants.find((entry) => entry.name === "Ana");
+
+    expect(anaSeen?.hasCat).toBe(false);
+    expect(fromBruno.cats?.map((cat) => cat.participantId)).not.toContain(
+      anaSeen?.id,
+    );
+  });
+
+  it("keeps the seat of somebody whose cat is gone", async () => {
+    const storage = createFakeStorage();
+    const ana = await joinInto(storage, "Ana");
+
+    await new Room(storage as never).webSocketMessage(
+      ana as never,
+      JSON.stringify({ type: "remove-cat" }),
+    );
+
+    const state = lastState(ana).state;
+    expect(state.participants).toHaveLength(1);
+    expect(state.participants[0]?.name).toBe("Ana");
+    expect(state.connectedCount).toBe(1);
+  });
+
+  it("lets a participant who is not the owner send their own cat away", async () => {
+    const storage = createFakeStorage();
+    await joinInto(storage, "Ana");
+    const bruno = await joinInto(storage, "Bruno");
+
+    await new Room(storage as never).webSocketMessage(
+      bruno as never,
+      JSON.stringify({ type: "remove-cat" }),
+    );
+
+    const brunoSeen = lastState(bruno).state.participants.find(
+      (entry) => entry.name === "Bruno",
+    );
+    expect(brunoSeen?.hasCat).toBe(false);
+    expect(brunoSeen?.isOwner).toBe(false);
+  });
+
+  /**
+   * The command carries no participant id, so the only cat a socket can reach is its
+   * own. This is the regression that matters: a message that named a target would let
+   * anybody in the room delete somebody else's cat, and nothing in the interface would
+   * have to go wrong for that to be reachable.
+   */
+  it("refuses to let a participant send away somebody else's cat", async () => {
+    const storage = createFakeStorage();
+    await joinInto(storage, "Ana");
+    const bruno = await joinInto(storage, "Bruno");
+
+    await new Room(storage as never).webSocketMessage(
+      bruno as never,
+      JSON.stringify({ type: "remove-cat" }),
+    );
+
+    const anaSeen = lastState(bruno).state.participants.find(
+      (entry) => entry.name === "Ana",
+    );
+    expect(anaSeen?.hasCat).toBe(true);
+  });
+
+  it("does not error the second time a cat is sent away", async () => {
+    const storage = createFakeStorage();
+    const ana = await joinInto(storage, "Ana");
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await new Room(storage as never).webSocketMessage(
+        ana as never,
+        JSON.stringify({ type: "remove-cat" }),
+      );
+    }
+
+    expect(parse(ana.sent).filter((entry) => entry["type"] === "error")).toHaveLength(0);
+    expect(lastState(ana).state.participants).toHaveLength(1);
+  });
+
+  /**
+   * The whole promise is that the cat does not come back, and a reload is the cheapest
+   * way to break it: the seat is still taken, so a pruner that only drops cats of
+   * people who left would carry the stale entry straight back onto the screen.
+   */
+  it("does not bring the cat back on a reload", async () => {
+    const storage = createFakeStorage();
+    const ana = await joinInto(storage, "Ana");
+
+    await new Room(storage as never).webSocketMessage(
+      ana as never,
+      JSON.stringify({ type: "remove-cat" }),
+    );
+
+    // The cat is gone from memory here, but the write that carries the cats is
+    // deferred, so storage still holds the entry. A fresh object is the cold start
+    // that would otherwise put it straight back on the screen.
+    const coldStart = new Room(storage as never);
+    const response: Response = await coldStart.fetch(
+      new Request("https://room.internal/state"),
+    );
+    const state: { cats?: unknown[] } = await response.json();
+
+    expect(state.cats).toHaveLength(0);
   });
 
   it("seeds every cat inside the viewport in a crowded room", async () => {

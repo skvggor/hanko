@@ -71,7 +71,7 @@ function createFakeStorage(initial: unknown = null) {
 function draft(
   id: string,
   token: string,
-): Omit<Participant, "vote" | "disconnectedAt"> {
+): Omit<Participant, "vote" | "disconnectedAt" | "hasCat"> {
   return {
     id,
     token,

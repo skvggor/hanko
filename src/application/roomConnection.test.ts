@@ -773,3 +773,22 @@ describe("RoomConnection recovery", () => {
     connection.close();
   });
 });
+describe("sending a cat away", () => {
+  /**
+   * No participant id goes on the wire, because the only cat a socket may reach is
+   * its own. A frame naming a target would put the decision in the hands of whoever
+   * is holding the keyboard and leave the server trusting it.
+   */
+  it("asks for the sender's own cat without naming anybody", async () => {
+    const { RoomConnection } = await import("@application/roomConnection");
+    const socket = createFakeSocket();
+
+    const connection = new RoomConnection("room-1", () => socket as unknown as WebSocket);
+    await connection.join("Ana", "voter", null);
+
+    connection.removeCat();
+
+    const sent = socket.sent.slice(1).map((entry) => JSON.parse(entry));
+    expect(sent).toEqual([{ type: "remove-cat" }]);
+  });
+});

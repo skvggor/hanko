@@ -22,6 +22,13 @@ export interface Participant {
   isConnected: boolean;
   disconnectedAt: number | null;
   vote: string | null;
+  /**
+   * Whether this participant still has a cat. Sending a cat away is permanent and
+   * belongs to the room rather than to the screen, because a cat only one person can
+   * see is not a cat the room has. The seat outlives the cat, so removing one says
+   * nothing about the vote or the name behind it.
+   */
+  hasCat: boolean;
 }
 
 export interface RoomSnapshot {
@@ -84,6 +91,9 @@ export function restoreRoom(
             typeof participant.disconnectedAt === "number"
               ? participant.disconnectedAt
               : null,
+          // Backfilled rather than left undefined: everybody who was already seated
+          // has a cat, and an upgrade is not the moment to take it off them.
+          hasCat: participant.hasCat ?? true,
         }))
       : [],
     messages: Array.isArray(stored.messages) ? stored.messages : [],
@@ -94,7 +104,7 @@ export function restoreRoom(
 
 export function joinRoom(
   room: RoomSnapshot,
-  participant: Omit<Participant, "vote" | "disconnectedAt">,
+  participant: Omit<Participant, "vote" | "disconnectedAt" | "hasCat">,
 ): RoomSnapshot {
   if (room.participants.length >= MAX_PARTICIPANTS) {
     return room;
@@ -107,6 +117,9 @@ export function joinRoom(
     ...participant,
     vote: null,
     disconnectedAt: null,
+    // Arriving is arriving with a cat. Nobody has had the chance to send one away yet,
+    // so the field is decided here rather than asked of every caller.
+    hasCat: true,
   };
   const participants = [...room.participants, nextParticipant];
 
@@ -327,6 +340,30 @@ export function transferOwnership(
  * sessionStorage and walks straight back in. The tombstone is capped because the
  * room only needs to outlive a reconnect, not remember people forever.
  */
+/**
+ * Sends a cat away for good, for everybody in the room.
+ *
+ * Permanent on purpose. A cat that came back would undo the only thing the person who
+ * sent it away asked for, and a cat that only one screen stopped drawing would still
+ * be there for everyone else. The seat is untouched: removing a cat is not removing a
+ * person, and it must not take their vote, their name or their place in the room.
+ */
+export function removeCat(
+  room: RoomSnapshot,
+  participantId: string,
+): RoomSnapshot {
+  const participant = room.participants.find((entry) => entry.id === participantId);
+
+  if (participant?.hasCat !== true) return room;
+
+  return {
+    ...room,
+    participants: room.participants.map((entry) =>
+      entry.id === participantId ? { ...entry, hasCat: false } : entry,
+    ),
+  };
+}
+
 export function removeParticipant(
   room: RoomSnapshot,
   participantId: string,

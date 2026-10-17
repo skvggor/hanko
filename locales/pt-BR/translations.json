@@ -165,7 +165,7 @@
   "cat": {
     "pause": "Pausar gato de {{name}}",
     "resume": "Retomar gato de {{name}}",
-    "removeAction": "Remover",
+    "removeAction": "Mandar este gato embora para sempre",
     "controls": "Controles do gato",
     "release": "Soltar",
     "paused": "Pausado",

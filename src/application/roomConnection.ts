@@ -388,6 +388,15 @@ export class RoomConnection {
     this.#send({ type: "remove-participant", participantId });
   }
 
+  /**
+   * Sent without an id on purpose. The frame asks for the sender's own cat, and the
+   * server reads who that is off the socket, so there is no field here that could be
+   * filled in with somebody else's name.
+   */
+  removeCat(): void {
+    this.#send({ type: "remove-cat" });
+  }
+
   setRoomName(name: string | null): void {
     this.#send({ type: "set-room-name", name });
   }

@@ -35,6 +35,7 @@ describe("CatOverlay", () => {
   it("renders one cat per connected participant", () => {
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -56,6 +57,7 @@ describe("CatOverlay", () => {
 
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -83,6 +85,7 @@ describe("CatOverlay", () => {
   it("hides disconnected participants", () => {
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -101,6 +104,7 @@ describe("CatOverlay", () => {
     const onSend = vi.fn();
     render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -122,6 +126,7 @@ describe("CatOverlay", () => {
     const onClear = vi.fn();
     render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner
         messages={[message()]}
@@ -141,6 +146,7 @@ describe("CatOverlay", () => {
   it("announces messages in a live region", () => {
     render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[message({ text: "vamos" })]}
@@ -163,6 +169,7 @@ describe("CatOverlay", () => {
 
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -191,6 +198,7 @@ describe("CatOverlay", () => {
   it("makes the controlled cat jump on the space bar", async () => {
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -217,6 +225,7 @@ describe("CatOverlay", () => {
   it("turns the controlled cat to face the way it is moving", async () => {
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -243,6 +252,7 @@ describe("CatOverlay", () => {
   it("drops the cat selection while typing and takes it back after", async () => {
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -274,6 +284,7 @@ describe("CatOverlay", () => {
     const onSend = vi.fn();
     render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -294,6 +305,7 @@ describe("CatOverlay", () => {
   it("does not move a cat that is asleep", async () => {
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -323,6 +335,7 @@ describe("CatOverlay", () => {
   it("releases the controlled cat on Escape", async () => {
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -344,7 +357,13 @@ describe("CatOverlay", () => {
     expect(cat).toHaveAttribute("data-controlled", "false");
   });
 
-  it("removes a cat from the overlay", async () => {
+  /**
+   * Sending a cat away is not something this screen can do on its own any more, so
+   * the click asks and then waits. A cat that vanished here and came back on the next
+   * state would be the interface claiming something that had not happened.
+   */
+  it("asks the room to send the cat away and keeps drawing it until the room answers", async () => {
+    const onRemoveCat = vi.fn();
     const { container } = render(
       <CatOverlay
         connectedParticipantIds={new Set(["p1", "p2"])}
@@ -352,21 +371,26 @@ describe("CatOverlay", () => {
         messages={[]}
         myParticipantId="p1"
         onClear={vi.fn()}
+        onRemoveCat={onRemoveCat}
         onSend={vi.fn()}
         participants={[participant()]}
         translate={translate}
       />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Send this cat away for good" }),
+    );
 
-    expect(container.querySelector(".cat")).toBeNull();
+    expect(onRemoveCat).toHaveBeenCalledTimes(1);
+    expect(container.querySelector(".cat")).not.toBeNull();
   });
 
   it("controls the server-backed cat in place and publishes its movement", async () => {
     const onUpdateCat = vi.fn();
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         cats={[{
           participantId: "p1",
@@ -404,6 +428,7 @@ describe("CatOverlay", () => {
   it("does not select a server-backed cat that is already asleep", async () => {
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         cats={[{
           participantId: "p1",
@@ -435,6 +460,7 @@ describe("CatOverlay", () => {
   it("shows a brief angry reaction when the controlled cat collides", async () => {
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         cats={[
           {
@@ -482,6 +508,7 @@ describe("CatOverlay", () => {
     const onUpdateCat = vi.fn();
     const { container } = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -509,6 +536,7 @@ describe("CatOverlay keyboard ownership", () => {
   function renderControlled() {
     const view = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -560,6 +588,7 @@ describe("CatOverlay keyboard ownership", () => {
   it("lets the chat composer keep its own space bar", async () => {
     const view = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[message()]}
@@ -635,6 +664,7 @@ describe("CatOverlay reconciliation", () => {
   ) {
     return render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[]}
@@ -647,19 +677,16 @@ describe("CatOverlay reconciliation", () => {
     );
   }
 
-  it("brings back a cat the moment its owner is in the room again", async () => {
+  /**
+   * The old behaviour was the opposite of this: the id was kept on the screen that
+   * hid it, so a cat came back whenever its owner reconnected and the hiding was
+   * never more than local. Sending a cat away now belongs to the room, so there is
+   * nothing on this screen that could bring it back.
+   */
+  it("does not bring back a cat the room has taken away", () => {
     const view = renderOverlay(others);
+    expect(view.container.querySelectorAll(".cat")).toHaveLength(2);
 
-    await userEvent.click(
-      view.container.querySelector(
-        '[data-testid="cat-p1"] .cat-controls__button:last-of-type',
-      ) as HTMLElement,
-    );
-    expect(view.container.querySelectorAll(".cat")).toHaveLength(1);
-
-    // Hiding is a local, temporary act. Keeping the id forever meant a refresh from
-    // the other side left their cat gone for the rest of the session, with no way
-    // back to it.
     view.rerender(
       <CatOverlay
         connectedParticipantIds={new Set(["p1", "p2"])}
@@ -667,15 +694,37 @@ describe("CatOverlay reconciliation", () => {
         messages={[]}
         myParticipantId="p1"
         onClear={vi.fn()}
+        onRemoveCat={vi.fn()}
+        onSend={vi.fn()}
+        participants={[participant({ hasCat: false }), participant({ id: "p2", name: "Bia" })]}
+        translate={translate}
+      />,
+    );
+    expect(view.container.querySelectorAll(".cat")).toHaveLength(1);
+
+    // A reconnect is the moment the old rule used to undo the removal, so it is the
+    // moment worth proving. The seat is taken again and the cat still stays away.
+    view.rerender(
+      <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
+        isOwner={false}
+        messages={[]}
+        myParticipantId="p1"
+        onClear={vi.fn()}
+        onRemoveCat={vi.fn()}
         onSend={vi.fn()}
         participants={[
-          participant({ isConnected: false }),
+          participant({ hasCat: false, isConnected: false }),
           participant({ id: "p2", name: "Bia" }),
         ]}
         translate={translate}
       />,
     );
     expect(view.container.querySelectorAll(".cat")).toHaveLength(1);
+  });
+
+  it("keeps the cat of somebody who only lost the connection", () => {
+    const view = renderOverlay(others);
 
     view.rerender(
       <CatOverlay
@@ -684,18 +733,34 @@ describe("CatOverlay reconciliation", () => {
         messages={[]}
         myParticipantId="p1"
         onClear={vi.fn()}
+        onRemoveCat={vi.fn()}
         onSend={vi.fn()}
-        participants={[participant(), participant({ id: "p2", name: "Bia" })]}
+        participants={[participant({ isConnected: false }), participant({ id: "p2", name: "Bia" })]}
         translate={translate}
       />,
     );
+    expect(view.container.querySelectorAll(".cat")).toHaveLength(1);
 
+    view.rerender(
+      <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
+        isOwner={false}
+        messages={[]}
+        myParticipantId="p1"
+        onClear={vi.fn()}
+        onRemoveCat={vi.fn()}
+        onSend={vi.fn()}
+        participants={others}
+        translate={translate}
+      />,
+    );
     expect(view.container.querySelectorAll(".cat")).toHaveLength(2);
   });
 
   it("still renders a cat whose state has not arrived yet", () => {
     const view = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         cats={[]}
         isOwner={false}
@@ -719,6 +784,7 @@ describe("CatOverlay reconciliation", () => {
   it("announces only the message that just arrived", () => {
     const view = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[message({ id: "m1", authorName: "Ana", text: "primeira" })]}
@@ -733,6 +799,7 @@ describe("CatOverlay reconciliation", () => {
 
     view.rerender(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[
@@ -760,6 +827,7 @@ describe("CatOverlay and the chat composer", () => {
     const onSend = vi.fn();
     const view = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={[message({ id: "m1", authorName: "Ana", text: "vamos nessa" })]}
@@ -774,16 +842,24 @@ describe("CatOverlay and the chat composer", () => {
     return { onSend, ...view };
   }
 
-  it("still offers the composer after your own cat is sent away", async () => {
-    const { container } = renderOverlay();
-
-    const remove = container.querySelector(
-      '[data-testid="cat-p1"] .cat-controls__button:last-of-type',
-    ) as HTMLElement;
-    expect(remove).toBeTruthy();
-    expect(container.querySelectorAll(".cat")).toHaveLength(1);
-
-    await userEvent.click(remove);
+  /**
+   * Losing the cat is losing a body in the room, not a voice in it. The cat is gone
+   * for good, so the way back into the conversation has to survive that.
+   */
+  it("still offers the composer after your own cat is sent away", () => {
+    const { container } = render(
+      <CatOverlay
+        connectedParticipantIds={new Set(["p1"])}
+        isOwner={false}
+        messages={[]}
+        myParticipantId="p1"
+        onClear={vi.fn()}
+        onRemoveCat={vi.fn()}
+        onSend={vi.fn()}
+        participants={[participant({ hasCat: false })]}
+        translate={translate}
+      />,
+    );
 
     expect(container.querySelectorAll(".cat")).toHaveLength(0);
     expect(container.querySelector(".cat-composer__input")).toBeTruthy();
@@ -827,6 +903,7 @@ describe("CatOverlay reading the conversation", () => {
     const onSend = vi.fn();
     const view = render(
       <CatOverlay
+        onRemoveCat={vi.fn()}
         connectedParticipantIds={new Set(["p1", "p2"])}
         isOwner={false}
         messages={messages}
@@ -907,5 +984,47 @@ describe("CatOverlay reading the conversation", () => {
 
     const first = within(screen.getByRole("log")).getByText("primeira");
     expect(first.closest(".chat-line")?.textContent).toContain("Bia");
+  });
+});
+describe("a cat that was sent away", () => {
+  /**
+   * The room is the truth about this now, so the screen that removed it is not the
+   * only one that stops drawing. Everything else in the overlay reacts to a local
+   * set; this one reacts to what everybody else was told.
+   */
+  it("draws nothing for the person who sent it away", () => {
+    const { container } = render(
+      <CatOverlay
+        connectedParticipantIds={new Set(["p1"])}
+        isOwner={false}
+        messages={[]}
+        myParticipantId="p1"
+        onClear={vi.fn()}
+        onRemoveCat={vi.fn()}
+        onSend={vi.fn()}
+        participants={[participant({ hasCat: false })]}
+        translate={translate}
+      />,
+    );
+
+    expect(container.querySelector('[data-testid="cat-p1"]')).toBeNull();
+  });
+
+  it("keeps the cat of everybody else in the room", () => {
+    const { container } = render(
+      <CatOverlay
+        connectedParticipantIds={new Set(["p1", "p2"])}
+        isOwner={false}
+        messages={[]}
+        myParticipantId="p1"
+        onClear={vi.fn()}
+        onRemoveCat={vi.fn()}
+        onSend={vi.fn()}
+        participants={[participant({ hasCat: false }), participant({ id: "p2" })]}
+        translate={translate}
+      />,
+    );
+
+    expect(container.querySelector('[data-testid="cat-p2"]')).toBeTruthy();
   });
 });

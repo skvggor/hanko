@@ -20,6 +20,7 @@ import {
   reconnectParticipant,
   reclaimDisconnected,
   isRemovedToken,
+  removeCat,
   removeParticipant,
   resetRound,
   reveal,
@@ -32,7 +33,7 @@ import {
   transferOwnership,
 } from "@domain/room";
 
-type DraftParticipant = Omit<Participant, "vote" | "disconnectedAt">;
+type DraftParticipant = Omit<Participant, "vote" | "disconnectedAt" | "hasCat">;
 
 function draft(
   id: string,
@@ -99,6 +100,7 @@ describe("joinRoom", () => {
       isConnected: true,
       disconnectedAt: null,
       vote: null,
+      hasCat: true,
     })) };
 
     const result = joinRoom(many, draft("late"));
@@ -566,5 +568,83 @@ describe("removal tombstones", () => {
     const { removedTokens: _removedTokens, ...legacy } = createRoom("room");
 
     expect(restoreRoom(legacy, "room").removedTokens).toEqual([]);
+  });
+});
+
+describe("removeCat", () => {
+  function roomWithTwoCats() {
+    const started = createRoom("abc");
+    const withAna = joinRoom(started, {
+      id: "p1",
+      token: "t1",
+      name: "Ana",
+      role: "voter",
+      isOwner: true,
+      isConnected: true,
+    });
+    return joinRoom(withAna, {
+      id: "p2",
+      token: "t2",
+      name: "Bruno",
+      role: "voter",
+      isOwner: false,
+      isConnected: true,
+    });
+  }
+
+  it("gives everybody a cat to begin with", () => {
+    const room = roomWithTwoCats();
+
+    expect(room.participants.every((participant) => participant.hasCat)).toBe(true);
+  });
+
+  it("takes the cat away", () => {
+    const room = removeCat(roomWithTwoCats(), "p1");
+
+    expect(room.participants.find((entry) => entry.id === "p1")?.hasCat).toBe(false);
+  });
+
+  it("leaves everybody else's cat alone", () => {
+    const room = removeCat(roomWithTwoCats(), "p1");
+
+    expect(room.participants.find((entry) => entry.id === "p2")?.hasCat).toBe(true);
+  });
+
+  it("changes nothing the second time, and says so by returning the same room", () => {
+    const room = removeCat(roomWithTwoCats(), "p1");
+
+    expect(removeCat(room, "p1")).toBe(room);
+  });
+
+  it("does nothing for a participant who is not in the room", () => {
+    const room = roomWithTwoCats();
+
+    expect(removeCat(room, "nobody")).toBe(room);
+  });
+
+  it("keeps the seat, the vote and the name of somebody whose cat is gone", () => {
+    const room = removeCat(roomWithTwoCats(), "p1");
+    const ana = room.participants.find((entry) => entry.id === "p1");
+
+    expect(ana?.name).toBe("Ana");
+    expect(ana?.isOwner).toBe(true);
+    expect(ana?.isConnected).toBe(true);
+  });
+
+  /**
+   * A room stored before this field existed has to come back with a cat rather than
+   * with nothing, or everyone who was already in a room would lose theirs on upgrade.
+   */
+  it("gives a cat back to a participant stored before the field existed", () => {
+    // Built as the storage of an older room would hold it, which is a snapshot that
+    // simply has no such field rather than one holding false.
+    const legacy = {
+      ...roomWithTwoCats(),
+      participants: roomWithTwoCats().participants.map(({ hasCat: _hasCat, ...rest }) => rest),
+    } as Partial<RoomSnapshot>;
+
+    const room = restoreRoom(legacy, "abc");
+
+    expect(room.participants.every((participant) => participant.hasCat)).toBe(true);
   });
 });

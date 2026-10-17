@@ -26,6 +26,7 @@ import {
   reclaimDisconnected,
   joinRoom,
   reconnectParticipant,
+  removeCat,
   removeParticipant,
   resetRound,
   restoreRoom,
@@ -308,7 +309,7 @@ export class Room {
     const participantId = crypto.randomUUID();
     const token = crypto.randomUUID();
 
-    const draft: Omit<Participant, "vote" | "disconnectedAt"> = {
+    const draft: Omit<Participant, "vote" | "disconnectedAt" | "hasCat"> = {
       id: participantId,
       token,
       name: validation.name,
@@ -418,6 +419,19 @@ export class Room {
         return { room: this.#advanceRoom(message, room), finished: false };
       case "transfer-ownership":
         return { room: transferOwnership(room, message.participantId), finished: false };
+      /**
+       * Carried off the socket rather than off a field, so a participant can only ever
+       * reach their own cat, and the seat is left exactly as it was: sending a cat away
+       * is not removing a person, and it must not take their vote with it.
+       *
+       * The next room is handed back rather than saved here. A command that saves for
+       * itself has to finish, or the room it started from is written straight back over
+       * the change, which is a mistake that leaves no trace of ever having happened.
+       */
+      case "remove-cat": {
+        this.#cats.delete(actor.id);
+        return { room: removeCat(room, actor.id), finished: false };
+      }
       case "remove-participant": {
         const removed = message.participantId;
 
@@ -794,18 +808,27 @@ export class Room {
   }
 
   /**
-   * A cat lives exactly as long as the seat behind it. Reclaiming a seat for the
-   * participant cap has to take the cat with it, because the whole map is
-   * serialised on every save: a ghost cat makes every vote, rename and chat message
-   * in the room pay for a cat whose owner can never come back. A departure is not
-   * grounds for pruning, because the participant is still seated and a refresh
-   * should find the same breed and pose waiting.
+   * A cat lives exactly as long as the room still says it does. Two things end it:
+   * the seat going away, and the owner sending it off, which keeps the seat. Both
+   * have to be honoured here rather than only in the map, because the map is
+   * serialised on every save and outlives the write that emptied it, so a stale entry
+   * makes every vote, rename and chat message in the room pay for a cat that should
+   * not be there, and puts it back on the screen the next time the room loads.
+   *
+   * A departure on its own is still not grounds for pruning: the participant is still
+   * seated and a refresh should find the same breed and pose waiting.
    */
   #pruneCats(room: RoomSnapshot): void {
-    const seated = new Set(room.participants.map((participant) => participant.id));
+    const stillOnScreen = new Map(
+      room.participants.map((participant) => [participant.id, participant.hasCat]),
+    );
 
     for (const participantId of this.#cats.keys()) {
-      if (!seated.has(participantId)) this.#cats.delete(participantId);
+      // A cat whose seat is taken but whose owner sent it away is pruned on purpose.
+      // Seated is not enough on its own: the cats map outlives the write that removed
+      // the entry, and a pruner that only asked whether the seat was still taken would
+      // carry a stale cat straight back onto the screen the next time the room loads.
+      if (stillOnScreen.get(participantId) !== true) this.#cats.delete(participantId);
     }
   }
 

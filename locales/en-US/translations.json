@@ -165,7 +165,7 @@
   "cat": {
     "pause": "Pause {{name}}'s cat",
     "resume": "Resume {{name}}'s cat",
-    "removeAction": "Remove",
+    "removeAction": "Send this cat away for good",
     "controls": "Cat controls",
     "release": "Release",
     "paused": "Paused",

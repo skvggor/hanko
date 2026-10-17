@@ -69,7 +69,7 @@ describe("CatControls", () => {
   it("removes the cat when asked", async () => {
     const { onRemove } = renderControls();
 
-    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await userEvent.click(screen.getByRole("button", { name: "Send this cat away for good" }));
 
     expect(onRemove).toHaveBeenCalledTimes(1);
   });

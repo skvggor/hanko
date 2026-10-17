@@ -191,6 +191,7 @@ export function RoomScreen({
     (participantId: string) => connection.removeParticipant(participantId),
     [connection],
   );
+  const handleRemoveCat = useCallback(() => connection.removeCat(), [connection]);
   const handleSetRole = useCallback(
     (participantId: string, role: ParticipantRole) =>
       connection.setRole(participantId, role),
@@ -371,6 +372,7 @@ export function RoomScreen({
             messages={messages}
             myParticipantId={connection.participantId}
             onClear={handleClearMessages}
+            onRemoveCat={handleRemoveCat}
             onSend={handleSendMessage}
             onUpdateCat={handleUpdateCat}
             participants={state.participants}

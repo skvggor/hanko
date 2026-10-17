@@ -17,6 +17,12 @@ export interface CatOverlayProps {
   isOwner: boolean;
   onClear: () => void;
   onSend: (text: string) => void;
+  /**
+   * Asks the room to send this cat away for good. It reaches the server rather than
+   * a set on this screen, because a cat that only one person stopped drawing is
+   * still in the room, and a removal that came back on reload was never a removal.
+   */
+  onRemoveCat: () => void;
   translate: Translator;
   cats?: CatState[];
   onUpdateCat?: (update: Omit<CatState, "participantId" | "breed">) => void;
@@ -62,6 +68,7 @@ export function CatOverlay({
   connectedParticipantIds,
   isOwner,
   onClear,
+  onRemoveCat,
   onSend,
   translate,
   cats = [],
@@ -71,7 +78,6 @@ export function CatOverlay({
   const [isAsleep, setIsAsleep] = useState(false);
   const initialControlParticipantRef = useRef<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(new Set());
 
   /**
    * The cat is drawn in fluid rem, so its pixel size changes with the viewport.
@@ -94,9 +100,17 @@ export function CatOverlay({
     triggerJump,
   } = useControlledCat({ asleep: isAsleep, bounds, catSize, cats });
 
+  /**
+   * A cat is drawn for as long as the room says it is there. Read as present unless
+   * it says otherwise, so a state that predates the field keeps every cat on screen
+   * rather than emptying the room at once.
+   */
   const visibleParticipants = useMemo(
-    () => participants.filter((participant) => participant.isConnected && !hiddenIds.has(participant.id)),
-    [participants, hiddenIds],
+    () =>
+      participants.filter(
+        (participant) => participant.isConnected && participant.hasCat !== false,
+      ),
+    [participants],
   );
 
   const catByParticipant = useMemo(
@@ -286,44 +300,6 @@ export function CatOverlay({
   }, [asleep, controlledDirection, controlledPosition, myParticipantId, releaseControl, takeControl]);
 
   /**
- * A hidden id is forgotten as soon as its owner drops out of the room. Keeping it
- * would mean that a person who hid a cat, and then watched that person come back,
- * was still looking at a gap with no way to undo it. Reconciling against who is
- * connected rather than who is listed is what makes the hiding temporary: a
- * participant stays seated while they are away, so only losing the connection
- * proves they actually left.
- *
- * Adjusted during the render rather than in an effect because the room it reads is
- * a prop: an effect would publish the pruned set one frame late, which is one frame
- * of a cat that was not meant to be on screen.
- */
-const connectedIds = useMemo(
-  () =>
-    new Set(
-      participants
-        .filter((participant) => participant.isConnected)
-        .map((participant) => participant.id),
-    ),
-  [participants],
-);
-
-const [reconciledIds, setReconciledIds] = useState(participants);
-
-if (reconciledIds !== participants) {
-  setReconciledIds(participants);
-  const kept = new Set([...hiddenIds].filter((id) => connectedIds.has(id)));
-  if (kept.size !== hiddenIds.size) setHiddenIds(kept);
-}
-
-const removeCat = useCallback((participantId: string) => {
-    setHiddenIds((previous) => {
-      const next = new Set(previous);
-      next.add(participantId);
-      return next;
-    });
-  }, []);
-
-  /**
    * Pausing is a pose, so it travels to the other clients like a move: the cat
    * falls asleep (or wakes) everywhere, not just on the screen that clicked it.
    */
@@ -357,7 +333,7 @@ const removeCat = useCallback((participantId: string) => {
           name={participant.name}
           onPauseChange={handlePauseChange}
           onReleaseControl={releaseControl}
-          onRemove={() => removeCat(participant.id)}
+          onRemove={onRemoveCat}
           onRequestControl={(position) => requestControl(participant.id, position)}
           participantId={participant.id}
           translate={translate}
