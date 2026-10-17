@@ -245,11 +245,10 @@ bars share one rem based height token so they stay equal at any root size, and t
 display. Pinned chrome takes a frosted background through `data-glass` when there is
 something behind it to blur.
 
-Destructive actions confirm first, except the cat's permanent remove control: it sends
-the cat away for the whole room without a confirmation. `ConfirmDialog` opens focused on
-the safe answer and hands focus back to whatever opened it. Dialogs are ours: `prompt`,
-`confirm` and `alert` are refused by `presentation/dialogs.test.ts`, which also requires
-the app to carry its own replacement.
+Destructive actions confirm first. `ConfirmDialog` opens focused on the safe answer and
+hands focus back to whatever opened it. Dialogs are ours: `prompt`, `confirm` and `alert`
+are refused by `presentation/dialogs.test.ts`, which also requires the app to carry its
+own replacement.
 
 Accessibility is a requirement, not polish. Every icon gets `aria-hidden`, every icon only
 button an `aria-label`, errors `role="alert"`, chat `role="log"`, the meter a native

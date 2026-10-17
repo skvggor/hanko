@@ -2282,6 +2282,22 @@ describe("Room cat bookkeeping", () => {
     expect(seen.size).toBe(cats.length);
   });
 
+  it("keeps shooed cats out of occupied screen areas", async () => {
+    const storage = createFakeStorage();
+    const owner = await joinInto(storage, "Ana");
+    const exclusionZones = [{ left: 0, top: 0.8, right: 1, bottom: 1 }];
+
+    await new Room(storage as never).webSocketMessage(
+      owner as never,
+      JSON.stringify({ type: "shoo-cats", aspect: 16 / 9, exclusionZones }),
+    );
+
+    const moved = lastCatStates(owner)[0];
+    expect(moved).toBeDefined();
+    if (moved === undefined) throw new Error("the room should publish the moved cat");
+    expect(moved.y).toBeLessThan(0.8);
+  });
+
   /**
    * Every cat was sitting dead centre before the button was pressed, which is the whole
    * complaint, and not one of them may still be there afterwards.

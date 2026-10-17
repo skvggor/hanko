@@ -135,12 +135,11 @@ export function Cat({
   let style: React.CSSProperties;
   if (controlledPosition !== null) {
     style = {
-      top: 0,
-      left: 0,
-      transform: `translate(${controlledPosition.x}px, ${controlledPosition.y}px)`,
-      // Gliding between key presses keeps the stride in step with the legs
-      // instead of teleporting the body while the paws are mid-swing.
-      transition: "transform 260ms ease-out",
+      top: `${controlledPosition.y}px`,
+      left: `${controlledPosition.x}px`,
+      // Keeping control in the same left/top coordinate system as the room means
+      // releasing cannot transition from the overlay origin before settling at its lane.
+      transition: "left 260ms ease-out, top 260ms ease-out",
       "--cat-duration": undefined,
     };
   } else if (catState === undefined) {

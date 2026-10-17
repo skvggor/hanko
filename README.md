@@ -154,12 +154,12 @@ so the only cat a socket can reach is its own, and the seat, the name and the vo
 alone because sending a cat away is not removing a person. There is no undo: a cat that
 came back would undo the only thing that was asked for.
 
-**The broom moves every cat to the border, not to a corner.** A corner holds one cat and
-leaves the rest in the way, so the spread walks the whole perimeter at even spacing. It is
-deterministic on purpose, which is also what keeps it from being a lever now that anybody
-may press it: pressing it twice in the same window finds every cat already where it would
-go, sends nothing, and costs nothing. It is a nudge and not a rule, because a cat nobody is
-driving wanders back.
+**The broom moves every cat to free space at the border, not to a corner.** A corner holds
+one cat and leaves the rest in the way, so the spread uses the open perimeter while
+skipping the room frame, pinned bars and floating controls. It is deterministic on purpose,
+which is also what keeps it from being a lever now that anybody may press it: pressing it
+twice in the same layout finds every cat already where it would go, sends nothing, and
+costs nothing. It is a nudge and not a rule, because a cat nobody is driving wanders back.
 
 **A dropped socket is not a lost seat.** The room keeps the seat for the whole grace
 window, so the honest response to a dropped connection is to open it again rather than
@@ -171,12 +171,12 @@ admission.
 clicking, so only your own cat is given a hit area. The rest are scenery, and scenery
 that crosses the vote grid at four rem a side is scenery that eats the votes.
 
-**Room, participant, leave and chat deletion ask first, and labels say what they reach.**
-The permanent cat-removal control is an exception: its X button has an accessible name but
-does not show a confirmation or tooltip. Two other icon-only controls carry a tooltip, and
-its sentence is the same one as the button's accessible name, because a tooltip is drawn
-and not announced and a split would leave the sentence nobody can hear. The broom says
-whose cats it moves; the bin says it clears the conversation *for everyone*.
+**Destructive controls ask first, and labels say what they reach.** Deleting a room,
+removing a person or cat, leaving and clearing the conversation all confirm. Two other
+icon-only controls carry a tooltip, and its sentence is the same one as the button's
+accessible name, because a tooltip is drawn and not announced and a split would leave
+the sentence nobody can hear. The broom says whose cats it moves; the bin says it clears
+the conversation *for everyone*.
 
 **Chat is not private and the interface says so.** There is no encryption and no accounts,
 so anyone holding the room link reads the room. The chat says this once per browser when

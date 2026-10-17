@@ -101,6 +101,11 @@ describe("isClientMessage", () => {
     expect(isClientMessage({ type: "transfer-ownership", participantId: "ana" })).toBe(true);
     expect(isClientMessage({ type: "remove-participant", participantId: "ana" })).toBe(true);
     expect(isClientMessage({ type: "shoo-cats", aspect: 1.78 })).toBe(true);
+    expect(isClientMessage({
+      type: "shoo-cats",
+      aspect: 1.78,
+      exclusionZones: [{ left: 0.2, top: 0.1, right: 0.8, bottom: 0.9 }],
+    })).toBe(true);
     expect(isClientMessage({ type: "remove-cat" })).toBe(true);
     expect(isClientMessage({ type: "delete-room" })).toBe(true);
     expect(isClientMessage({ type: "ping" })).toBe(true);
@@ -199,5 +204,28 @@ describe("isClientMessage and the shoo", () => {
   it("refuses a shape that is not a real number", () => {
     expect(isClientMessage({ type: "shoo-cats", aspect: Number.NaN })).toBe(false);
     expect(isClientMessage({ type: "shoo-cats", aspect: Number.POSITIVE_INFINITY })).toBe(false);
+  });
+
+  it("refuses malformed or oversized exclusion zones", () => {
+    expect(isClientMessage({
+      type: "shoo-cats",
+      aspect: 1.78,
+      exclusionZones: [{ left: 0.8, top: 0.1, right: 0.2, bottom: 0.9 }],
+    })).toBe(false);
+    expect(isClientMessage({
+      type: "shoo-cats",
+      aspect: 1.78,
+      exclusionZones: [{ left: Number.NaN, top: 0, right: 1, bottom: 1 }],
+    })).toBe(false);
+    expect(isClientMessage({
+      type: "shoo-cats",
+      aspect: 1.78,
+      exclusionZones: Array.from({ length: 33 }, () => ({
+        left: 0,
+        top: 0,
+        right: 1,
+        bottom: 1,
+      })),
+    })).toBe(false);
   });
 });

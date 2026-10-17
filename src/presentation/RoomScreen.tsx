@@ -3,7 +3,7 @@ import { MESSAGE_LIMIT, type ChatMessage } from "@domain/chat";
 import type { PublicRoomState } from "@domain/protocol";
 import type { DeckId } from "@domain/deck";
 import type { ParticipantRole } from "@domain/room";
-import type { CatActivity, CatState } from "@domain/cat";
+import type { CatActivity, CatExclusionZone, CatState } from "@domain/cat";
 import { RoomConnection, type ConnectionStatus } from "@application/roomConnection";
 import type { Translator } from "@application/i18n";
 import { roomPath } from "@application/routing";
@@ -19,6 +19,77 @@ import { useIsMobile } from "@presentation/useIsMobile";
 
 const TOKEN_PREFIX = "hanko:token:";
 const NAME_PREFIX = "hanko:name:";
+const CAT_OBSTACLE_SELECTORS =
+  "header, footer, [data-frame], .cat-composer, .chat-panel, .chat-dock, .chat-transcript, .chat-transcript__open, .cat-shoo";
+
+function clampExclusionCoordinate(value: number): number {
+  return Math.min(2, Math.max(-2, value));
+}
+
+/**
+ * Each rectangle is expanded from the obstacle to the places a cat's anchor cannot
+ * occupy without its sprite or controls covering that obstacle. The room stores only
+ * normalised positions, so these exclusions cross the wire in the same coordinates.
+ */
+function readCatExclusionZones(): CatExclusionZone[] {
+  const viewportWidth = Math.max(1, globalThis.innerWidth);
+  const viewportHeight = Math.max(1, globalThis.innerHeight);
+  const root = globalThis.document.documentElement;
+  const rootFontSize = Number.parseFloat(globalThis.getComputedStyle(root).fontSize) || 16;
+  const configuredCatSize = Number.parseFloat(
+    globalThis.getComputedStyle(root).getPropertyValue("--cat-size"),
+  );
+  const fallbackCatSize = (configuredCatSize || 4) * rootFontSize;
+  const cat = globalThis.document.querySelector<HTMLElement>(".cat");
+  const catBounds = cat?.getBoundingClientRect();
+  const controlsBounds = cat?.querySelector<HTMLElement>(".cat-controls")?.getBoundingClientRect();
+  const hasMeasuredFootprint =
+    catBounds !== undefined && catBounds.width > 0 && catBounds.height > 0;
+  const footprintWidth = Math.max(
+    hasMeasuredFootprint ? catBounds.width : fallbackCatSize,
+    controlsBounds !== undefined && controlsBounds.width > 0
+      ? controlsBounds.width
+      : 0,
+  );
+  const footprintHeight = Math.max(
+    hasMeasuredFootprint ? catBounds.height : fallbackCatSize,
+    hasMeasuredFootprint && controlsBounds !== undefined && controlsBounds.height > 0
+      ? controlsBounds.bottom - catBounds.top
+      : fallbackCatSize + 1.75 * rootFontSize,
+  );
+  const elements = globalThis.document.querySelectorAll<HTMLElement>(CAT_OBSTACLE_SELECTORS);
+  const exclusionZones: CatExclusionZone[] = [
+    {
+      left: clampExclusionCoordinate(1 - footprintWidth / viewportWidth),
+      top: -2,
+      right: 2,
+      bottom: 2,
+    },
+    {
+      left: -2,
+      top: clampExclusionCoordinate(1 - footprintHeight / viewportHeight),
+      right: 2,
+      bottom: 2,
+    },
+  ];
+
+  for (const element of elements) {
+    const style = globalThis.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden") continue;
+
+    const bounds = element.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) continue;
+
+    exclusionZones.push({
+      left: clampExclusionCoordinate((bounds.left - footprintWidth) / viewportWidth),
+      top: clampExclusionCoordinate((bounds.top - footprintHeight) / viewportHeight),
+      right: clampExclusionCoordinate(bounds.right / viewportWidth),
+      bottom: clampExclusionCoordinate(bounds.bottom / viewportHeight),
+    });
+  }
+
+  return exclusionZones;
+}
 
 /**
  * Identity lives in sessionStorage so each tab is its own participant: a second tab
@@ -90,6 +161,7 @@ export function RoomScreen({
   const [copied, setCopied] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
+  const [confirmingRemoveCat, setConfirmingRemoveCat] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connected");
   /** Waiting the round trip left a tap looking like it had done nothing. */
   const [pendingVote, setPendingVote] = useState<string | null | undefined>(undefined);
@@ -194,11 +266,19 @@ export function RoomScreen({
     (participantId: string) => connection.removeParticipant(participantId),
     [connection],
   );
-  const handleRemoveCat = useCallback(() => connection.removeCat(), [connection]);
+  const handleRemoveCat = useCallback(() => setConfirmingRemoveCat(true), []);
+  const confirmRemoveCat = useCallback(() => {
+    connection.removeCat();
+    setConfirmingRemoveCat(false);
+  }, [connection]);
 
   /** Cat positions are normalised, so the room needs this window's shape to know where the edge is. */
   const handleShooCats = useCallback(
-    () => connection.shooCats(globalThis.innerWidth / Math.max(1, globalThis.innerHeight)),
+    () =>
+      connection.shooCats(
+        globalThis.innerWidth / Math.max(1, globalThis.innerHeight),
+        readCatExclusionZones(),
+      ),
     [connection],
   );
   const handleSetRole = useCallback(
@@ -242,14 +322,24 @@ export function RoomScreen({
       direction: "left" | "right";
       activity: CatActivity;
       isPaused: boolean;
-    }) =>
+    }) => {
+      const participantId = connection.participantId;
+      if (participantId !== null) {
+        setCats((previous) =>
+          previous.map((cat) =>
+            cat.participantId === participantId ? { ...cat, ...update } : cat,
+          ),
+        );
+      }
+
       connection.updateCat(
         update.x,
         update.y,
         update.direction,
         update.activity,
         update.isPaused,
-      ),
+      );
+    },
     [connection],
   );
 
@@ -485,6 +575,17 @@ export function RoomScreen({
           title={translate("chat.clearConfirmTitle")}
           onAccept={confirmClearMessages}
           onCancel={() => setConfirmingClear(false)}
+        />
+      )}
+
+      {confirmingRemoveCat && (
+        <ConfirmDialog
+          acceptLabel={translate("cat.removeConfirmAccept")}
+          body={translate("cat.removeConfirmBody")}
+          cancelLabel={translate("cat.removeConfirmCancel")}
+          title={translate("cat.removeConfirmTitle")}
+          onAccept={confirmRemoveCat}
+          onCancel={() => setConfirmingRemoveCat(false)}
         />
       )}
 

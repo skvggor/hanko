@@ -94,6 +94,19 @@ describe("Cat", () => {
     expect(onRequestControl).not.toHaveBeenCalled();
   });
 
+  it("keeps the controlled cat's position in left and top instead of rebasing from the origin", () => {
+    const { container } = renderCat({
+      isControllable: true,
+      isControlled: true,
+      controlledPosition: { x: 312, y: 456 },
+    });
+
+    const cat = container.querySelector<HTMLElement>(".cat");
+    expect(cat?.style.left).toBe("312px");
+    expect(cat?.style.top).toBe("456px");
+    expect(cat?.style.transform).toBe("");
+  });
+
   it("shows the controls only on the owner's cat", () => {
     const { container: own } = renderCat({ isControllable: true });
     const { container: other } = renderCat({

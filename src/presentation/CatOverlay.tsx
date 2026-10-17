@@ -314,16 +314,34 @@ export function CatOverlay({
    */
   const handlePauseChange = useCallback(
     (paused: boolean) => {
+      const ownCat = myParticipantId === null ? undefined : catByParticipant.get(myParticipantId);
+      const positionIsControlled = controlledId === myParticipantId && controlledPosition !== null;
+      const x = positionIsControlled && bounds.width > 0
+        ? controlledPosition.x / bounds.width
+        : (ownCat?.x ?? 0);
+      const y = positionIsControlled && bounds.height > 0
+        ? controlledPosition.y / bounds.height
+        : (ownCat?.y ?? 0);
+
       setIsAsleep(paused);
       onUpdateCat?.({
-        x: bounds.width === 0 || controlledPosition === null ? 0 : controlledPosition.x / bounds.width,
-        y: bounds.height === 0 || controlledPosition === null ? 0 : controlledPosition.y / bounds.height,
-        direction: controlledDirection,
+        x,
+        y,
+        direction: positionIsControlled ? controlledDirection : (ownCat?.direction ?? controlledDirection),
         activity: paused ? "sleeping" : "idle",
         isPaused: paused,
       });
     },
-    [bounds.height, bounds.width, controlledDirection, controlledPosition, onUpdateCat],
+    [
+      bounds.height,
+      bounds.width,
+      catByParticipant,
+      controlledDirection,
+      controlledId,
+      controlledPosition,
+      myParticipantId,
+      onUpdateCat,
+    ],
   );
 
   return (

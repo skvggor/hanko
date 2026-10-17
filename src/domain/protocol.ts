@@ -1,7 +1,12 @@
 import { isChatMessage, type ChatMessage } from "@domain/chat";
 import { isDeckId, type DeckId } from "@domain/deck";
 import { isValidName } from "@domain/name";
-import { isCatActivity, isCatState, type CatState } from "@domain/cat";
+import {
+  isCatActivity,
+  isCatState,
+  type CatExclusionZone,
+  type CatState,
+} from "@domain/cat";
 import {
   type ParticipantRole,
   type RoomSnapshot,
@@ -9,6 +14,27 @@ import {
   findByToken,
   tallyPoints,
 } from "@domain/room";
+
+const MAX_CAT_EXCLUSION_ZONES = 32;
+
+function isCatExclusionZones(value: unknown): value is CatExclusionZone[] {
+  if (!Array.isArray(value) || value.length > MAX_CAT_EXCLUSION_ZONES) return false;
+
+  return value.every((zone: unknown) => {
+    if (typeof zone !== "object" || zone === null) return false;
+    const candidate = zone as Partial<CatExclusionZone>;
+    return (
+      typeof candidate.left === "number" && Number.isFinite(candidate.left) &&
+      typeof candidate.top === "number" && Number.isFinite(candidate.top) &&
+      typeof candidate.right === "number" && Number.isFinite(candidate.right) &&
+      typeof candidate.bottom === "number" && Number.isFinite(candidate.bottom) &&
+      candidate.left <= candidate.right &&
+      candidate.top <= candidate.bottom &&
+      candidate.left >= -2 && candidate.top >= -2 &&
+      candidate.right <= 2 && candidate.bottom <= 2
+    );
+  });
+}
 
 export interface PublicParticipant {
   id: string;
@@ -130,7 +156,7 @@ export type ClientMessage =
    */
   | { type: "remove-cat" }
   /** Carries the pressing window's shape, since cat positions are normalised and "the edge" means nothing without it. */
-  | { type: "shoo-cats"; aspect: number }
+  | { type: "shoo-cats"; aspect: number; exclusionZones?: CatExclusionZone[] }
   | { type: "set-room-name"; name: string | null }
   | { type: "chat"; text: string }
   | { type: "clear-chat" }
@@ -222,7 +248,11 @@ export function isClientMessage(value: unknown): value is ClientMessage {
       return true;
     case "shoo-cats": {
       const aspect = (candidate as { aspect?: unknown }).aspect;
-      return typeof aspect === "number" && Number.isFinite(aspect);
+      const exclusionZones = (candidate as { exclusionZones?: unknown }).exclusionZones;
+      return (
+        typeof aspect === "number" && Number.isFinite(aspect) &&
+        (exclusionZones === undefined || isCatExclusionZones(exclusionZones))
+      );
     }
     case "reveal":
     case "next-round":

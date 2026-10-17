@@ -268,20 +268,35 @@ async function dismissPrivacyNotice(page) {
 }
 
 /**
- * Every capture runs with reduced motion on, so a cat that has been told where to go
- * is already there. What is still possible is a position that has not been written
- * yet, and a figure taken then shows the room as it was before the button.
+ * The frame can arrive before its CSS transition does. Watching inline styles only caught
+ * the destination while the cat was still crossing the board, so a photograph could show
+ * it over the very content the broom had cleared. Wait for the browser's running movement
+ * animations to finish before opening the shutter.
  */
-async function waitForCatsToSettle(page) {
+async function readCatPositions(page) {
+  return page.locator(".cat").evaluateAll((cats) =>
+    cats.map((cat) => `${cat.style.left}|${cat.style.top}|${cat.style.transform}`),
+  );
+}
+
+async function waitForCatsToSettle(page, positionsBeforeMove) {
+  await page.waitForFunction((previous) => {
+    const cats = [...globalThis.document.querySelectorAll(".cat")];
+    const current = cats.map((cat) => `${cat.style.left}|${cat.style.top}|${cat.style.transform}`);
+    return cats.length === previous.length && current.some((position, index) => position !== previous[index]);
+  }, positionsBeforeMove);
+
   await page.waitForFunction(() => {
     const cats = [...globalThis.document.querySelectorAll(".cat")];
-    const read = cats
-      .map((cat) => `${cat.style.left}|${cat.style.top}|${cat.style.transform}`)
-      .join();
-
-    const previous = globalThis.__hankoCatPositions;
-    globalThis.__hankoCatPositions = read;
-    return cats.length > 0 && read === previous;
+    return (
+      cats.length > 0 &&
+      cats.every((cat) =>
+        cat
+          .getAnimations()
+          .filter((animation) => "transitionProperty" in animation)
+          .every((animation) => animation.playState !== "running"),
+      )
+    );
   });
 }
 
@@ -473,16 +488,19 @@ async function captureManual(origin, browser) {
     await captureCatControls(ownerPage, "17-send-cat-away");
 
     // The broom, with two cats it is worth pressing at all.
-    await waitForCatsToSettle(ownerPage);
+    const positionsBeforeShoo = await readCatPositions(ownerPage);
     await ownerPage
       .getByRole("button", { name: "Shoo everyone's cats to the edges", exact: true })
       .click();
-    await waitForCatsToSettle(ownerPage);
+    await waitForCatsToSettle(ownerPage, positionsBeforeShoo);
     await captureShot(ownerPage, "16-cats-to-the-edges");
 
-    // Sending one away, which says what it reaches before it does it, and then does
-    // it. Last of the cat figures because nothing brings the cat back.
+    // The permanent removal asks first, so the figure records the confirmation before
+    // answering it. The control figure above remains separate from this question.
     await sendAway.click();
+    await ownerPage.getByRole("dialog").waitFor();
+    await captureShot(ownerPage, "20-cat-remove-confirm");
+    await ownerPage.getByRole("button", { name: "Send it away", exact: true }).click();
     await ownerPage
       .getByRole("button", { name: "Shoo everyone's cats to the edges", exact: true })
       .waitFor({ state: "detached" });

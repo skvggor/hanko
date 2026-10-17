@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ConfirmDialog } from "@presentation/ConfirmDialog";
@@ -33,6 +34,29 @@ describe("ConfirmDialog", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keep it" }));
   });
 
+  it("keeps both answers on one row", () => {
+    open();
+
+    const dialog = screen.getByRole("dialog");
+    const actions = dialog.querySelector(".confirm-dialog__actions");
+
+    expect(actions?.className).toContain("flex-nowrap");
+    expect(screen.getByRole("button", { name: "Keep it" }).className).toContain("px-snug");
+    expect(screen.getByRole("button", { name: "Delete room" }).className).toContain("px-snug");
+  });
+
+  it("opens even when no element had focus before it", () => {
+    const activeElement = vi.spyOn(document, "activeElement", "get").mockReturnValue(null);
+
+    try {
+      open();
+
+      expect(screen.getByRole("button", { name: "Keep it" })).toBeTruthy();
+    } finally {
+      activeElement.mockRestore();
+    }
+  });
+
   it("confirms when the destructive answer is chosen", async () => {
     const { onAccept } = open();
 
@@ -47,6 +71,35 @@ describe("ConfirmDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Keep it" }));
 
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns focus to the control that opened it after cancellation", async () => {
+    function ConfirmationHarness() {
+      const [isOpen, setIsOpen] = useState(false);
+
+      return (
+        <>
+          <button type="button" onClick={() => setIsOpen(true)}>Open confirmation</button>
+          {isOpen && (
+            <ConfirmDialog
+              acceptLabel="Delete room"
+              body="Everyone loses the room."
+              cancelLabel="Keep it"
+              title="Delete this room?"
+              onAccept={() => setIsOpen(false)}
+              onCancel={() => setIsOpen(false)}
+            />
+          )}
+        </>
+      );
+    }
+
+    render(<ConfirmationHarness />);
+    const trigger = screen.getByRole("button", { name: "Open confirmation" });
+    await userEvent.click(trigger);
+    await userEvent.click(screen.getByRole("button", { name: "Keep it" }));
+
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("cancels on escape", () => {

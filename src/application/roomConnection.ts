@@ -7,7 +7,7 @@ import {
 import type { ChatMessage } from "@domain/chat";
 import type { DeckId } from "@domain/deck";
 import type { ParticipantRole } from "@domain/room";
-import type { CatActivity, CatState } from "@domain/cat";
+import type { CatActivity, CatExclusionZone, CatState } from "@domain/cat";
 
 export type SocketFactory = (url: string) => WebSocket;
 
@@ -393,9 +393,9 @@ export class RoomConnection {
     this.#send({ type: "remove-cat" });
   }
 
-  /** Carries this window's shape, because the room keeps cat positions normalised and has never seen this screen. */
-  shooCats(aspect: number): void {
-    this.#send({ type: "shoo-cats", aspect });
+  /** Carries this window's shape and occupied layout areas, because the room has never seen this screen. */
+  shooCats(aspect: number, exclusionZones: CatExclusionZone[] = []): void {
+    this.#send({ type: "shoo-cats", aspect, exclusionZones });
   }
 
   setRoomName(name: string | null): void {

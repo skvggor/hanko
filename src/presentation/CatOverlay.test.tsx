@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ChatMessage } from "@domain/chat";
 import type { PublicParticipant } from "@domain/protocol";
@@ -192,7 +192,7 @@ describe("CatOverlay", () => {
       );
     });
 
-    expect(cat).toHaveAttribute("style", expect.stringContaining("translate(0px, 16px)"));
+    expect(cat).toHaveAttribute("style", expect.stringContaining("top: 16px"));
   });
 
   it("makes the controlled cat jump on the space bar", async () => {
@@ -530,6 +530,49 @@ describe("CatOverlay", () => {
       isPaused: true,
     }));
   });
+
+  it("keeps the server position when pausing before local control is acquired", () => {
+    vi.useFakeTimers();
+    try {
+      const onUpdateCat = vi.fn();
+      const { container } = render(
+        <CatOverlay
+          onRemoveCat={vi.fn()}
+          connectedParticipantIds={new Set(["p1"])}
+          cats={[{
+            participantId: "p1",
+            breed: "tabby",
+            x: 0.12,
+            y: 0.72,
+            direction: "right",
+            activity: "idle",
+            isPaused: false,
+          }]}
+          isOwner={false}
+          messages={[]}
+          myParticipantId="p1"
+          onClear={vi.fn()}
+          onSend={vi.fn()}
+          onUpdateCat={onUpdateCat}
+          participants={[participant()]}
+          translate={translate}
+        />,
+      );
+
+      act(() => {
+        fireEvent.click(container.querySelector(".cat-controls__button") as HTMLElement);
+      });
+
+      expect(onUpdateCat).toHaveBeenCalledWith(expect.objectContaining({
+        x: 0.12,
+        y: 0.72,
+        activity: "sleeping",
+        isPaused: true,
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("CatOverlay keyboard ownership", () => {
@@ -582,7 +625,7 @@ describe("CatOverlay keyboard ownership", () => {
       button.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     });
 
-    expect(cat).toHaveAttribute("style", expect.stringContaining("translate(0px, 16px)"));
+    expect(cat).toHaveAttribute("style", expect.stringContaining("top: 16px"));
   });
 
   it("lets the chat composer keep its own space bar", async () => {

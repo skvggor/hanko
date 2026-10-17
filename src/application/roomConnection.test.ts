@@ -805,11 +805,12 @@ describe("shooing the cats", () => {
     const connection = new RoomConnection("room-1", () => socket as unknown as WebSocket);
     await connection.join("Ana", "voter", null);
 
-    connection.shooCats(16 / 9);
+    connection.shooCats(16 / 9, [{ left: 0.2, top: 0.1, right: 0.8, bottom: 0.9 }]);
 
     expect(JSON.parse(socket.sent[1] ?? "{}")).toEqual({
       type: "shoo-cats",
       aspect: 16 / 9,
+      exclusionZones: [{ left: 0.2, top: 0.1, right: 0.8, bottom: 0.9 }],
     });
   });
 });

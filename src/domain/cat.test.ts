@@ -143,4 +143,53 @@ describe("spreadAlongTheEdges", () => {
 
     expect(second).toEqual(first);
   });
+
+  it("skips edge positions that would cover existing room elements", () => {
+    const original = spreadAlongTheEdges(1, WIDE)[0];
+    if (original === undefined) throw new Error("a single cat needs an edge position");
+    const excluded = {
+      left: original.x - 0.01,
+      top: original.y - 0.01,
+      right: original.x + 0.01,
+      bottom: original.y + 0.01,
+    };
+
+    const [safe] = spreadAlongTheEdges(1, WIDE, [excluded]);
+
+    if (safe === undefined) throw new Error("the cat needs an unblocked edge position");
+    expect(
+      safe.x >= excluded.left && safe.x <= excluded.right &&
+      safe.y >= excluded.top && safe.y <= excluded.bottom,
+    ).toBe(false);
+  });
+
+  it("keeps every shooed cat outside all excluded layout areas", () => {
+    const excludedAreas = [
+      { left: 0.2, top: 0, right: 0.8, bottom: 0.4 },
+      { left: 0.1, top: 0.75, right: 0.35, bottom: 1 },
+    ];
+
+    for (const spot of spreadAlongTheEdges(12, WIDE, excludedAreas)) {
+      for (const area of excludedAreas) {
+        expect(
+          spot.x >= area.left && spot.x <= area.right &&
+          spot.y >= area.top && spot.y <= area.bottom,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("keeps the whole cat footprint inside the viewport", () => {
+    const footprintWidth = 0.06;
+    const footprintHeight = 0.12;
+    const viewportExclusions = [
+      { left: 1 - footprintWidth, top: -2, right: 2, bottom: 2 },
+      { left: -2, top: 1 - footprintHeight, right: 2, bottom: 2 },
+    ];
+
+    for (const spot of spreadAlongTheEdges(8, WIDE, viewportExclusions)) {
+      expect(spot.x + footprintWidth).toBeLessThanOrEqual(1);
+      expect(spot.y + footprintHeight).toBeLessThanOrEqual(1);
+    }
+  });
 });

@@ -114,8 +114,13 @@ vi.mock("@application/roomConnection", () => ({
       this.#record({ type: "remove-cat" });
     }
 
-    shooCats(aspect: number) {
-      this.#record({ type: "shoo-cats", aspect });
+    shooCats(aspect: number, exclusionZones: Array<{
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+    }>) {
+      this.#record({ type: "shoo-cats", aspect, exclusionZones });
     }
     removeParticipant(participantId: string) {
       this.#record({ type: "remove-participant", participantId });
@@ -1382,12 +1387,36 @@ describe("RoomScreen connection recovery", () => {
 
 /** Sending a cat away is a room-wide, permanent act, so the room has to hear it. */
 describe("RoomScreen sending a cat away", () => {
-  it("asks the room rather than only hiding it on this screen", async () => {
+  it("asks before permanently removing the cat", async () => {
     renderRoom();
     await joinAs("Ana");
     pushState(roomState);
 
     await userEvent.click(screen.getByRole("button", { name: "Send this cat away for good" }));
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(harness.sent).not.toContainEqual({ type: "remove-cat" });
+  });
+
+  it("keeps the cat when removal is cancelled", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+
+    await userEvent.click(screen.getByRole("button", { name: "Send this cat away for good" }));
+    await userEvent.click(screen.getByRole("button", { name: "Keep my cat" }));
+
+    expect(harness.sent).not.toContainEqual({ type: "remove-cat" });
+    expect(document.querySelector('[data-testid="cat-p1"]')).toBeTruthy();
+  });
+
+  it("removes the cat from the room after confirmation", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(roomState);
+
+    await userEvent.click(screen.getByRole("button", { name: "Send this cat away for good" }));
+    await userEvent.click(screen.getByRole("button", { name: "Send it away" }));
 
     expect(harness.sent).toContainEqual({ type: "remove-cat" });
   });
@@ -1412,6 +1441,45 @@ describe("RoomScreen sending a cat away", () => {
     // for everyone and for good. Someone reading it out loud needs the whole thing.
     const button = screen.getByRole("button", { name: "Send this cat away for good" });
     expect(button.getAttribute("aria-label")).toBe("Send this cat away for good");
+  });
+
+  it("keeps my cat at the position sent to the room when pausing releases control", async () => {
+    const { container } = renderRoom();
+    await joinAs("Ana");
+    pushState({
+      ...roomState,
+      cats: [
+        {
+          participantId: "p1",
+          breed: "tabby",
+          x: 0.2,
+          y: 0.2,
+          direction: "right",
+          activity: "idle",
+          isPaused: false,
+        },
+      ],
+    });
+
+    const cat = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
+    await userEvent.click(cat?.querySelector(".cat__button") as HTMLElement);
+    act(() => {
+      cat?.querySelector(".cat__button")?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+      );
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Pause Ana's cat" }));
+
+    const update = harness.sent.at(-1);
+    expect(update).toMatchObject({ type: "cat-update", isPaused: true });
+    if (typeof update !== "object" || update === null || !("x" in update) || typeof update.x !== "number") {
+      throw new Error("pausing did not send the cat's local position");
+    }
+
+    const pausedCat = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
+    expect(pausedCat?.style.transform).toBe("");
+    expect(Number.parseFloat(pausedCat?.style.left ?? "0")).not.toBe(20);
+    expect(pausedCat?.style.left).toBe(`${(update.x * 100).toString()}%`);
   });
 });
 /**
@@ -1464,12 +1532,8 @@ describe("RoomScreen and a cat the room moved", () => {
     pushCat(catAt("p1", 0.08, 0.92));
 
     const moved = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
-    // Placed from the room's own numbers against this window, rather than against a
-    // viewport somebody hard coded once.
-    expect(moved?.style.transform).toContain(
-      `translate(${(0.08 * globalThis.innerWidth).toString().slice(0, 7)}`,
-    );
-    expect(moved?.style.top).not.toBe("50%");
+    expect(moved?.style.left).toBe(`${0.08 * globalThis.innerWidth}px`);
+    expect(moved?.style.top).toBe(`${0.92 * globalThis.innerHeight}px`);
   });
 
   /**
@@ -1500,17 +1564,16 @@ describe("RoomScreen and a cat the room moved", () => {
     });
 
     const driven = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
-    const drivenStyle = driven?.style.transform;
+    const drivenStyle = `${driven?.style.left}|${driven?.style.top}`;
     expect(drivenStyle).not.toBe("");
 
     // Now the shoo lands: three cat frames, including the owner's own.
     for (const id of ["p1", "p2", "p3"]) pushCat(catAt(id, 0.08, 0.92));
 
     const moved = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
-    expect(moved?.style.transform).not.toBe(drivenStyle);
-    expect(moved?.style.transform).toContain(
-      `translate(${(0.08 * globalThis.innerWidth).toString().slice(0, 7)}`,
-    );
+    expect(`${moved?.style.left}|${moved?.style.top}`).not.toBe(drivenStyle);
+    expect(moved?.style.left).toBe(`${0.08 * globalThis.innerWidth}px`);
+    expect(moved?.style.top).toBe(`${0.92 * globalThis.innerHeight}px`);
   });
 
   /**
@@ -1537,23 +1600,21 @@ describe("RoomScreen and a cat the room moved", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Shoo everyone's cats to the edges" }),
     );
-    expect(harness.sent).toContainEqual({ type: "shoo-cats", aspect: expect.any(Number) });
+    expect(harness.sent).toContainEqual({
+      type: "shoo-cats",
+      aspect: expect.any(Number),
+      exclusionZones: expect.any(Array),
+    });
 
     for (const id of ["p1", "p2", "p3"]) pushCat(catAt(id, 0.08, 0.92));
 
     const after = container.querySelector<HTMLElement>('[data-testid="cat-p1"]');
     expect(`${after?.style.left}|${after?.style.top}`).not.toBe(beforeStyle);
 
-    // The presser's own cat is drawn from its held position rather than from left and
-    // top, so the transform is where the move has to show up. Before the shoo it sat at
-    // the middle; afterwards it is the room's own numbers, which is what everybody else
-    // is looking at.
-    expect(after?.style.transform).toContain(
-      `translate(${(0.08 * globalThis.innerWidth).toString().slice(0, 7)}`,
-    );
-    expect(after?.style.transform).toContain(
-      `${(0.92 * globalThis.innerHeight).toString().slice(0, 6)}`,
-    );
+    // The held cat uses the room's coordinates in pixels too, so pausing it after the
+    // shoo does not rebase it at the overlay origin.
+    expect(after?.style.left).toBe(`${0.08 * globalThis.innerWidth}px`);
+    expect(after?.style.top).toBe(`${0.92 * globalThis.innerHeight}px`);
     expect(after?.getAttribute("data-controlled")).toBe("true");
   });
 
@@ -1660,7 +1721,51 @@ describe("RoomScreen shooing the cats", () => {
     expect(harness.sent).toContainEqual({
       type: "shoo-cats",
       aspect: globalThis.innerWidth / globalThis.innerHeight,
+      exclusionZones: expect.any(Array),
     });
+  });
+
+  it("sends occupied frame bounds expanded by the cat footprint", async () => {
+    renderRoom();
+    await joinAs("Ana");
+    pushState(crowdedRoom);
+
+    const frame = document.createElement("div");
+    frame.setAttribute("data-frame", "");
+    document.body.append(frame);
+    const frameBounds = vi.spyOn(frame, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(300, 100, 680, 600),
+    );
+
+    try {
+      await userEvent.click(
+        screen.getByRole("button", { name: "Shoo everyone's cats to the edges" }),
+      );
+
+      const command = harness.sent.at(-1);
+      expect(command).toMatchObject({ type: "shoo-cats" });
+      if (
+        typeof command !== "object" ||
+        command === null ||
+        !("exclusionZones" in command) ||
+        !Array.isArray(command.exclusionZones)
+      ) {
+        throw new Error("the shoo command did not include layout exclusions");
+      }
+
+      expect(command.exclusionZones).toContainEqual({
+        left: expect.any(Number),
+        top: expect.any(Number),
+        right: 980 / globalThis.innerWidth,
+        bottom: 700 / globalThis.innerHeight,
+      });
+      const frameZone = command.exclusionZones.find((zone) => zone.right === 980 / globalThis.innerWidth);
+      expect(frameZone?.left).toBeLessThan(300 / globalThis.innerWidth);
+      expect(frameZone?.top).toBeLessThan(100 / globalThis.innerHeight);
+    } finally {
+      frameBounds.mockRestore();
+      frame.remove();
+    }
   });
 
   it("says whose cats it moves", async () => {

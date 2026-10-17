@@ -26,9 +26,14 @@ export function ConfirmDialog({
   onCancel,
 }: Readonly<ConfirmDialogProps>) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
+    const activeElement = globalThis.document.activeElement;
+    openerRef.current = activeElement instanceof HTMLElement ? activeElement : null;
     cancelRef.current?.focus();
+
+    return () => openerRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -61,11 +66,11 @@ export function ConfirmDialog({
           {title}
         </h2>
         <p className="mt-snug mb-0 text-[0.8125rem] leading-relaxed text-ink-dim">{body}</p>
-        <div className="mt-room flex flex-wrap justify-center gap-tight">
-          <Button onClick={onCancel} ref={cancelRef} variant="quiet">
+        <div className="confirm-dialog__actions mt-room flex flex-nowrap justify-center gap-tight">
+          <Button className="shrink-0 px-snug" onClick={onCancel} ref={cancelRef} variant="quiet">
             {cancelLabel}
           </Button>
-          <Button onClick={onAccept} variant="danger">
+          <Button className="shrink-0 px-snug" onClick={onAccept} variant="danger">
             {acceptLabel}
           </Button>
         </div>

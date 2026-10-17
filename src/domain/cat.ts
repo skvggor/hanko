@@ -81,6 +81,13 @@ export interface EdgeSpot {
   readonly direction: "left" | "right";
 }
 
+export interface CatExclusionZone {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
 /** The header and the footer are pinned over the top and bottom edges, so a cat has to stand inside them. */
 const EDGE_INSET = 0.08;
 
@@ -88,13 +95,67 @@ const EDGE_INSET = 0.08;
 // half the cats on top of each other.
 const NARROWEST_SCREEN = 0.35;
 const WIDEST_SCREEN = 3.5;
+const EDGE_CANDIDATE_MULTIPLIER = 32;
+const MINIMUM_EDGE_CANDIDATES = 128;
+
+function edgeSpotAt(
+  index: number,
+  count: number,
+  usable: number,
+  width: number,
+  height: number,
+  perimeter: number,
+): EdgeSpot {
+  let along = ((index + 0.5) / count) * perimeter;
+  let x: number;
+  let y: number;
+
+  // Clockwise from the top left, spending exactly as much of the walk on each side
+  // as that side is long.
+  if (along < width) {
+    x = EDGE_INSET + along;
+    y = EDGE_INSET;
+  } else if ((along -= width) < height) {
+    x = EDGE_INSET + width;
+    y = EDGE_INSET + along;
+  } else if ((along -= height) < width) {
+    x = EDGE_INSET + width - along;
+    y = EDGE_INSET + height;
+  } else {
+    along -= width;
+    x = EDGE_INSET;
+    y = EDGE_INSET + height - along;
+  }
+
+  const normalizedX = Math.min(1, Math.max(0, x / usable));
+
+  return {
+    x: normalizedX,
+    y: Math.min(1, Math.max(0, y)),
+    direction: normalizedX < 0.5 ? "right" : "left",
+  };
+}
+
+function isExcluded(spot: EdgeSpot, exclusionZones: readonly CatExclusionZone[]): boolean {
+  return exclusionZones.some(
+    (zone) =>
+      spot.x >= zone.left &&
+      spot.x <= zone.right &&
+      spot.y >= zone.top &&
+      spot.y <= zone.bottom,
+  );
+}
 
 /**
  * The border rather than a corner, which holds one cat and leaves the rest of them in
  * the way. Deterministic on purpose, so pressing it twice reads as a reset rather than
  * as a shuffle nobody can predict.
  */
-export function spreadAlongTheEdges(count: number, aspect: number): EdgeSpot[] {
+export function spreadAlongTheEdges(
+  count: number,
+  aspect: number,
+  exclusionZones: readonly CatExclusionZone[] = [],
+): EdgeSpot[] {
   if (!Number.isFinite(count) || count <= 0) return [];
   const total = Math.floor(count);
   if (total === 0) return [];
@@ -109,38 +170,31 @@ export function spreadAlongTheEdges(count: number, aspect: number): EdgeSpot[] {
   const width = usable - 2 * EDGE_INSET;
   const height = 1 - 2 * EDGE_INSET;
   const perimeter = 2 * (width + height);
-  const spots: EdgeSpot[] = [];
-
-  for (let index = 0; index < total; index += 1) {
-    let along = ((index + 0.5) / total) * perimeter;
-    let x: number;
-    let y: number;
-
-    // Clockwise from the top left, spending exactly as much of the walk on each side
-    // as that side is long.
-    if (along < width) {
-      x = EDGE_INSET + along;
-      y = EDGE_INSET;
-    } else if ((along -= width) < height) {
-      x = EDGE_INSET + width;
-      y = EDGE_INSET + along;
-    } else if ((along -= height) < width) {
-      x = EDGE_INSET + width - along;
-      y = EDGE_INSET + height;
-    } else {
-      along -= width;
-      x = EDGE_INSET;
-      y = EDGE_INSET + height - along;
-    }
-
-    const normalizedX = Math.min(1, Math.max(0, x / usable));
-
-    spots.push({
-      x: normalizedX,
-      y: Math.min(1, Math.max(0, y)),
-      direction: normalizedX < 0.5 ? "right" : "left",
-    });
+  if (exclusionZones.length === 0) {
+    return Array.from({ length: total }, (_, index) =>
+      edgeSpotAt(index, total, usable, width, height, perimeter),
+    );
   }
 
-  return spots;
+  const candidateCount = Math.max(
+    MINIMUM_EDGE_CANDIDATES,
+    total * EDGE_CANDIDATE_MULTIPLIER,
+  );
+  const available = Array.from({ length: candidateCount }, (_, index) =>
+    edgeSpotAt(index, candidateCount, usable, width, height, perimeter),
+  ).filter((spot) => !isExcluded(spot, exclusionZones));
+
+  if (available.length === 0) return [];
+
+  return Array.from({ length: total }, (_, index) => {
+    const availableIndex = Math.floor(((index + 0.5) / total) * available.length);
+    return available[availableIndex] ?? available.at(-1) ?? edgeSpotAt(
+      index,
+      total,
+      usable,
+      width,
+      height,
+      perimeter,
+    );
+  });
 }

@@ -38,7 +38,12 @@ import {
   startNextRound,
   transferOwnership,
 } from "@domain/room";
-import { CAT_BREEDS, type CatState, spreadAlongTheEdges } from "@domain/cat";
+import {
+  CAT_BREEDS,
+  type CatExclusionZone,
+  type CatState,
+  spreadAlongTheEdges,
+} from "@domain/cat";
 
 interface SocketIdentity {
   participantId: string | null;
@@ -439,7 +444,7 @@ export class Room {
         return { room: removeCat(room, actor.id), finished: false };
       }
       case "shoo-cats":
-        this.#shooCats(message.aspect);
+        this.#shooCats(message.aspect, message.exclusionZones ?? []);
         return { room, finished: true };
       case "remove-participant": {
         const removed = message.participantId;
@@ -502,8 +507,8 @@ export class Room {
    * deterministic and a cat that has not moved being left unannounced: pressing it twice
    * in the same window costs nothing and says nothing.
    */
-  #shooCats(aspect: number): void {
-    const spots = spreadAlongTheEdges(this.#cats.size, aspect);
+  #shooCats(aspect: number, exclusionZones: readonly CatExclusionZone[]): void {
+    const spots = spreadAlongTheEdges(this.#cats.size, aspect, exclusionZones);
     let index = 0;
     let changed = false;
 

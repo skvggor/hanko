@@ -185,21 +185,23 @@ the arrow keys have stopped answering to it.
 
 Two small buttons sit under your cat. One pauses it where it stands, for everybody,
 and one sends it away. **Sending a cat away is for good and for everyone:** it leaves
-the screen for the whole room and does not come back, including for you. The button
-is an X and does not ask for confirmation, so use it only if you mean to remove the
-cat permanently. Your seat, your name and your vote are untouched by it.
+the screen for the whole room and does not come back, including for you. The X asks
+you to confirm before removing it permanently. Your seat, your name and your vote are
+untouched by it.
 
 ![The pause and remove controls beneath the cat](images/17-send-cat-away.png)
+
+![Confirmation before permanently removing the cat](images/20-cat-remove-confirm.png)
 
 ![The room after a cat has gone for good](images/18-cat-sent-away.png)
 
 ![Two cats walked out to the edges of the screen](images/16-cats-to-the-edges.png)
 
-A broom in the top corner walks every cat out to the edges of the screen, so the
-grid is readable again in a crowded room. Anyone can use it, not only the owner,
-because a cat over the grid is in the way of everyone reading it. It is a nudge and
-not a rule: a cat nobody is driving wanders back on its own, and you can press it
-again.
+A broom in the top corner walks every cat out to free space at the edges of the screen,
+skipping the cards, chat and pinned bars so they stay readable. Anyone can use it, not
+only the owner, because a cat over the grid is in the way of everyone reading it. It is a
+nudge and not a rule: a cat nobody is driving wanders back on its own, and you can press
+it again.
 
 On a phone or tablet the cats are replaced by the chat panel instead: a moving
 target is not something to tap at, so the cats step aside rather than sit in the way.
