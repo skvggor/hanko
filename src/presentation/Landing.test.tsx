@@ -41,6 +41,18 @@ describe("Landing", () => {
     expect(screen.getByRole("button", { name: "Start a room" })).toBeTruthy();
   });
 
+  it("presents the three steps as a compact responsive sequence", () => {
+    render(<Landing onNavigate={vi.fn()} translate={translate} />);
+
+    const steps = screen.getByRole("list", { name: "How it works" });
+    expect(steps.querySelectorAll("li")).toHaveLength(3);
+    expect(screen.getByText("Create and share")).toBeTruthy();
+    expect(screen.getByText("Vote privately")).toBeTruthy();
+    expect(screen.getByText("Reveal together")).toBeTruthy();
+    expect(steps.className).toContain("grid-cols-1");
+    expect(steps.className).toContain("sm:grid-cols-3");
+  });
+
   it("navigates to the created room", async () => {
     const onNavigate = vi.fn();
     render(<Landing onNavigate={onNavigate} translate={translate} />);
@@ -127,7 +139,7 @@ describe("Landing", () => {
     );
     expect(screen.getByRole("button", { name: "Criar sala" })).toBeTruthy();
     expect(
-      screen.getByText("Crie uma sala e compartilhe o link."),
+      screen.getByText("Crie e compartilhe"),
     ).toBeTruthy();
   });
 

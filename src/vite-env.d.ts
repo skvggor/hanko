@@ -5,6 +5,7 @@ declare global {
     readonly MODE: string;
     readonly DEV: boolean;
     readonly PROD: boolean;
+    readonly VITE_COMMIT_SHA: string;
   }
 
   interface ImportMeta {

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { Locale } from "@application/i18n";
+import { BUILD_COMMIT } from "@config/version";
 import { BrandMark, Signature } from "@presentation/Signature";
 import { ConfirmDialog } from "@presentation/ConfirmDialog";
 import "@presentation/styles/theme.css";
@@ -121,15 +122,11 @@ export function Shell({
         data-glass={scrolled}
       >
         {brandInHeader ? (
-          <button
-            aria-label={translate("brand.goHome")}
-            className="cursor-pointer"
-            data-logo
-            onClick={openLogo}
-            type="button"
-          >
-            <BrandMark translate={translate} />
-          </button>
+          <BrandMark
+            buildCommit={BUILD_COMMIT}
+            onNavigateHome={openLogo}
+            translate={translate}
+          />
         ) : (
           <div aria-hidden="true" />
         )}

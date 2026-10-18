@@ -31,6 +31,40 @@ describe("BrandMark", () => {
     render(<BrandMark translate={translate} />);
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
   });
+
+  it("places the deployed revision beside the home wordmark", () => {
+    render(
+      <BrandMark
+        buildCommit="a236738da190a55781a647b51e692daf972b1b55"
+        size="hero"
+        translate={translate}
+      />,
+    );
+
+    const name = screen.getByRole("heading", { level: 1 });
+    const revision = screen.getByRole("link", { name: "Build a236738, view on GitHub" });
+    expect(name.parentElement).toBe(revision.parentElement);
+  });
+
+  it("places the header revision beside Hanko without nesting links in the home button", () => {
+    const { container } = render(
+      <BrandMark buildCommit="a236738da190a55781a647b51e692daf972b1b55" translate={translate} />,
+    );
+
+    const name = screen.getByRole("heading", { level: 1 });
+    const revision = screen.getByRole("link", { name: "Build a236738, view on GitHub" });
+
+    expect(name.parentElement?.parentElement).toBe(revision.parentElement?.parentElement);
+    expect(revision.parentElement?.parentElement?.className).toContain("w-max");
+    expect(revision.parentElement?.parentElement?.className).toContain(
+      "grid-cols-[var(--spacing-stack)_auto_auto]",
+    );
+    expect(revision.closest("button")).toBeNull();
+    expect(revision.parentElement?.className).toContain("flex");
+    expect(revision.parentElement?.className).toContain("items-center");
+    expect(revision.parentElement?.className).not.toContain("hidden");
+    expect(container.querySelector("[data-logo]")).toBeTruthy();
+  });
 });
 
 describe("Signature", () => {

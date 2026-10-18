@@ -114,16 +114,21 @@
     "create": "Criar sala",
     "creating": "Criando...",
     "failed": "Não foi possível criar a sala. Verifique sua conexão.",
-    "stepOne": "Crie uma sala e compartilhe o link.",
-    "stepTwo": "Cada pessoa escolhe um número em privado.",
-    "stepThree": "O dono revela e o time vê a distribuição."
+    "stepsLabel": "Como funciona",
+    "stepOneTitle": "Crie e compartilhe",
+    "stepOneBody": "Abra uma sala e envie o link.",
+    "stepTwoTitle": "Vote em segredo",
+    "stepTwoBody": "Cada pessoa escolhe sua estimativa.",
+    "stepThreeTitle": "Revelem juntos",
+    "stepThreeBody": "Compare a distribuição dos votos."
   },
   "brand": {
     "name": "Hanko",
     "tagline": "O consenso da sua equipe.",
     "credit": "Feito por",
     "author": "skvggor",
-    "goHome": "Ir para a página inicial"
+    "goHome": "Ir para a página inicial",
+    "buildCommitLink": "Build {{commit}}, ver no GitHub"
   },
   "result": {
     "average": "Média",

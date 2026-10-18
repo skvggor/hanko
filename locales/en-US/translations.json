@@ -114,16 +114,21 @@
     "create": "Start a room",
     "creating": "Creating...",
     "failed": "Could not create the room. Check your connection.",
-    "stepOne": "Start a room and share the link.",
-    "stepTwo": "Everyone picks a number in private.",
-    "stepThree": "The owner reveals, and the team sees the spread."
+    "stepsLabel": "How it works",
+    "stepOneTitle": "Create and share",
+    "stepOneBody": "Start a room, then send the link.",
+    "stepTwoTitle": "Vote privately",
+    "stepTwoBody": "Everyone chooses an estimate in secret.",
+    "stepThreeTitle": "Reveal together",
+    "stepThreeBody": "Compare the team's spread."
   },
   "brand": {
     "name": "Hanko",
     "tagline": "Your team's consensus.",
     "credit": "Made by",
     "author": "skvggor",
-    "goHome": "Go to the start page"
+    "goHome": "Go to the start page",
+    "buildCommitLink": "Build {{commit}}, view on GitHub"
   },
   "result": {
     "average": "Average",

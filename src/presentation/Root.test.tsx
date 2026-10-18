@@ -86,12 +86,9 @@ describe("Root", () => {
 
   it("explains how the room works", () => {
     render(<Root />);
-    expect(
-      screen.getByText("Start a room and share the link."),
-    ).toBeTruthy();
-    expect(
-      screen.getByText("Everyone picks a number in private."),
-    ).toBeTruthy();
+    expect(screen.getByText("Create and share")).toBeTruthy();
+    expect(screen.getByText("Vote privately")).toBeTruthy();
+    expect(screen.getByText("Reveal together")).toBeTruthy();
   });
 
   it("does not create a room before the user asks", () => {

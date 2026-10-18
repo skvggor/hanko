@@ -1,5 +1,6 @@
 import type { Translator } from "@application/i18n";
 import { BUILD_YEAR } from "@config/version";
+import { BuildStamp } from "@presentation/BuildStamp";
 import { Logo } from "@presentation/Logo";
 
 /**
@@ -13,9 +14,16 @@ export interface BrandMarkProps {
   translate: Translator;
   /** Header is the chrome. Hero is the home screen, where the lockup is the content. */
   size?: "header" | "hero";
+  buildCommit?: string;
+  onNavigateHome?: () => void;
 }
 
-export function BrandMark({ translate, size = "header" }: Readonly<BrandMarkProps>) {
+export function BrandMark({
+  translate,
+  size = "header",
+  buildCommit = "",
+  onNavigateHome,
+}: Readonly<BrandMarkProps>) {
   const name = <h1 className={NAME_TYPE}>{translate("brand.name")}</h1>;
   const tagline = <p className={TAGLINE_TYPE}>{translate("brand.tagline")}</p>;
 
@@ -23,22 +31,54 @@ export function BrandMark({ translate, size = "header" }: Readonly<BrandMarkProp
     return (
       <div className="flex flex-col items-center gap-snug text-center text-[2.5rem]">
         <Logo className="h-28 w-28 text-primary-bright" />
-        {name}
+        <div className="flex items-center gap-tight">
+          {name}
+          <BuildStamp commit={buildCommit} translate={translate} />
+        </div>
         {tagline}
       </div>
     );
   }
 
+  if (buildCommit !== "") {
+    return (
+      <div className="grid w-max grid-cols-[var(--spacing-stack)_auto_auto] grid-rows-[auto_auto] items-center gap-x-snug text-[1.375rem]">
+        <button
+          aria-label={translate("brand.goHome")}
+          className="col-span-2 row-start-1 flex cursor-pointer items-center gap-snug text-left"
+          data-logo
+          onClick={onNavigateHome}
+          type="button"
+        >
+          <Logo className="h-8 w-8 shrink-0 text-primary-bright" />
+          {name}
+        </button>
+        <span className="col-start-3 row-start-1 flex items-center">
+          <BuildStamp commit={buildCommit} translate={translate} />
+        </span>
+        <p className={`${TAGLINE_TYPE} col-start-2 col-span-2 row-start-2 text-left`}>
+          {translate("brand.tagline")}
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-snug text-[1.375rem]">
+    <button
+      aria-label={translate("brand.goHome")}
+      className="flex cursor-pointer items-center gap-snug text-[1.375rem]"
+      data-logo
+      onClick={onNavigateHome}
+      type="button"
+    >
       <Logo className="h-8 w-8 shrink-0 text-primary-bright" />
       {/* On a phone the mark keeps the brand and the wording steps aside, because the
           one thing worth the width is which room this is. */}
-      <div className="hidden flex-col items-start sm:flex">
+      <span className="hidden flex-col items-start sm:flex">
         {name}
         {tagline}
-      </div>
-    </div>
+      </span>
+    </button>
   );
 }
 
